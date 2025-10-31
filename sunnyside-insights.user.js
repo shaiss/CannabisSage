@@ -28,6 +28,9 @@
     // Sunnyside brand colors
     const SUNNYSIDE_ORANGE = '#FF6B35';
     const SUNNYSIDE_DARK = '#2C3E50';
+    const SUCCESS_GREEN = '#1f883d';
+    const SECOND_GREEN = '#6e7781';
+    const MUTED_GRAY = '#9aa0a6';
 
     function hasCannabinoidInfo(cannabinoids) {
         if (!cannabinoids || typeof cannabinoids !== 'object') return false;
@@ -1165,10 +1168,27 @@
         // Loading message
         const loadingDiv = document.createElement('div');
         loadingDiv.textContent = 'Loading product data...';
+        loadingDiv.id = 'sunnyside-comparison-loading';
         loadingDiv.style.cssText = 'text-align: center; padding: 20px;';
         sidebar.appendChild(loadingDiv);
         
         document.body.appendChild(sidebar);
+        
+        // Scoped styles for comparison UI
+        const style = document.createElement('style');
+        style.textContent = `
+            #sunnyside-comparison-sidebar .ssi-subheader td { 
+                padding: 8px 10px; 
+                background: #fafafa; 
+                color: #555; 
+                font-weight: 600; 
+                border-top: 1px solid #eee; 
+            }
+            #sunnyside-comparison-sidebar .ssi-max { color: ${SUCCESS_GREEN}; font-weight: 700; }
+            #sunnyside-comparison-sidebar .ssi-second { color: ${SECOND_GREEN}; font-weight: 600; }
+            #sunnyside-comparison-sidebar .ssi-muted { color: ${MUTED_GRAY}; }
+        `;
+        sidebar.appendChild(style);
         
         // Fetch all product data
         const productData = [];
@@ -1205,9 +1225,9 @@
 
     // Display comparison table
     function displayComparisonTable(productData) {
-        // Remove loading message
-        const loadingDiv = sidebar.querySelector('div:last-child');
-        if (loadingDiv && loadingDiv.textContent.includes('Loading')) {
+        // Remove loading message (robust to additional elements like <style>)
+        const loadingDiv = sidebar.querySelector('#sunnyside-comparison-loading');
+        if (loadingDiv) {
             loadingDiv.remove();
         }
         
@@ -1236,6 +1256,15 @@
         });
         
         table.appendChild(headerRow);
+        
+        // Cannabinoids section subheader
+        const canSep = document.createElement('tr');
+        canSep.className = 'ssi-subheader';
+        const canTd = document.createElement('td');
+        canTd.colSpan = 1 + productData.length;
+        canTd.textContent = 'Cannabinoids';
+        canSep.appendChild(canTd);
+        table.appendChild(canSep);
         
         // Helpers
         const preferredCannabinoids = ['THC', 'THCA', 'CBD', 'CBDA', 'CBN', 'CBG', 'CBC', 'totalTHC', 'totalCBD'];
@@ -1317,13 +1346,43 @@
             nameCell.textContent = label;
             nameCell.style.cssText = 'padding: 10px; font-weight: 600;';
             row.appendChild(nameCell);
+
+            const cellRefs = [];
             values.forEach(v => {
                 const td = document.createElement('td');
                 td.style.cssText = 'padding: 10px;';
                 td.textContent = formatCell(v);
+                cellRefs.push(td);
                 row.appendChild(td);
             });
             table.appendChild(row);
+
+            // Highlight max and second-best; mute zero/N-A
+            const nums = values.map(v => {
+                const n = parsePercent(v);
+                return (n === null || Number.isNaN(n)) ? null : n;
+            });
+            const positives = nums.filter(n => n !== null && n > 0);
+            if (positives.length) {
+                const uniq = Array.from(new Set(positives)).sort((a, b) => b - a);
+                const max = uniq[0];
+                const second = uniq.length > 1 ? uniq[1] : null;
+                cellRefs.forEach((td, i) => {
+                    const n = nums[i];
+                    if (n === null || n === 0) {
+                        td.classList.add('ssi-muted');
+                        return;
+                    }
+                    if (n === max) {
+                        td.classList.add('ssi-max');
+                    } else if (second !== null && n === second) {
+                        td.classList.add('ssi-second');
+                    }
+                });
+            } else {
+                // All zero or missing
+                cellRefs.forEach(td => td.classList.add('ssi-muted'));
+            }
         });
         
         // Union of terpene names
@@ -1335,6 +1394,7 @@
         // Add a separator row for clarity
         if (terpeneNames.length) {
             const sep = document.createElement('tr');
+            sep.className = 'ssi-subheader';
             const sepTd = document.createElement('td');
             sepTd.colSpan = 1 + productData.length;
             sepTd.style.cssText = 'padding: 6px 10px; background: #fafafa; font-weight: 600; color: #555;';
@@ -1357,13 +1417,41 @@
             nameCell.textContent = name;
             nameCell.style.cssText = 'padding: 10px; font-weight: 600;';
             row.appendChild(nameCell);
+
+            const cellRefs = [];
             vals.forEach(v => {
                 const td = document.createElement('td');
                 td.style.cssText = 'padding: 10px;';
                 td.textContent = formatCell(v);
+                cellRefs.push(td);
                 row.appendChild(td);
             });
             table.appendChild(row);
+
+            const nums = vals.map(v => {
+                const n = parsePercent(v);
+                return (n === null || Number.isNaN(n)) ? null : n;
+            });
+            const positives = nums.filter(n => n !== null && n > 0);
+            if (positives.length) {
+                const uniq = Array.from(new Set(positives)).sort((a, b) => b - a);
+                const max = uniq[0];
+                const second = uniq.length > 1 ? uniq[1] : null;
+                cellRefs.forEach((td, i) => {
+                    const n = nums[i];
+                    if (n === null || n === 0) {
+                        td.classList.add('ssi-muted');
+                        return;
+                    }
+                    if (n === max) {
+                        td.classList.add('ssi-max');
+                    } else if (second !== null && n === second) {
+                        td.classList.add('ssi-second');
+                    }
+                });
+            } else {
+                cellRefs.forEach(td => td.classList.add('ssi-muted'));
+            }
         });
         
         sidebar.appendChild(table);

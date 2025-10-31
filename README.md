@@ -9,6 +9,44 @@ A Tampermonkey userscript that enhances the Sunnyside flower listing page by dis
 - **Side-by-Side Comparison**: Click the "Compare" button to view selected products in a comparison sidebar
 - **Real-time Data**: Fetches fresh product data from detail pages on demand
 
+## Screenshots
+
+### Hover Tooltips
+
+Hover over any product card to instantly see detailed cannabinoid and terpene profiles:
+
+<img src="screenshots/image.png" alt="Product Hover Tooltip - Flower" />
+
+*Hover tooltip showing cannabinoid and terpene breakdown for Big Bang OG Flower (THC: 1.77%, THCA: 27.56%)*
+
+<img src="screenshots/2.png" alt="Product Hover Tooltip - Flower" />
+
+*Hover tooltip showing detailed terpene profile for 814 Fireworks Flower (THCA: 34.78%)*
+
+<img src="screenshots/3.png" alt="Product Hover Tooltip - Concentrates" />
+
+*Hover tooltip displaying cannabinoid and terpene information for 814 Fireworks x Sunsl Budder concentrate (THCA: 81.69%)*
+
+<img src="screenshots/4.png" alt="Product Hover Tooltip - Vapes" />
+
+*Vape cartridge hover tooltip showing cannabinoid profile for 8" Bagel Liquid Live Resin (THC: 69.60%)*
+
+### Product Comparison
+
+Select up to 3 products and compare them side-by-side:
+
+<img src="screenshots/5.png" alt="Product Comparison - Vapes (3 products)" />
+
+*Side-by-side comparison of three vape products: Blueberry Space Cake, Bio Jesus, and 8" Bagel Liquid Live Resin cartridges with highlighted differences*
+
+<img src="screenshots/6.png" alt="Product Comparison - Vapes (2 products)" />
+
+*Comparing two vape products (8" Bagel vs Bio Jesus) with detailed cannabinoid and terpene profiles*
+
+<img src="screenshots/7.png" alt="Product Comparison - Capsules" />
+
+*Capsule product comparison showing Awake, Renew, and Relax capsules with cannabinoid and terpene variations*
+
 ## Installation
 
 1. **Install Tampermonkey Extension**
@@ -115,7 +153,17 @@ A Tampermonkey userscript that enhances the Sunnyside flower listing page by dis
 ```
 Sunnyside/
 ├── sunnyside-insights.user.js  # Main Tampermonkey script
-└── README.md                    # This file
+├── test-script.user.js         # Test/development script
+├── README.md                    # This file
+├── .gitignore                   # Git ignore rules
+└── screenshots/                 # Screenshot images for documentation
+    ├── image.png               # Flower hover tooltip (Big Bang OG)
+    ├── 2.png                   # Flower hover tooltip (814 Fireworks)
+    ├── 3.png                   # Concentrate hover tooltip (Budder)
+    ├── 4.png                   # Vape hover tooltip (Liquid Live Resin)
+    ├── 5.png                   # Vape comparison (3 products)
+    ├── 6.png                   # Vape comparison (2 products)
+    └── 7.png                   # Capsule comparison (3 products)
 ```
 
 ### Customization

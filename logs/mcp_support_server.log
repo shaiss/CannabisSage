@@ -1,0 +1,20 @@
+2025-10-31 11:30:02.589 | INFO     | awslabs.aws_support_mcp_server.server:main:704 | 8649508864:98464 | {'diagnostics': True} - AWS Support MCP Server starting up. Log file: /Users/Shai.Perednik/Sunnyside/logs/mcp_support_server.log
+2025-10-31 11:30:02.589 | INFO     | awslabs.aws_support_mcp_server.server:main:706 | 8649508864:98464 | {'diagnostics': True} - Debug mode: True
+2025-10-31 11:30:02.589 | DEBUG    | awslabs.aws_support_mcp_server.server:main:710 | 8649508864:98464 | {'diagnostics': True} - Enabling detailed performance tracking and error monitoring
+2025-10-31 11:30:02.589 | DEBUG    | awslabs.aws_support_mcp_server.server:main:715 | 8649508864:98464 | {'diagnostics': True} - Starting awslabs_support_mcp_server MCP server
+2025-10-31 11:30:02.589 | INFO     | awslabs.aws_support_mcp_server.server:main:718 | 8649508864:98464 | {'diagnostics': True} - Starting AWS Support MCP Server with stdio transport
+2025-10-31 11:30:02.695 | INFO     | awslabs.aws_support_mcp_server.server:main:704 | 8649508864:98463 | {'diagnostics': True} - AWS Support MCP Server starting up. Log file: /Users/Shai.Perednik/Sunnyside/logs/mcp_support_server.log
+2025-10-31 11:30:02.696 | INFO     | awslabs.aws_support_mcp_server.server:main:706 | 8649508864:98463 | {'diagnostics': True} - Debug mode: True
+2025-10-31 11:30:02.696 | DEBUG    | awslabs.aws_support_mcp_server.server:main:710 | 8649508864:98463 | {'diagnostics': True} - Enabling detailed performance tracking and error monitoring
+2025-10-31 11:30:02.696 | DEBUG    | awslabs.aws_support_mcp_server.server:main:715 | 8649508864:98463 | {'diagnostics': True} - Starting awslabs_support_mcp_server MCP server
+2025-10-31 11:30:02.696 | INFO     | awslabs.aws_support_mcp_server.server:main:718 | 8649508864:98463 | {'diagnostics': True} - Starting AWS Support MCP Server with stdio transport
+2025-10-31 13:02:23.328 | INFO     | awslabs.aws_support_mcp_server.server:main:704 | 8649508864:26913 | {'diagnostics': True} - AWS Support MCP Server starting up. Log file: /Users/Shai.Perednik/Sunnyside/logs/mcp_support_server.log
+2025-10-31 13:02:23.329 | INFO     | awslabs.aws_support_mcp_server.server:main:706 | 8649508864:26913 | {'diagnostics': True} - Debug mode: True
+2025-10-31 13:02:23.329 | DEBUG    | awslabs.aws_support_mcp_server.server:main:710 | 8649508864:26913 | {'diagnostics': True} - Enabling detailed performance tracking and error monitoring
+2025-10-31 13:02:23.329 | DEBUG    | awslabs.aws_support_mcp_server.server:main:715 | 8649508864:26913 | {'diagnostics': True} - Starting awslabs_support_mcp_server MCP server
+2025-10-31 13:02:23.329 | INFO     | awslabs.aws_support_mcp_server.server:main:718 | 8649508864:26913 | {'diagnostics': True} - Starting AWS Support MCP Server with stdio transport
+2025-10-31 13:02:23.616 | INFO     | awslabs.aws_support_mcp_server.server:main:704 | 8649508864:26964 | {'diagnostics': True} - AWS Support MCP Server starting up. Log file: /Users/Shai.Perednik/Sunnyside/logs/mcp_support_server.log
+2025-10-31 13:02:23.616 | INFO     | awslabs.aws_support_mcp_server.server:main:706 | 8649508864:26964 | {'diagnostics': True} - Debug mode: True
+2025-10-31 13:02:23.616 | DEBUG    | awslabs.aws_support_mcp_server.server:main:710 | 8649508864:26964 | {'diagnostics': True} - Enabling detailed performance tracking and error monitoring
+2025-10-31 13:02:23.616 | DEBUG    | awslabs.aws_support_mcp_server.server:main:715 | 8649508864:26964 | {'diagnostics': True} - Starting awslabs_support_mcp_server MCP server
+2025-10-31 13:02:23.616 | INFO     | awslabs.aws_support_mcp_server.server:main:718 | 8649508864:26964 | {'diagnostics': True} - Starting AWS Support MCP Server with stdio transport

@@ -23,7 +23,7 @@
     let tooltip = null;
     let sidebar = null;
     let compareButton = null;
-    let currentFetchUrl = null;
+    // Removed global fetch guard; allow concurrent product detail requests
 
     // Sunnyside brand colors
     const SUNNYSIDE_ORANGE = '#FF6B35';
@@ -230,6 +230,9 @@
         const urlFromProduct = slug ? `https://www.sunnyside.shop/product/${slug.toString().replace(/^\/product\//, '')}`
                                    : (productId ? `https://www.sunnyside.shop/product/${productId}` : undefined);
         const url = urlFromProduct || fallbackUrl;
+        
+        // Best-effort product name for comparison headers
+        const name = productObj.ecomm_display_name || productObj.bt_product_name || productObj.name || productObj.productName || productObj.displayName;
 
         const cannabinoids = {};
         const sourceCannabinoids = productObj.cannabinoids;
@@ -292,6 +295,7 @@
 
         const result = {};
         if (url) result.url = url;
+        if (name) result.name = String(name);
         if (Object.keys(cannabinoids).length) result.cannabinoids = cannabinoids;
         if (terpenes !== undefined) result.terpenes = terpenes;
 
@@ -766,15 +770,11 @@
             callback({ error: 'Unable to determine product URL' });
             return;
         }
-
-        currentFetchUrl = url;
         
         GM_xmlhttpRequest({
             method: 'GET',
             url: url,
             onload: function(response) {
-                if (currentFetchUrl !== url) return; // Ignore stale responses
-                
                 try {
                     const parser = new DOMParser();
                     const doc = parser.parseFromString(response.responseText, 'text/html');
@@ -901,9 +901,7 @@
                 }
             },
             onerror: function() {
-                if (currentFetchUrl === url) {
-                    callback({ error: 'Failed to fetch product details' });
-                }
+                callback({ error: 'Failed to fetch product details' });
             }
         });
     }
@@ -1045,9 +1043,14 @@
                     return;
                 }
                 
+                // Pull any cached insights already discovered during hover
+                const cached = getCachedProductData(productCard) || {};
+                
                 selectedProducts.push({
                     url: url,
-                    name: productCard.textContent.trim().split('\n')[1] || 'Product'
+                    name: cached.name || productCard.textContent.trim().split('\n')[1] || 'Product',
+                    cannabinoids: cached.cannabinoids || undefined,
+                    terpenes: cached.terpenes || undefined
                 });
                 btn.textContent = 'Selected ✓';
                 btn.style.background = '#28a745';
@@ -1174,10 +1177,24 @@
         selectedProducts.forEach((product, index) => {
             fetchProductDetails(product.url, (data) => {
                 loadedCount++;
-                productData[index] = {
-                    ...product,
-                    ...data
-                };
+                
+                // Merge without clobbering existing cached values
+                const merged = { ...product };
+                if (data) {
+                    if (data.url) merged.url = data.url;
+                    if (data.name && !merged.name) merged.name = data.name;
+                    if (data.cannabinoids && Object.keys(data.cannabinoids).length > 0) {
+                        merged.cannabinoids = { ...(merged.cannabinoids || {}), ...data.cannabinoids };
+                    }
+                    if (data.terpenes !== undefined) {
+                        const existingCount = Array.isArray(merged.terpenes) ? merged.terpenes.length : (merged.terpenes && typeof merged.terpenes === 'object') ? Object.keys(merged.terpenes).length : 0;
+                        const incomingCount = Array.isArray(data.terpenes) ? data.terpenes.length : (data.terpenes && typeof data.terpenes === 'object') ? Object.keys(data.terpenes).length : 0;
+                        if (incomingCount > 0 || existingCount === 0) {
+                            merged.terpenes = data.terpenes;
+                        }
+                    }
+                }
+                productData[index] = merged;
                 
                 if (loadedCount === selectedProducts.length) {
                     displayComparisonTable(productData);
@@ -1220,52 +1237,134 @@
         
         table.appendChild(headerRow);
         
-        // Cannabinoids row
-        const cannabinoidRow = document.createElement('tr');
-        cannabinoidRow.style.cssText = 'border-bottom: 1px solid #eee;';
-        
-        const cannabinoidLabel = document.createElement('td');
-        cannabinoidLabel.textContent = 'Cannabinoids';
-        cannabinoidLabel.style.cssText = 'padding: 10px; font-weight: 600;';
-        cannabinoidRow.appendChild(cannabinoidLabel);
-        
-        productData.forEach(product => {
-            const td = document.createElement('td');
-            td.style.cssText = 'padding: 10px;';
-            
-            if (product.cannabinoids && Object.keys(product.cannabinoids).length > 0) {
-                let html = '';
-                if (product.cannabinoids.THC) html += `THC: ${product.cannabinoids.THC}%<br>`;
-                if (product.cannabinoids.THCA) html += `THCA: ${product.cannabinoids.THCA}%<br>`;
-                if (product.cannabinoids.CBD) html += `CBD: ${product.cannabinoids.CBD}%<br>`;
-                if (product.cannabinoids.CBDa) html += `CBDa: ${product.cannabinoids.CBDa}%<br>`;
-                td.innerHTML = html || 'N/A';
-            } else {
-                td.textContent = 'N/A';
+        // Helpers
+        const preferredCannabinoids = ['THC', 'THCA', 'CBD', 'CBDA', 'CBN', 'CBG', 'CBC', 'totalTHC', 'totalCBD'];
+        const readCannabinoid = (obj, key) => {
+            if (!obj) return null;
+            switch (key) {
+                case 'THC': return obj.THC ?? obj.thc ?? obj.totalTHC ?? obj.total_thc ?? obj.thcPercent ?? obj.thc_percentage;
+                case 'THCA': return obj.THCA ?? obj.thca ?? obj.totalTHCA ?? obj.total_thca;
+                case 'CBD': return obj.CBD ?? obj.cbd ?? obj.totalCBD ?? obj.total_cbd ?? obj.cbdPercent ?? obj.cbd_percentage;
+                case 'CBDA': return obj.CBDA ?? obj.CBDa ?? obj.cbda;
+                case 'CBN': return obj.CBN ?? obj.cbn;
+                case 'CBG': return obj.CBG ?? obj.cbg;
+                case 'CBC': return obj.CBC ?? obj.cbc;
+                case 'totalTHC': return obj.totalTHC ?? obj.total_thc ?? obj.usable_thc;
+                case 'totalCBD': return obj.totalCBD ?? obj.total_cbd ?? obj.usable_cbd;
+                default: return obj[key] ?? obj[key && key.toUpperCase()] ?? obj[key && key.toLowerCase()];
             }
-            cannabinoidRow.appendChild(td);
+        };
+        const formatCell = (v) => {
+            if (v === null || v === undefined || v === '') return '-';
+            if (typeof v === 'number') return `${v}%`;
+            const n = parsePercent(v);
+            return n === null ? String(v) : `${n}%`;
+        };
+        const normalizeTerpenes = (terps) => {
+            const map = {};
+            if (!terps) return map;
+            if (Array.isArray(terps)) {
+                terps.forEach(t => {
+                    if (t && typeof t === 'object' && t.name !== undefined) {
+                        const name = canonicalizeTerpeneName(t.name) || String(t.name);
+                        const val = t.percentage ?? t.value ?? t.percent;
+                        const num = parsePercent(val);
+                        if (name && num !== null) map[name] = num;
+                    } else if (typeof t === 'string') {
+                        const name = canonicalizeTerpeneName(t) || t;
+                        const num = parsePercent(t);
+                        if (name && num !== null) map[name] = num;
+                    }
+                });
+                return map;
+            }
+            if (typeof terps === 'object') {
+                Object.entries(terps).forEach(([k, v]) => {
+                    const name = canonicalizeTerpeneName(k) || k;
+                    const num = parsePercent(v);
+                    if (name && num !== null) map[name] = num;
+                });
+                return map;
+            }
+            if (typeof terps === 'string') {
+                const num = parsePercent(terps);
+                if (num !== null) map['Total Terpenes'] = num;
+            }
+            return map;
+        };
+        
+        // Build union of cannabinoid keys (preferred order first, then any extras)
+        const extraCanna = new Set();
+        productData.forEach(p => {
+            if (p.cannabinoids) Object.keys(p.cannabinoids).forEach(k => {
+                if (!preferredCannabinoids.includes(k)) extraCanna.add(k);
+            });
+        });
+        const cannabinoidRows = [...preferredCannabinoids, ...Array.from(extraCanna).sort()];
+        
+        // Render cannabinoid rows (skip rows that are all '-' or all 0%)
+        cannabinoidRows.forEach(label => {
+            const values = productData.map(p => readCannabinoid(p.cannabinoids, label));
+            const hasAnyNonZero = values.some(v => {
+                const n = parsePercent(v);
+                return n !== null && n > 0;
+            });
+            if (!hasAnyNonZero) return; // hide if all are missing or 0%
+
+            const row = document.createElement('tr');
+            row.style.cssText = 'border-bottom: 1px solid #eee;';
+            const nameCell = document.createElement('td');
+            nameCell.textContent = label;
+            nameCell.style.cssText = 'padding: 10px; font-weight: 600;';
+            row.appendChild(nameCell);
+            values.forEach(v => {
+                const td = document.createElement('td');
+                td.style.cssText = 'padding: 10px;';
+                td.textContent = formatCell(v);
+                row.appendChild(td);
+            });
+            table.appendChild(row);
         });
         
-        table.appendChild(cannabinoidRow);
+        // Union of terpene names
+        const terpeneMaps = productData.map(p => normalizeTerpenes(p.terpenes));
+        const terpeneNamesSet = new Set();
+        terpeneMaps.forEach(m => Object.keys(m).forEach(n => terpeneNamesSet.add(n)));
+        const terpeneNames = Array.from(terpeneNamesSet).sort((a, b) => a.localeCompare(b));
         
-        // Terpenes row
-        const terpeneRow = document.createElement('tr');
+        // Add a separator row for clarity
+        if (terpeneNames.length) {
+            const sep = document.createElement('tr');
+            const sepTd = document.createElement('td');
+            sepTd.colSpan = 1 + productData.length;
+            sepTd.style.cssText = 'padding: 6px 10px; background: #fafafa; font-weight: 600; color: #555;';
+            sepTd.textContent = 'Terpenes';
+            sep.appendChild(sepTd);
+            table.appendChild(sep);
+        }
         
-        const terpeneLabel = document.createElement('td');
-        terpeneLabel.textContent = 'Terpenes';
-        terpeneLabel.style.cssText = 'padding: 10px; font-weight: 600;';
-        terpeneRow.appendChild(terpeneLabel);
-        
-        productData.forEach(product => {
-            const td = document.createElement('td');
-            td.style.cssText = 'padding: 10px;';
-            td.textContent = (product.terpenes && product.terpenes.length > 0) 
-                ? product.terpenes.join(', ') 
-                : 'N/A';
-            terpeneRow.appendChild(td);
+        // Render terpene rows (skip rows that are all '-' or all 0%)
+        terpeneNames.forEach(name => {
+            const vals = productData.map((p, idx) => terpeneMaps[idx][name]);
+            const hasAnyNonZero = vals.some(v => {
+                const n = parsePercent(v);
+                return n !== null && n > 0;
+            });
+            if (!hasAnyNonZero) return;
+
+            const row = document.createElement('tr');
+            const nameCell = document.createElement('td');
+            nameCell.textContent = name;
+            nameCell.style.cssText = 'padding: 10px; font-weight: 600;';
+            row.appendChild(nameCell);
+            vals.forEach(v => {
+                const td = document.createElement('td');
+                td.style.cssText = 'padding: 10px;';
+                td.textContent = formatCell(v);
+                row.appendChild(td);
+            });
+            table.appendChild(row);
         });
-        
-        table.appendChild(terpeneRow);
         
         sidebar.appendChild(table);
     }

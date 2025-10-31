@@ -982,6 +982,10 @@
             console.warn('Sunnyside Insights: Could not find parent li for button');
             return;
         }
+        // Ensure we only add to real product cards, not filter sidebar entries
+        if (!isLikelyProductCard(li)) {
+            return;
+        }
         
         // Check if button already exists in the li
         if (li.querySelector('.sunnyside-select-btn')) {
@@ -1220,6 +1224,31 @@
                     displayComparisonTable(productData);
                 }
             });
+        });
+    }
+    
+    // Heuristic helpers to keep buttons only under product cards
+    function isLikelyProductCard(element) {
+        let li = null;
+        if (!element) return false;
+        if (element.tagName === 'LI') li = element; else if (element.closest) li = element.closest('li');
+        if (!li) return false;
+        // Exclude obvious filter/sidebar containers
+        const isInFilter = !!li.closest('aside, [aria-label*="Filter"], [aria-label*="filter"], [class*="filter"], [id*="filter"]');
+        if (isInFilter) return false;
+        // Positive signals for product cards
+        const hasProductLink = !!li.querySelector('a[href*="/product/"], [href*="/product/"]');
+        const hasImage = !!li.querySelector('img');
+        const text = (li.textContent || '').trim();
+        const hasPrice = /\$\s*\d/.test(text);
+        return hasProductLink || (hasImage && hasPrice);
+    }
+
+    function cleanupSidebarSelectButtons() {
+        document.querySelectorAll('.sunnyside-select-btn').forEach(btn => {
+            if (!isLikelyProductCard(btn)) {
+                btn.remove();
+            }
         });
     }
 
@@ -1464,6 +1493,8 @@
             console.log('Sunnyside Insights: document.body not ready');
             return;
         }
+        // Ensure we don't leave stray buttons in non-product areas
+        cleanupSidebarSelectButtons();
         
         // Find all product buttons - try multiple selectors
         let productButtons = document.querySelectorAll('ul[role="region"] li button');
@@ -1519,6 +1550,11 @@
             if (button.dataset.sunnysideEnhanced === 'true') {
                 return;
             }
+            // Skip buttons that are not part of a product card (e.g., filter sidebar)
+            const li = button.closest('li');
+            if (!isLikelyProductCard(li || button)) {
+                return;
+            }
             
             // Mark as enhanced BEFORE doing anything
             button.dataset.sunnysideEnhanced = 'true';
@@ -1539,7 +1575,6 @@
             button.addEventListener('mouseout', hideTooltip);
             
             // Add selection button ONLY if it doesn't exist
-            const li = button.closest('li');
             if (li && !li.querySelector('.sunnyside-select-btn')) {
                 addSelectionButton(button);
             }

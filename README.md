@@ -1,6 +1,8 @@
-# Sunnyside Product Insights POC
+# Cannabis Sage - Product Insights Enhancement
 
-A Tampermonkey userscript that enhances the Sunnyside flower listing page by displaying detailed terpene and cannabinoid profiles on hover, and enabling side-by-side comparison of up to 3 selected products.
+A Tampermonkey userscript that enhances cannabis ecommerce product listing pages by displaying detailed terpene and cannabinoid profiles on hover, and enabling side-by-side comparison of up to 3 selected products.
+
+**Why This Matters**: Cannabinoid and terpene information is critical for making informed purchasing decisions, yet many cannabis ecommerce sites leave this essential data buried in product detail pages or completely hidden. This script brings this vital information directly to product listings where consumers need it most.
 
 ## Features
 
@@ -17,19 +19,19 @@ Hover over any product card to instantly see detailed cannabinoid and terpene pr
 
 <img src="screenshots/image.png" alt="Product Hover Tooltip - Flower" />
 
-*Hover tooltip showing cannabinoid and terpene breakdown for Big Bang OG Flower (THC: 1.77%, THCA: 27.56%)*
+*Hover tooltip showing cannabinoid and terpene breakdown for flower product (THC: 1.77%, THCA: 27.56%)*
 
 <img src="screenshots/2.png" alt="Product Hover Tooltip - Flower" />
 
-*Hover tooltip showing detailed terpene profile for 814 Fireworks Flower (THCA: 34.78%)*
+*Hover tooltip showing detailed terpene profile for flower product (THCA: 34.78%)*
 
 <img src="screenshots/3.png" alt="Product Hover Tooltip - Concentrates" />
 
-*Hover tooltip displaying cannabinoid and terpene information for 814 Fireworks x Sunsl Budder concentrate (THCA: 81.69%)*
+*Hover tooltip displaying cannabinoid and terpene information for concentrate product (THCA: 81.69%)*
 
 <img src="screenshots/4.png" alt="Product Hover Tooltip - Vapes" />
 
-*Vape cartridge hover tooltip showing cannabinoid profile for 8" Bagel Liquid Live Resin (THC: 69.60%)*
+*Vape cartridge hover tooltip showing cannabinoid profile for liquid live resin product (THC: 69.60%)*
 
 ### Product Comparison
 
@@ -37,15 +39,15 @@ Select up to 3 products and compare them side-by-side:
 
 <img src="screenshots/5.png" alt="Product Comparison - Vapes (3 products)" />
 
-*Side-by-side comparison of three vape products: Blueberry Space Cake, Bio Jesus, and 8" Bagel Liquid Live Resin cartridges with highlighted differences*
+*Side-by-side comparison of three vape products with highlighted differences in cannabinoid and terpene profiles*
 
 <img src="screenshots/6.png" alt="Product Comparison - Vapes (2 products)" />
 
-*Comparing two vape products (8" Bagel vs Bio Jesus) with detailed cannabinoid and terpene profiles*
+*Comparing two vape products with detailed cannabinoid and terpene profiles side-by-side*
 
 <img src="screenshots/7.png" alt="Product Comparison - Capsules" />
 
-*Capsule product comparison showing Awake, Renew, and Relax capsules with cannabinoid and terpene variations*
+*Capsule product comparison showing three different capsules with cannabinoid and terpene variations*
 
 ## Installation
 
@@ -63,18 +65,20 @@ Select up to 3 products and compare them side-by-side:
 
 3. **Enable the Script**
    - The script should be enabled by default
-   - Navigate to `https://www.sunnyside.shop/products/flower`
-   - The script will automatically activate on flower listing pages
+   - Navigate to any supported cannabis ecommerce site's product listing page
+   - The script will automatically activate on compatible product listing pages
 
 ## Usage
 
 ### Viewing Product Insights
 
-1. Navigate to the [Sunnyside Flower Products page](https://www.sunnyside.shop/products/flower)
+1. Navigate to any supported cannabis ecommerce site's product listing page
 2. Hover your mouse over any product card
 3. A tooltip will appear showing:
    - **Cannabinoids**: THC, THCA, CBD, CBDa percentages
    - **Terpenes**: List of terpenes (e.g., Myrcene, Caryophyllene, Limonene, Linalool)
+   
+   This information is often missing or hard to find on product listing pages, making it difficult to compare products without clicking through to each individual product page.
 
 ### Comparing Products
 
@@ -118,16 +122,18 @@ Select up to 3 products and compare them side-by-side:
 - **No Caching**: Product data is fetched fresh on each hover (as per POC requirements)
 - **Product URL Detection**: Some products may require a click before hover works (URL gets cached)
 - **Rate Limiting**: Respects the website's rate limits - don't hover rapidly across many products
-- **Structure Changes**: If Sunnyside updates their HTML structure, selectors may need adjustment
+- **Structure Changes**: If sites update their HTML structure, selectors may need adjustment
+- **Site-Specific**: Each cannabis ecommerce site may require custom configuration for optimal compatibility
 
 ## Troubleshooting
 
 ### Tooltip Not Appearing
 
 - **Check Script Status**: Click Tampermonkey icon → Ensure script is enabled
-- **Check Page URL**: Script only works on `/products/flower*` pages
+- **Check Page URL**: Script only works on compatible product listing pages
 - **Check Console**: Open browser DevTools (F12) → Console tab → Look for errors
 - **Try Clicking First**: Some products may need one click to cache the URL before hover works
+- **Site Compatibility**: Ensure the site is supported - some sites may require custom configuration
 
 ### Product Selection Not Working
 
@@ -151,16 +157,16 @@ Select up to 3 products and compare them side-by-side:
 ### File Structure
 
 ```
-Sunnyside/
+CannabisSage/
 ├── sunnyside-insights.user.js  # Main Tampermonkey script
 ├── test-script.user.js         # Test/development script
 ├── README.md                    # This file
 ├── .gitignore                   # Git ignore rules
 └── screenshots/                 # Screenshot images for documentation
-    ├── image.png               # Flower hover tooltip (Big Bang OG)
-    ├── 2.png                   # Flower hover tooltip (814 Fireworks)
-    ├── 3.png                   # Concentrate hover tooltip (Budder)
-    ├── 4.png                   # Vape hover tooltip (Liquid Live Resin)
+    ├── image.png               # Flower hover tooltip example
+    ├── 2.png                   # Flower hover tooltip example
+    ├── 3.png                   # Concentrate hover tooltip example
+    ├── 4.png                   # Vape hover tooltip example
     ├── 5.png                   # Vape comparison (3 products)
     ├── 6.png                   # Vape comparison (2 products)
     └── 7.png                   # Capsule comparison (3 products)
@@ -171,7 +177,7 @@ Sunnyside/
 To modify the script:
 
 1. Open Tampermonkey dashboard (click icon → Dashboard)
-2. Find "Sunnyside Product Insights POC"
+2. Find the script name (may vary based on script header)
 3. Click the script name to edit
 4. Make your changes
 5. Save (Ctrl+S / Cmd+S)
@@ -181,7 +187,8 @@ To modify the script:
 - **Change Maximum Products**: Edit `selectedProducts.length >= 3` to change limit
 - **Modify Tooltip Style**: Edit CSS in `createTooltip()` function
 - **Add More Cannabinoids**: Extend the regex patterns in `fetchProductDetails()`
-- **Change Colors**: Modify `SUNNYSIDE_ORANGE` and `SUNNYSIDE_DARK` constants
+- **Change Colors**: Modify color constants to match your preferred theme
+- **Add Site Support**: Update selectors and URL patterns to support additional cannabis ecommerce sites
 
 ## Notes
 
@@ -212,10 +219,13 @@ If you encounter issues:
 
 1. Check the browser console for errors
 2. Verify the script is enabled in Tampermonkey
-3. Ensure you're on the correct page (`/products/flower`)
+3. Ensure you're on a compatible product listing page
 4. Try refreshing the page
+5. Verify the site structure matches expected patterns
 
 ---
 
-**Enjoy exploring Sunnyside products with enhanced insights! 🌿**
+**Enjoy making informed cannabis purchases with enhanced product insights! 🌿**
+
+**Remember**: Cannabinoid and terpene profiles are essential information that should be easily accessible when shopping. This script helps bridge the gap where ecommerce sites fail to surface this critical data on product listing pages.
 

@@ -372,27 +372,17 @@
 
         function addEntry(label, value) {
             if (value === undefined || value === null) return;
-            let display = value;
-            if (typeof value === 'number') {
-                display = value.toFixed(2);
+            const num = parsePercent(value);
+            // Hide zeros (0 or 0.0 etc.)
+            if (num !== null) {
+                if (num <= 0) return;
+                entries.push(`${label}: ${num.toFixed(2)}%`);
+                return;
             }
-            if (typeof display === 'string') {
-                display = display.trim();
-            }
-            if (typeof display === 'number') {
-                display = display.toString();
-            }
-            if (typeof display === 'string') {
-                if (/^-?\d+(\.\d+)?$/.test(display)) {
-                    display = `${parseFloat(display).toFixed(2)}%`;
-                } else if (!display.endsWith('%')) {
-                    display += '%';
-                }
-            }
-            if (typeof display === 'object') {
-                display = JSON.stringify(display);
-            }
-            entries.push(`${label}: ${display}`);
+            // Non-numeric fallbacks
+            const str = String(value).trim();
+            if (!str) return;
+            entries.push(`${label}: ${str}`);
         }
 
         addEntry('THC', data.THC ?? data.thc ?? data.totalTHC ?? data.total_thc ?? data.thcPercent ?? data.thc_percentage);
@@ -432,28 +422,49 @@
         let terpeneList = [];
 
         if (Array.isArray(terpenes)) {
-            terpeneList = terpenes.map(terp => {
-                if (terp.name && terp.percentage !== undefined) {
-                    return `${terp.name}: ${terp.percentage}%`;
+            terpeneList = terpenes.reduce((acc, terp) => {
+                // Object format with name/percentage
+                if (terp && typeof terp === 'object' && 'name' in terp) {
+                    const val = 'percentage' in terp ? terp.percentage : ('value' in terp ? terp.value : ('percent' in terp ? terp.percent : undefined));
+                    const num = parsePercent(val);
+                    if (num !== null && num > 0) acc.push(`${terp.name}: ${num}%`);
+                    return acc;
                 }
+                // String format – include if it doesn't clearly indicate 0%
                 if (typeof terp === 'string') {
-                    return terp;
+                    const num = parsePercent(terp);
+                    if (num === null || num > 0) acc.push(terp);
+                    return acc;
                 }
-                const entries = Object.entries(terp);
-                if (entries.length > 0) {
-                    return entries.map(([key, value]) => `${key}: ${value}`).join(' ');
+                // Generic object map
+                if (terp && typeof terp === 'object') {
+                    const parts = Object.entries(terp)
+                        .filter(([_, v]) => {
+                            const n = parsePercent(v);
+                            return n === null || n > 0; // keep non-numeric or positive values
+                        })
+                        .map(([k, v]) => {
+                            const n = parsePercent(v);
+                            return n === null ? `${k}: ${v}` : `${k}: ${n}%`;
+                        });
+                    if (parts.length) acc.push(parts.join(' '));
+                    return acc;
                 }
-                return JSON.stringify(terp);
-            });
+                return acc;
+            }, []);
         } else if (typeof terpenes === 'object') {
-            terpeneList = Object.entries(terpenes).map(([key, value]) => {
-                if (typeof value === 'number') {
-                    return `${key}: ${value}%`;
-                }
-                return `${key}: ${value}`;
-            });
+            terpeneList = Object.entries(terpenes)
+                .filter(([_, value]) => {
+                    const n = parsePercent(value);
+                    return n === null || n > 0; // hide 0%
+                })
+                .map(([key, value]) => {
+                    const n = parsePercent(value);
+                    return n === null ? `${key}: ${value}` : `${key}: ${n}%`;
+                });
         } else if (typeof terpenes === 'string') {
-            terpeneList = [terpenes];
+            const n = parsePercent(terpenes);
+            if (n === null || n > 0) terpeneList = [terpenes];
         }
 
         if (terpeneList.length === 0) {

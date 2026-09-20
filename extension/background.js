@@ -1,17 +1,29 @@
 /**
  * CannabisSage service worker — product HTML fetch + cache pruning.
+ * Allowed PDP URLs are validated against known store host/path rules
+ * (mirrors adapter isAllowedFetchUrl — kept inline because SW has no DOM adapters).
  */
 
-const ALLOWED_HOSTS = new Set(['www.sunnyside.shop', 'sunnyside.shop']);
+const ALLOWED_FETCH_RULES = [
+  {
+    hosts: ['www.sunnyside.shop', 'sunnyside.shop'],
+    path: /^\/product\/[^/]+\/?$/
+  },
+  {
+    hosts: ['zenleafdispensaries.com', 'www.zenleafdispensaries.com'],
+    path: /^\/locations\/[^/]+\/(?:(?:medical|recreational)-menu\/)?menu\/[^/]+\/[^/]+\/?$/i
+  }
+];
+
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function isAllowedProductUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:') return false;
-    if (!ALLOWED_HOSTS.has(url.hostname)) return false;
-    if (!/^\/product\/[^/]+\/?$/.test(url.pathname)) return false;
-    return true;
+    return ALLOWED_FETCH_RULES.some(
+      (rule) => rule.hosts.includes(url.hostname) && rule.path.test(url.pathname)
+    );
   } catch {
     return false;
   }
@@ -46,7 +58,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
   const { url } = message;
   if (!isAllowedProductUrl(url)) {
-    sendResponse({ ok: false, error: 'Blocked: URL is not an allowed Sunnyside product page.' });
+    sendResponse({ ok: false, error: 'Blocked: URL is not an allowed product page.' });
     return false;
   }
 

@@ -36,46 +36,21 @@
   }
 
   function findProductCards() {
-    const primary = Array.from(document.querySelectorAll('[data-cy="ProductListItem"]'));
-    if (primary.length) return primary;
-    const fallbacks = [
-      'main .cursor-pointer.border-radius-6',
-      'main [class*="Product"]',
-      'ul[role="list"] li button',
-      'main ul li button'
-    ];
-    for (const selector of fallbacks) {
-      try {
-        const nodes = Array.from(document.querySelectorAll(selector)).filter(isLikelyProductCard);
-        if (nodes.length) return nodes;
-      } catch {
-        /* ignore */
-      }
-    }
+    const adapter = CSI.registry?.getActiveAdapter?.();
+    if (adapter?.findProductCards) return adapter.findProductCards();
     return [];
   }
 
   function isLikelyProductCard(element) {
-    if (!element) return false;
-    if (element.matches?.('[data-cy="ProductListItem"]')) return true;
-    if (element.closest?.('[data-cy="ProductListItem"]')) return true;
-    const isInFilter = !!element.closest?.(
-      'aside, [aria-label*="Filter" i], [class*="filter" i], [id*="filter" i], #csi-filter-bar'
-    );
-    if (isInFilter) return false;
-    const root = element.closest?.('li') || element;
-    const hasImage = !!root.querySelector?.('img');
-    const hasPrice = /\$\s*\d/.test(root.textContent || '');
-    return hasImage && hasPrice;
+    const adapter = CSI.registry?.getActiveAdapter?.();
+    if (adapter?.isLikelyProductCard) return adapter.isLikelyProductCard(element);
+    return false;
   }
 
   function cardHost(cardEl) {
-    return (
-      cardEl.closest('[data-cy="ProductListItem"]')?.parentElement ||
-      cardEl.closest('li') ||
-      cardEl.parentElement ||
-      cardEl
-    );
+    const adapter = CSI.registry?.getActiveAdapter?.();
+    if (adapter?.cardHost) return adapter.cardHost(cardEl);
+    return cardEl;
   }
 
   function ensureBadgeRow(cardEl) {
@@ -132,13 +107,23 @@
     const url = await CSI.resolveProductUrl(cardEl);
     product = CSI.getElementProduct(cardEl) || product;
 
-    // Listing price / sale from DOM even without fetch
+    // Listing price / sale / optional on-card chem from adapter
     const host = cardHost(cardEl);
-    const price = product.price ?? CSI.parsePrice(host.textContent || '');
-    const onSale = product.onSale || CSI.detectSale(host);
-    const weightGrams = CSI.parseWeightGrams(product.weightText || host.textContent || '');
+    const hints = CSI.registry?.getActiveAdapter?.()?.parseListingHints?.(cardEl) || {};
+    const price = product.price ?? hints.price ?? CSI.parsePrice(host.textContent || '');
+    const onSale = product.onSale || hints.onSale || CSI.detectSale(host);
+    const weightGrams = CSI.parseWeightGrams(
+      product.weightText || hints.weightText || host.textContent || ''
+    );
     if (price != null) product.price = price;
     product.onSale = onSale;
+    if (hints.weightText && !product.weightText) product.weightText = hints.weightText;
+    if (hints.cannabinoids) {
+      product.cannabinoids = { ...(hints.cannabinoids || {}), ...(product.cannabinoids || {}) };
+    }
+    if (hints.terpenes && !CSI.hasTerpeneInfo(product.terpenes)) {
+      product.terpenes = hints.terpenes;
+    }
 
     const needsFetch =
       forceFetch ||
@@ -332,7 +317,11 @@
     filterBar = document.createElement('div');
     filterBar.id = 'csi-filter-bar';
     filterBar.innerHTML = `
-      <div class="csi-filter-title">CannabisSage</div>
+      <div class="csi-filter-title">CannabisSage${
+        CSI.registry?.getActiveAdapter?.()?.displayName
+          ? ` · ${CSI.escapeHtml(CSI.registry.getActiveAdapter().displayName)}`
+          : ''
+      }</div>
       <label>Min THC% <input type="number" step="0.1" min="0" id="csi-min-thc" placeholder="—"></label>
       <label>Must terpene <input type="text" id="csi-must-terp" placeholder="e.g. Limonene" list="csi-terp-list"></label>
       <label>Exclude <input type="text" id="csi-excl-terp" placeholder="terpene" list="csi-terp-list"></label>
@@ -452,7 +441,8 @@
   }
 
   function onListingPathChange() {
-    if (!location.pathname.startsWith('/products/')) return;
+    const adapter = CSI.registry?.refreshActiveAdapter?.() || CSI.registry?.getActiveAdapter?.();
+    if (!adapter || adapter.routeMode(location.pathname) !== 'listing') return;
     if (location.pathname !== lastPath) {
       CSI.log('listing SPA path', lastPath, '->', location.pathname);
       lastPath = location.pathname;
@@ -486,7 +476,11 @@
       return;
     }
     active = true;
-    CSI.log(`listing start v${CSI.VERSION}`, location.href);
+    CSI.log(
+      `listing start v${CSI.VERSION}`,
+      CSI.registry?.getActiveAdapter?.()?.id || 'no-adapter',
+      location.href
+    );
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();
     state.tasteMap = await CSI.storage.loadTasteMap();

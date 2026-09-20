@@ -1,7 +1,5 @@
 /**
- * Route router — SPA-aware listing ↔ PDP switching.
- * Polls location in the isolated world because MAIN-world history
- * notifications can race; also listens for bridge route messages.
+ * Route router — SPA-aware listing ↔ PDP switching via active store adapter.
  */
 (function () {
   'use strict';
@@ -12,14 +10,12 @@
   let lastPathSeen = '';
 
   function currentMode() {
-    const path = location.pathname;
-    if (/^\/product\//.test(path)) return 'pdp';
-    if (/^\/products\//.test(path)) return 'listing';
-    return null;
+    const adapter = CSI.registry?.refreshActiveAdapter?.() || CSI.registry?.getActiveAdapter?.();
+    if (!adapter) return null;
+    return adapter.routeMode(location.pathname) || null;
   }
 
   function cleanupSharedChrome() {
-    // Do not remove compare tray
     document.getElementById('csi-filter-bar')?.remove();
   }
 
@@ -31,7 +27,7 @@
       return;
     }
     lastPathSeen = path;
-    CSI.log('route sync', mode, '->', next, path);
+    CSI.log('route sync', mode, '->', next, path, CSI.registry?.getActiveAdapter?.()?.id);
     const prev = mode;
     mode = next;
 
@@ -45,7 +41,6 @@
 
     if (next === 'listing') CSI.routes?.startListing?.();
     if (next === 'pdp') {
-      // Slight delay so React can mount PDP content before bridge extract
       setTimeout(() => CSI.routes?.startPdp?.(), 200);
     }
   }

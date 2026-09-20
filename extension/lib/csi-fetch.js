@@ -1,5 +1,6 @@
 /**
  * Product HTML parse + cached fetch via background worker.
+ * Delegates store-specific parsing / URL resolution to the active adapter.
  */
 (function (global) {
   'use strict';
@@ -7,63 +8,19 @@
   if (!CSI) throw new Error('CSI core missing');
 
   function parseProductHtml(html, url) {
+    const adapter = CSI.registry?.getActiveAdapter?.() || CSI.registry?.resolveAdapter?.(url);
+    if (adapter?.parseProductHtml) {
+      return adapter.parseProductHtml(html, url);
+    }
+    // Fallback minimal scrape
     const parser = new DOMParser();
     const doc = parser.parseFromString(html, 'text/html');
-    const cannabinoids = {};
-    const cannabinoidText = doc.body?.textContent || '';
-
-    const thcMatch = cannabinoidText.match(/THC[:\s]+(\d+\.?\d*)%/i);
-    if (thcMatch) cannabinoids.THC = thcMatch[1];
-    const thcaMatch = cannabinoidText.match(/THCA[:\s]+(\d+\.?\d*)%/i);
-    if (thcaMatch) cannabinoids.THCA = thcaMatch[1];
-    const cbdMatch = cannabinoidText.match(/CBD[:\s]+(\d+\.?\d*)%/i);
-    if (cbdMatch) cannabinoids.CBD = cbdMatch[1];
-    const cbdaMatch = cannabinoidText.match(/CBDa[:\s]+(\d+\.?\d*)%/i);
-    if (cbdaMatch) cannabinoids.CBDa = cbdaMatch[1];
-
-    const terpenes = [];
-    const terpeneHeading = Array.from(doc.querySelectorAll('h6, h5, h4, h3')).find(
-      (h) => h.textContent.trim().toLowerCase() === 'terpenes'
-    );
-    const terpeneSection = terpeneHeading ? terpeneHeading.closest('section, div, article') : null;
-    const sectionText = (terpeneSection ? terpeneSection.innerText : doc.body?.innerText || '').trim();
-
-    CSI.TERPENE_CANON.forEach(({ name, keys }) => {
-      const synPattern = keys.map((s) => CSI.escapeRegExp(s)).join('|');
-      const re = new RegExp(`(?:${synPattern})[\\n\\r\\t\\s:]*([0-9]+(?:\\.[0-9]+)?)%`, 'gi');
-      let m;
-      while ((m = re.exec(sectionText)) !== null) {
-        const pct = parseFloat(m[1]);
-        if (Number.isNaN(pct)) continue;
-        const existing = terpenes.find((t) => t.name === name);
-        if (!existing) terpenes.push({ name, percentage: pct });
-        else if (pct > existing.percentage) existing.percentage = pct;
-      }
-    });
-
-    let terpeneResult;
-    if (terpenes.length > 0) {
-      terpeneResult = terpenes;
-    } else {
-      const totalTerpsMatch = (sectionText || cannabinoidText).match(
-        /Total\s*Terpenes\s*:?[\s]*([0-9]+(?:\.[0-9]+)?)%/i
-      );
-      if (totalTerpsMatch) {
-        const totalVal = parseFloat(totalTerpsMatch[1]);
-        if (!Number.isNaN(totalVal)) terpeneResult = { 'Total Terpenes': totalVal };
-      }
-    }
-
-    const title = doc.querySelector('h1')?.textContent?.trim() || doc.title?.split('|')[0]?.trim();
-    const price = CSI.parsePrice(doc.body?.innerText || '');
-
     return {
-      cannabinoids,
-      terpenes: terpeneResult || terpenes,
+      cannabinoids: {},
+      terpenes: [],
       url,
-      name: title || undefined,
-      price: price || undefined,
-      status: 'ok'
+      name: doc.querySelector('h1')?.textContent?.trim(),
+      status: 'empty'
     };
   }
 
@@ -130,6 +87,8 @@
       const requestId = `csi-${Date.now()}-${++bridgeSeq}`;
       const marker = requestId;
       cardEl.dataset.csiBridgeId = marker;
+      const adapter = CSI.registry?.getActiveAdapter?.();
+      const strategy = adapter?.bridgeStrategy || 'sunnyside';
 
       const onMessage = (event) => {
         if (event.source !== window) return;
@@ -153,7 +112,8 @@
           direction: 'request',
           requestId,
           action: 'extractProduct',
-          marker
+          marker,
+          strategy
         },
         '*'
       );
@@ -171,12 +131,11 @@
       potency: bridgeProduct.potency,
       terpenes: bridgeProduct.terpenes
     };
-    const extracted = CSI.extractProductData(productObj, cardEl.dataset.csiUrl);
+    const extracted = CSI.extractProductData(productObj, cardEl.dataset.csiUrl || bridgeProduct.slug);
     if (extracted) {
       storeElementProduct(cardEl, extracted);
       if (extracted.url) cardEl.dataset.csiUrl = extracted.url;
     }
-    // Attach listing-only fields from bridge
     if (bridgeProduct.price != null) {
       storeElementProduct(cardEl, { price: bridgeProduct.price });
     }
@@ -227,34 +186,34 @@
     if (!cardEl) return null;
     if (cardEl.dataset.csiUrl) return cardEl.dataset.csiUrl;
 
+    const adapter = CSI.registry?.getActiveAdapter?.();
     const bridgeProduct = await requestBridgeExtract(cardEl);
     const fromBridge = applyBridgeProduct(cardEl, bridgeProduct);
     if (fromBridge?.url) return fromBridge.url;
-    if (bridgeProduct?.id) {
-      const url = CSI.buildProductUrl(bridgeProduct.id);
+
+    if (bridgeProduct?.slug && adapter?.buildProductUrl) {
+      const url = adapter.buildProductUrl(bridgeProduct.slug);
       if (url) {
         cardEl.dataset.csiUrl = url;
+        storeElementProduct(cardEl, { url });
+        return url;
+      }
+    }
+    if (bridgeProduct?.id && adapter?.buildProductUrl) {
+      const url = adapter.buildProductUrl(bridgeProduct.id);
+      // Only use id-built URLs when adapter produces a real PDP path (Sunnyside)
+      if (url && adapter.isAllowedFetchUrl?.(url)) {
+        cardEl.dataset.csiUrl = url;
+        storeElementProduct(cardEl, { url });
         return url;
       }
     }
 
-    const root =
-      cardEl.closest('[data-cy="ProductListItem"]') ||
-      cardEl.closest('li') ||
-      cardEl.parentElement ||
-      cardEl;
-
-    for (const selector of ['a[href*="/product/"]', '[href*="/product/"]']) {
-      const link = root.querySelector?.(selector);
-      if (!link) continue;
-      const href = link.getAttribute('href') || link.href;
-      if (href && href.includes('/product/')) {
-        const url = href.startsWith('http')
-          ? href.split(/[?#]/)[0]
-          : `https://www.sunnyside.shop${href.split(/[?#]/)[0]}`;
-        cardEl.dataset.csiUrl = url;
-        return url;
-      }
+    const fromDom = adapter?.resolveProductUrlFromDom?.(cardEl) || null;
+    if (fromDom) {
+      cardEl.dataset.csiUrl = fromDom;
+      storeElementProduct(cardEl, { url: fromDom });
+      return fromDom;
     }
 
     return null;

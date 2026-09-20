@@ -12,6 +12,7 @@
   function requestPdpBridge(timeoutMs = 1000) {
     return new Promise((resolve) => {
       const requestId = `csi-pdp-${Date.now()}`;
+      const strategy = CSI.registry?.getActiveAdapter?.()?.bridgeStrategy || 'sunnyside';
       const onMessage = (event) => {
         if (event.source !== window) return;
         const data = event.data;
@@ -27,7 +28,7 @@
       }, timeoutMs);
       window.addEventListener('message', onMessage);
       window.postMessage(
-        { source: BRIDGE_SOURCE, direction: 'request', requestId, action: 'extractPdp' },
+        { source: BRIDGE_SOURCE, direction: 'request', requestId, action: 'extractPdp', strategy },
         '*'
       );
     });
@@ -205,7 +206,9 @@
         setTimeout(mount, 50);
         return;
       }
-      if (!active || !location.pathname.startsWith('/product/')) return;
+      if (!active) return;
+      const adapter = CSI.registry?.refreshActiveAdapter?.() || CSI.registry?.getActiveAdapter?.();
+      if (!adapter || adapter.routeMode(location.pathname) !== 'pdp') return;
       document.getElementById('csi-pdp-panel')?.remove();
       const loading = document.createElement('div');
       loading.id = 'csi-pdp-panel';

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CannabisSage",
-  "version": "1.1.0",
-  "description": "Cannabinoid and terpene insights on Sunnyside listings and product pages: compare, filter, sort, and taste-map match — no medical claims.",
+  "version": "1.2.0",
+  "description": "Cannabinoid and terpene insights on Sunnyside, Zen Leaf, and TerraVida (Zen Leaf Malvern) listings and product pages — compare, filter, sort, taste-map. Not medical advice.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
@@ -26,7 +26,9 @@
         "https://www.sunnyside.shop/products/*",
         "https://sunnyside.shop/products/*",
         "https://www.sunnyside.shop/product/*",
-        "https://sunnyside.shop/product/*"
+        "https://sunnyside.shop/product/*",
+        "https://zenleafdispensaries.com/locations/*",
+        "https://www.zenleafdispensaries.com/locations/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_idle",
@@ -37,10 +39,17 @@
         "https://www.sunnyside.shop/products/*",
         "https://sunnyside.shop/products/*",
         "https://www.sunnyside.shop/product/*",
-        "https://sunnyside.shop/product/*"
+        "https://sunnyside.shop/product/*",
+        "https://zenleafdispensaries.com/locations/*",
+        "https://www.zenleafdispensaries.com/locations/*"
       ],
       "js": [
         "lib/csi-core.js",
+        "adapters/interface.js",
+        "adapters/sunnyside.js",
+        "adapters/zenleaf.js",
+        "adapters/terravida.js",
+        "adapters/registry.js",
         "lib/csi-storage.js",
         "lib/csi-fetch.js",
         "lib/csi-glossary.js",
@@ -56,7 +65,9 @@
   ],
   "host_permissions": [
     "https://www.sunnyside.shop/*",
-    "https://sunnyside.shop/*"
+    "https://sunnyside.shop/*",
+    "https://zenleafdispensaries.com/*",
+    "https://www.zenleafdispensaries.com/*"
   ],
   "permissions": ["storage"],
   "web_accessible_resources": [
@@ -67,7 +78,9 @@
       ],
       "matches": [
         "https://www.sunnyside.shop/*",
-        "https://sunnyside.shop/*"
+        "https://sunnyside.shop/*",
+        "https://zenleafdispensaries.com/*",
+        "https://www.zenleafdispensaries.com/*"
       ]
     }
   ]

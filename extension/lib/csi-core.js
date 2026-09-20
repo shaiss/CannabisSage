@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.1.0';
+  const VERSION = '1.2.0';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const SUNNYSIDE_ORANGE = '#FF6B35';
@@ -238,7 +238,13 @@
     return parsePercent(cannabinoids.THCA ?? cannabinoids.thca ?? cannabinoids.totalTHCA);
   }
 
+  function activeAdapter() {
+    return global.CSI?.registry?.getActiveAdapter?.() || global.CSI?._activeAdapter || null;
+  }
+
   function buildProductUrl(idOrSlug) {
+    const adapter = activeAdapter();
+    if (adapter?.buildProductUrl) return adapter.buildProductUrl(idOrSlug);
     if (!idOrSlug) return null;
     const cleaned = String(idOrSlug).replace(/^\/product\//, '').replace(/^\//, '');
     if (!cleaned) return null;
@@ -250,7 +256,14 @@
 
     const slug = productObj.slug || productObj.productSlug || productObj.permalink || productObj.handle;
     const productId = productObj.id || productObj.productId || productObj.slugId || productObj.sku;
-    const url = buildProductUrl(slug) || buildProductUrl(productId) || fallbackUrl;
+    const adapter = activeAdapter();
+    let url = null;
+    if (adapter?.buildProductUrl) {
+      url = adapter.buildProductUrl(slug) || adapter.buildProductUrl(productId);
+    } else {
+      url = buildProductUrl(slug) || buildProductUrl(productId);
+    }
+    url = url || fallbackUrl;
     const name =
       productObj.ecomm_display_name ||
       productObj.bt_product_name ||

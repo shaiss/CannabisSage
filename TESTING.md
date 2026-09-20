@@ -1,16 +1,19 @@
-# CannabisSage — Manual Test Matrix (v1.1)
+# CannabisSage — Manual Test Matrix (v1.2)
 
 Load unpacked from `extension/` after each change. Debug logs stay off unless `localStorage.cannabisSageDebug='1'`.
+
+Automated adapter checks (no browser): `node scripts/smoke-adapters.mjs`
 
 ## Setup
 
 > After reloading the unpacked extension, hard-refresh (Ctrl+Shift+R) or open a new tab. Otherwise Chrome shows “Extension context invalidated” and UI may collapse.
 
 1. `chrome://extensions` → Developer mode → **Load unpacked** → `extension/`
-2. Open popup via toolbar icon; confirm taste-map editor loads
+2. Open popup via toolbar icon; confirm taste-map editor loads with seeded defaults
 3. Confirm service worker link has no errors
+4. Filter bar title should show the active store (e.g. `CannabisSage · Sunnyside`)
 
-## Category listings
+## Sunnyside — category listings
 
 For each URL, confirm badges, Compare Select, filter bar, and hover tooltip:
 
@@ -23,13 +26,13 @@ For each URL, confirm badges, Compare Select, filter bar, and hover tooltip:
 
 Checks per listing:
 
-- [ ] Filter bar visible at top
+- [ ] Filter bar visible; title includes **Sunnyside**
 - [ ] Cards show THC% and/or top-terp badge (or explicit “No chem data” / “Chem unavailable”)
 - [ ] Hover shows loading → profile or clear empty/error message (never silent)
 - [ ] “Map match” appears when score ≥ threshold
 - [ ] Sale / `$/mg` badges only when DOM provides sale cues and weight+price+THC
 
-## Product detail (PDP)
+## Sunnyside — product detail (PDP)
 
 | Step | Pass? |
 | --- | --- |
@@ -38,13 +41,32 @@ Checks per listing:
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
 
+## Zen Leaf — smoke
+
+| Step | URL / action | Pass? |
+| --- | --- | --- |
+| Malvern medical menu listing | https://zenleafdispensaries.com/locations/malvern/medical-menu/menu | |
+| Filter bar shows **TerraVida (Zen Leaf Malvern)** (Malvern uses TerraVida alias) | | |
+| Cards enhance with THC badge from on-card ranges | | |
+| Compare Select + hover tooltip | | |
+| Open a product PDP from a card (`.../menu/<category>/<slug>`) | | |
+| PDP panel loads chem / empty / error (never silent) | | |
+| Non-Malvern Zen Leaf (e.g. Abington) shows **Zen Leaf** in filter title | https://zenleafdispensaries.com/locations/abington/medical-menu/menu | |
+
+## TerraVida — findings check
+
+| Step | Pass? |
+| --- | --- |
+| Extension does **not** inject on `terravidahc.com` (no host permission; not a catalog) | |
+| Shopping Malvern on Zen Leaf host activates TerraVida alias adapter | |
+
 ## Compare tray persistence
 
 | Step | Pass? |
 | --- | --- |
 | Select 2 products → tray shows Compare (2) | |
 | Hard refresh listing → selection still present; buttons show Selected | |
-| SPA navigate flower → vapes → selection survives | |
+| SPA navigate within store → selection survives | |
 | **Clear** empties tray and resets buttons | |
 | Sidebar **JSON** / **CSV** copies to clipboard | |
 
@@ -63,6 +85,7 @@ Checks per listing:
 
 | Step | Pass? |
 | --- | --- |
+| Defaults favor limonene / terpinolene / myrcene / linalool (shopping prefs seed) | |
 | Change preferred weights → Save | |
 | Reload listing → match badges update | |
 | Reset defaults restores seeded JSON prefs | |
@@ -72,13 +95,14 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | Product with strikethrough/sale UI shows **Sale** badge when detectable | |
+| Zen Leaf “% Off” / Currently $ shows Sale | |
 | `$/mg` appears only with scrapeable price + weight + THC | |
 
 ## SPA / scroll
 
 | Step | Pass? |
 | --- | --- |
-| Infinite scroll / “load more” enhances new cards | |
+| Infinite scroll / “load more” / pagination enhances new cards | |
 | Client-side category change re-enhances without clearing compare | |
 
 ## Permissions / hygiene
@@ -86,12 +110,13 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.1.0.zip` | |
-| Zip contains manifest, lib/*, popup/*, data/*, icons | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.2.0.zip` | |
+| Zip contains `adapters/*`, manifest, lib/*, popup/*, data/*, icons | |
 | No secrets in package | |
+| `node scripts/smoke-adapters.mjs` exits 0 | |
 
-## Explicitly out of scope (do not fail v1)
+## Explicitly out of scope (do not fail v1.2)
 
-- TerraVida / Zen Leaf
 - Wishlist / tried tags beyond taste prefs
 - Strain lineage deep features
+- Remote / sideloaded community adapters (in-repo PRs only)

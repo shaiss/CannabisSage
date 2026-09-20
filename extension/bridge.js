@@ -1,5 +1,6 @@
 /**
- * MAIN-world bridge: React product props + listing price/sale/weight hints.
+ * MAIN-world bridge: store-specific product extraction + SPA route notify.
+ * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints).
  */
 (function () {
   'use strict';
@@ -14,7 +15,7 @@
       );
       if (!reactKey) return null;
       let fiber = el[reactKey];
-      for (let i = 0; i < 16 && fiber; i++) {
+      for (let i = 0; i < 20 && fiber; i++) {
         const props = fiber.memoizedProps || fiber.pendingProps;
         if (props) {
           if (props.product && typeof props.product === 'object') return props.product;
@@ -23,6 +24,10 @@
             if (inv.raw && typeof inv.raw === 'object') return inv.raw;
             if (inv.product) return inv.product;
             if (inv.id || inv.sku) return inv;
+          }
+          // Zen Leaf / Sweed-style card props
+          if (props.labTests || (props.name && props.price != null && (props.sku || props.id))) {
+            return props;
           }
         }
         fiber = fiber.return || fiber._owner;
@@ -39,7 +44,27 @@
     return m ? parseFloat(m[1]) : null;
   }
 
-  function summarizeProduct(product, hostEl) {
+  function midRange(a, b) {
+    if (a == null && b == null) return null;
+    if (b == null) return a;
+    if (a == null) return b;
+    return (Number(a) + Number(b)) / 2;
+  }
+
+  function labValue(node) {
+    if (!node) return null;
+    const v = node.value;
+    if (Array.isArray(v) && v.length) {
+      const nums = v.map(Number).filter((n) => !Number.isNaN(n));
+      if (!nums.length) return null;
+      return midRange(Math.min(...nums), Math.max(...nums));
+    }
+    if (typeof v === 'number') return v;
+    const n = parseFloat(v);
+    return Number.isNaN(n) ? null : n;
+  }
+
+  function summarizeSunnyside(product, hostEl) {
     if (!product || typeof product !== 'object') return null;
     const id = product.id || product.productId || product.sku?.product?.id || product.sku?.id;
     const slug = product.slug || product.productSlug || product.handle;
@@ -92,8 +117,140 @@
       terpenes: product.terpenes,
       price: price || undefined,
       weightText: weightText ? String(weightText) : undefined,
-      onSale: !!onSale
+      onSale: !!onSale,
+      strategy: 'sunnyside'
     };
+  }
+
+  function summarizeZenleaf(product, hostEl) {
+    if (!product || typeof product !== 'object') return null;
+    const id = product.id || product.productId;
+    const name = product.name || product.displayName || product.title;
+    const cannabinoids = {};
+    const lab = product.labTests || product.lab_tests || {};
+    const thc = labValue(lab.displayThc) ?? labValue(lab.thc);
+    const cbd = labValue(lab.displayCbd) ?? labValue(lab.cbd);
+    const cbn = labValue(lab.cbn);
+    const cbg = labValue(lab.cbg);
+    if (thc != null) cannabinoids.THC = thc;
+    if (cbd != null) cannabinoids.CBD = cbd;
+    if (cbn != null) cannabinoids.CBN = cbn;
+    if (cbg != null) cannabinoids.CBG = cbg;
+
+    let terpenes;
+    const totalTerps = labValue(lab.terpenes);
+    if (Array.isArray(product.terpenes) && product.terpenes.length) {
+      terpenes = product.terpenes
+        .map((t) => {
+          if (!t || typeof t !== 'object') return null;
+          const n = t.name || t.canonicalName;
+          const pct = t.percentage ?? t.value ?? t.percent;
+          if (!n || pct == null) return null;
+          return { name: String(n), percentage: Number(pct) };
+        })
+        .filter(Boolean);
+    }
+    if ((!terpenes || !terpenes.length) && totalTerps != null) {
+      terpenes = { 'Total Terpenes': totalTerps };
+    }
+
+    const host = hostEl || null;
+    const hostText = host ? host.textContent || '' : '';
+    const price =
+      (product.promoPrice != null ? Number(product.promoPrice) : null) ||
+      (product.price != null ? Number(product.price) : null) ||
+      parsePrice(hostText);
+
+    const unit = product.unitSize;
+    const weightText = unit
+      ? `${unit.value}${unit.unitAbbr || ''}`
+      : (hostText.match(/(\d+(?:\.\d+)?\s*(?:g|mg|oz)\b)/i) || [])[1] || null;
+
+    const onSale =
+      (product.promoPrice != null &&
+        product.price != null &&
+        Number(product.promoPrice) < Number(product.price)) ||
+      !!(host && /\bSale\b|\d+\s*%\s*Off|Currently\s*\$/i.test(hostText));
+
+    // Prefer product page path from nearby link
+    let slug;
+    const link =
+      host?.querySelector?.('a[data-testid="product-card-title-link"]') ||
+      host?.querySelector?.('a[href*="/menu/"]');
+    if (link) {
+      const href = link.getAttribute('href') || link.href;
+      if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
+    }
+
+    return {
+      id: id != null ? String(id) : undefined,
+      slug: slug || undefined,
+      name: name != null ? String(name) : undefined,
+      cannabinoids: Object.keys(cannabinoids).length ? cannabinoids : undefined,
+      terpenes,
+      price: price || undefined,
+      weightText: weightText ? String(weightText) : undefined,
+      onSale: !!onSale,
+      strategy: 'zenleaf'
+    };
+  }
+
+  function detectStrategy() {
+    const host = location.hostname.replace(/^www\./, '');
+    if (host === 'sunnyside.shop') return 'sunnyside';
+    if (host === 'zenleafdispensaries.com') return 'zenleaf';
+    return 'sunnyside';
+  }
+
+  function summarize(product, hostEl, strategy) {
+    if (strategy === 'zenleaf') return summarizeZenleaf(product, hostEl);
+    return summarizeSunnyside(product, hostEl);
+  }
+
+  function extractListing(marker, strategy) {
+    const safeMarker = marker
+      ? typeof CSS !== 'undefined' && CSS.escape
+        ? CSS.escape(marker)
+        : String(marker).replace(/["\\]/g, '')
+      : '';
+    const el = safeMarker ? document.querySelector(`[data-csi-bridge-id="${safeMarker}"]`) : null;
+    let host = el;
+    if (strategy === 'zenleaf') {
+      host = el?.closest('[data-testid="product-card"]') || el?.closest('[role="listitem"]') || el;
+    } else {
+      host = el?.closest('[data-cy="ProductListItem"]')?.parentElement || el?.parentElement || el;
+    }
+    return summarize(readReactProduct(el || host), host, strategy);
+  }
+
+  function extractPdp(strategy) {
+    const roots =
+      strategy === 'zenleaf'
+        ? [
+            document.querySelector('[data-testid="product-details"]'),
+            document.querySelector('main'),
+            document.body
+          ].filter(Boolean)
+        : [
+            document.querySelector('[data-cy*="Product"]'),
+            document.querySelector('main'),
+            document.body
+          ].filter(Boolean);
+
+    for (const root of roots) {
+      const product = readReactProduct(root);
+      if (product && (product.id || product.name || product.labTests)) {
+        return summarize(product, root, strategy);
+      }
+      const kids = root.querySelectorAll('div, section, article');
+      for (let i = 0; i < Math.min(kids.length, 100); i++) {
+        const p = readReactProduct(kids[i]);
+        if (p && (p.id || p.sku || p.labTests)) {
+          return summarize(p, kids[i], strategy);
+        }
+      }
+    }
+    return null;
   }
 
   window.addEventListener('message', (event) => {
@@ -101,42 +258,14 @@
     const data = event.data;
     if (!data || data.source !== SOURCE || data.direction !== 'request') return;
 
-    const { requestId, action, marker } = data;
+    const { requestId, action, marker, strategy: requested } = data;
+    const strategy = requested || detectStrategy();
     let result = null;
     try {
       if (action === 'extractProduct') {
-        const safeMarker = marker
-          ? typeof CSS !== 'undefined' && CSS.escape
-            ? CSS.escape(marker)
-            : String(marker).replace(/["\\]/g, '')
-          : '';
-        const el = safeMarker ? document.querySelector(`[data-csi-bridge-id="${safeMarker}"]`) : null;
-        const host = el?.closest('[data-cy="ProductListItem"]')?.parentElement || el?.parentElement || el;
-        result = summarizeProduct(readReactProduct(el), host);
+        result = extractListing(marker, strategy);
       } else if (action === 'extractPdp') {
-        // Walk from main product root
-        const roots = [
-          document.querySelector('[data-cy*="Product"]'),
-          document.querySelector('main'),
-          document.body
-        ].filter(Boolean);
-        for (const root of roots) {
-          const product = readReactProduct(root);
-          if (product && (product.id || product.name)) {
-            result = summarizeProduct(product, root);
-            break;
-          }
-          // Deep scan children with react fibers (limited)
-          const kids = root.querySelectorAll('div, section, article');
-          for (let i = 0; i < Math.min(kids.length, 80); i++) {
-            const p = readReactProduct(kids[i]);
-            if (p && (p.id || p.sku)) {
-              result = summarizeProduct(p, kids[i]);
-              break;
-            }
-          }
-          if (result) break;
-        }
+        result = extractPdp(strategy);
       }
     } catch (err) {
       result = { error: String(err && err.message ? err.message : err) };
@@ -153,7 +282,6 @@
     );
   });
 
-  // Notify isolated content scripts of SPA navigations (React Router uses MAIN-world history).
   (function patchHistory() {
     let lastHref = location.href;
     const notify = () => {

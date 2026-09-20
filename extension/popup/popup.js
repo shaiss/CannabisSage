@@ -3,16 +3,17 @@
 
   const DEFAULTS = {
     preferredTerpenes: {
-      Limonene: 0.9,
-      'Beta-Myrcene': 0.7,
-      'Beta-Caryophyllene': 0.8,
-      Linalool: 0.6,
+      Limonene: 0.95,
+      Terpinolene: 0.85,
+      'Beta-Myrcene': 0.75,
+      Linalool: 0.8,
+      'Beta-Caryophyllene': 0.7,
+      'Alpha-Pinene': 0.55,
       Humulene: 0.4,
-      'Alpha-Pinene': 0.5,
-      Terpinolene: 0.5
+      Ocimene: 0.35
     },
     avoidTerpenes: [],
-    minMatchScore: 0.35,
+    minMatchScore: 0.32,
     preferHighTotalTerps: true
   };
 

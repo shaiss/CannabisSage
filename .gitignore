@@ -63,3 +63,4 @@ build/
 # *.jpeg
 # *.gif
 
+web/tsconfig.tsbuildinfo

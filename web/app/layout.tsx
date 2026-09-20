@@ -2,9 +2,9 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'CannabisSage — Chem insights for dispensary shopping',
+  title: 'CannabisSage — Shop dispensary menus with chemistry on the page',
   description:
-    'Chrome extension for Sunnyside & Zen Leaf: cannabinoid/terpene badges, compare, filters, taste-map. Not medical advice. Pro unlock via Stripe Checkout.'
+    'Chrome extension for cannabissage.app: badges, compare, and Pro filters, taste-map match, and multi-store support on Sunnyside & Zen Leaf. Stripe Checkout — not medical advice.'
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

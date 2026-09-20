@@ -4,23 +4,39 @@
 import {
   LAUNCH_DATE,
   PROMO_DAYS,
+  PRICE_PROMO_YEAR_CENTS,
+  PRICE_PROMO_MONTH_CENTS,
+  PRICE_REGULAR_YEAR_CENTS,
+  PRICE_REGULAR_MONTH_CENTS,
   PRICE_PROMO_CENTS,
   PRICE_AFTER_PROMO_CENTS,
   promoEndsAt,
   isPromoActive,
   formatUsd,
-  activePriceLabel
+  activePriceLabel,
+  getPricingCatalog,
+  quoteForCheckout,
+  priceLine
 } from './pricing';
+
+export type { BillingInterval, PricingCatalog, PlanQuote } from './pricing';
 
 export {
   LAUNCH_DATE,
   PROMO_DAYS,
+  PRICE_PROMO_YEAR_CENTS,
+  PRICE_PROMO_MONTH_CENTS,
+  PRICE_REGULAR_YEAR_CENTS,
+  PRICE_REGULAR_MONTH_CENTS,
   PRICE_PROMO_CENTS,
   PRICE_AFTER_PROMO_CENTS,
   promoEndsAt,
   isPromoActive,
   formatUsd,
-  activePriceLabel
+  activePriceLabel,
+  getPricingCatalog,
+  quoteForCheckout,
+  priceLine
 };
 
 export const FEATURE_GATES = {

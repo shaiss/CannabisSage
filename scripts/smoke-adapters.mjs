@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.11', 'version bump');
+assert(manifest.version === '1.3.12', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -190,7 +190,7 @@ assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.11', 'core version 1.3.11');
+assert(CSI.VERSION === '1.3.12', 'core version 1.3.12');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -608,5 +608,82 @@ assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'preference match stays out 
 const featuresSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-features.js'), 'utf8');
 assert(/tasteMap:\s*true/.test(featuresSrcPref), 'tasteMap stays the existing gate');
 assert(!/preferenceMatch:/.test(featuresSrcPref), 'no second gate for the product-page match');
+
+// Soft Pro unlock mid-browse (v1.3.12) — after chem is visible, not a wall
+const softCopy = Object.values(CSI.ui.SOFT_UNLOCK_COPY).join(' ');
+assert(CSI.ui.SOFT_UNLOCK_MIN_CARDS === 3, 'soft unlock waits for three cards');
+assert(
+  /taste-map match/.test(CSI.ui.SOFT_UNLOCK_COPY.line) && /\$\/mg/.test(CSI.ui.SOFT_UNLOCK_COPY.line),
+  'line names match and $/mg'
+);
+assert(/Chemistry and compare stay/.test(CSI.ui.SOFT_UNLOCK_COPY.line), 'line keeps chem and compare');
+assert(CSI.ui.SOFT_UNLOCK_COPY.upgrade === 'Upgrade', 'reuses Upgrade label');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida/i.test(softCopy), 'no retailer brand in soft unlock copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(softCopy),
+  'no medical or effects claims in soft unlock copy'
+);
+const readyOffer = {
+  hasPro: false,
+  storeAllowed: true,
+  enrichedCount: 3,
+  engaged: true,
+  dismissed: false
+};
+assert(CSI.ui.shouldOfferSoftUnlock(readyOffer) === true, 'offers after browse and three cards');
+assert(CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, engaged: false }) === false, 'quiet before scroll or hover');
+assert(
+  CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, enrichedCount: 2 }) === false,
+  'quiet before three chem-ready cards'
+);
+assert(CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, hasPro: true }) === false, 'pro does not see the prompt');
+assert(
+  CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, storeAllowed: false }) === false,
+  'multi-store gate does not add the prompt'
+);
+assert(CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, dismissed: true }) === false, 'dismiss stays quiet');
+const softHtml = CSI.ui.buildSoftUnlockPrompt();
+assert(softHtml.includes('data-csi-soft-unlock="1"'), 'prompt marker');
+assert(softHtml.includes('data-csi-soft-unlock-upgrade="1"'), 'upgrade control');
+assert(softHtml.includes('data-csi-soft-unlock-dismiss="1"'), 'dismiss control');
+assert(softHtml.includes('role="note"'), 'prompt is a note');
+assert(!/role="dialog"|aria-modal/i.test(softHtml), 'prompt is not a modal wall');
+assert(!/sunnyside|zenleaf|terravida/i.test(softHtml), 'prompt html has no retailer name');
+
+const softSrc = listingSrc.slice(
+  listingSrc.indexOf('function countChemReadyCards'),
+  listingSrc.indexOf('async function startListing')
+);
+assert(softSrc.includes('shouldOfferSoftUnlock'), 'listing asks before showing');
+assert(softSrc.includes('openUpgrade'), 'upgrade uses the existing deep link');
+assert(softSrc.includes('saveSoftUnlockDismissed'), 'dismiss is remembered');
+assert(!softSrc.includes('csi-filtered-out'), 'prompt does not hide cards');
+assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(softSrc), 'no card collection in the prompt');
+const enrichSrc = listingSrc.slice(
+  listingSrc.indexOf('async function enrichCard'),
+  listingSrc.indexOf('function cardCategoryKey')
+);
+assert(!/openUpgrade|buildSoftUnlockPrompt|csi-soft-unlock/.test(enrichSrc), 'chem enrich is not an upgrade wall');
+assert(!pdpSrc.includes('buildSoftUnlockPrompt'), 'product page does not mount the mid-browse prompt');
+const gateAt = listingSrc.indexOf('if (!CSI.features?.canUseActiveStore');
+const gateBlock = listingSrc.slice(gateAt, gateAt + 160);
+assert(gateBlock.includes('showStoreGateBanner();') && gateBlock.includes('return;'), 'store gate still returns early');
+assert(!gateBlock.includes('soft-unlock') && !gateBlock.includes('maybeOfferSoftUnlock'), 'store gate does not mount the soft prompt');
+assert(
+  listingSrc.indexOf('showStoreGateBanner();') < listingSrc.indexOf("addEventListener('scroll', onSoftUnlockScroll"),
+  'soft unlock is armed only after the store gate'
+);
+assert(/hoverTooltip:\s*true/.test(featuresSrcPref), 'hover stays free');
+assert(/compareTray:\s*true/.test(featuresSrcPref), 'compare stays free');
+assert(/pdpPanel:\s*true/.test(featuresSrcPref), 'product panel stays free');
+assert(/basicBadges:\s*true/.test(featuresSrcPref), 'chem badges stay free');
+const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
+assert(storageSrc.includes("SOFT_UNLOCK_DISMISS: 'csi_soft_unlock_dismissed'"), 'dismiss key');
+assert(storageSrc.includes('function loadSoftUnlockDismissed'), 'dismiss load');
+assert(storageSrc.includes('function saveSoftUnlockDismissed'), 'dismiss save');
+assert(listingSrc.includes("addEventListener('scroll', onSoftUnlockScroll"), 'scroll can count as mid-browse');
+assert(listingSrc.includes('noteBrowseEngagement();'), 'hover counts as mid-browse');
+const configSoft = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
+assert(configSoft.upgradeUrl === 'https://cannabissage.app/#pricing', 'upgrade still opens site checkout');
 
 console.log('smoke-adapters: OK');

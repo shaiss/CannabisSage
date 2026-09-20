@@ -11,7 +11,8 @@
     TASTE: 'csi_taste_map',
     FILTERS: 'csi_listing_filters',
     CACHE_PREFIX: 'csi_pdp:',
-    CATEGORY_MEDIANS: 'csi_category_medians'
+    CATEGORY_MEDIANS: 'csi_category_medians',
+    SOFT_UNLOCK_DISMISS: 'csi_soft_unlock_dismissed'
   };
 
   const DEFAULT_TASTE = {
@@ -253,6 +254,15 @@
     });
   }
 
+  async function loadSoftUnlockDismissed() {
+    const data = await storageGet([KEYS.SOFT_UNLOCK_DISMISS]);
+    return data[KEYS.SOFT_UNLOCK_DISMISS] === true;
+  }
+
+  async function saveSoftUnlockDismissed() {
+    await storageSet({ [KEYS.SOFT_UNLOCK_DISMISS]: true });
+  }
+
   CSI.storage = {
     KEYS,
     DEFAULT_TASTE,
@@ -269,6 +279,8 @@
     invalidatePdpCache,
     pruneExpiredCache,
     loadCategoryMedians,
-    saveCategoryMedians
+    saveCategoryMedians,
+    loadSoftUnlockDismissed,
+    saveSoftUnlockDismissed
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

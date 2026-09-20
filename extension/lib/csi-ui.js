@@ -832,4 +832,43 @@
     copyText,
     createCompareTrayController
   };
+
+  /**
+   * Mid-browse soft unlock (v1.3.12). Shown only after the shopper has started
+   * browsing and chemistry is already on the cards. Not a gate: badges, hover,
+   * and compare stay. The Upgrade control is wired by the listing page to the
+   * existing site deep link. Copy names no retailer.
+   */
+  const SOFT_UNLOCK_MIN_CARDS = 3;
+  const SOFT_UNLOCK_COPY = {
+    line: 'Pro adds taste-map match and $/mg on the menu. Chemistry and compare stay on this page.',
+    upgrade: 'Upgrade',
+    dismiss: 'Not now'
+  };
+
+  function shouldOfferSoftUnlock(opts) {
+    const o = opts || {};
+    if (o.hasPro) return false;
+    if (o.storeAllowed === false) return false;
+    if (o.dismissed) return false;
+    if (!o.engaged) return false;
+    const n = Number(o.enrichedCount);
+    if (!Number.isFinite(n) || n < SOFT_UNLOCK_MIN_CARDS) return false;
+    return true;
+  }
+
+  function buildSoftUnlockPrompt() {
+    return `<aside id="csi-soft-unlock" class="csi-soft-unlock" data-csi-soft-unlock="1" role="note"><p class="csi-soft-unlock-line">${CSI.escapeHtml(
+      SOFT_UNLOCK_COPY.line
+    )}</p><div class="csi-soft-unlock-actions"><button type="button" class="csi-soft-unlock-upgrade" data-csi-soft-unlock-upgrade="1">${CSI.escapeHtml(
+      SOFT_UNLOCK_COPY.upgrade
+    )}</button><button type="button" class="csi-soft-unlock-dismiss" data-csi-soft-unlock-dismiss="1">${CSI.escapeHtml(
+      SOFT_UNLOCK_COPY.dismiss
+    )}</button></div></aside>`;
+  }
+
+  CSI.ui.SOFT_UNLOCK_COPY = SOFT_UNLOCK_COPY;
+  CSI.ui.SOFT_UNLOCK_MIN_CARDS = SOFT_UNLOCK_MIN_CARDS;
+  CSI.ui.shouldOfferSoftUnlock = shouldOfferSoftUnlock;
+  CSI.ui.buildSoftUnlockPrompt = buildSoftUnlockPrompt;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -325,6 +325,7 @@
   }
 
   async function handleHover(event, cardEl) {
+    noteBrowseEngagement();
     let product = CSI.getElementProduct(cardEl);
     CSI.ui.showTooltip(event.pageX, event.pageY, CSI.ui.buildTooltipContent({ status: 'loading' }));
 
@@ -512,6 +513,7 @@
       enrichCard(card).then(() => {
         syncSelectButtonForCard(card);
         applyFiltersAndSort();
+        maybeOfferSoftUnlock();
       });
     }
     CSI.log(`newly enhanced: ${n}`);
@@ -578,6 +580,9 @@
     clearTimeout(enhanceTimer);
     document.getElementById('csi-filter-bar')?.remove();
     document.getElementById('csi-store-gate')?.remove();
+    document.getElementById('csi-soft-unlock')?.remove();
+    window.removeEventListener('scroll', onSoftUnlockScroll);
+    browseEngaged = false;
     filterBar = null;
     document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
     document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
@@ -601,6 +606,74 @@
     });
   }
 
+  /**
+   * Soft unlock sits beside the menu after browse has started.
+   * It never replaces badges, hover, or compare, and it is not mounted
+   * on the multi-store gate (that path returns before this is armed).
+   */
+  const SOFT_UNLOCK_SCROLL_PX = 64;
+  let softUnlockDismissed = false;
+  let browseEngaged = false;
+
+  function countChemReadyCards() {
+    let n = 0;
+    for (const card of findProductCards()) {
+      if (card.dataset?.csiEnhanced !== 'true') continue;
+      const host = cardHost(card);
+      const row = host?.querySelector?.('.csi-badge-row');
+      if (!row) continue;
+      const badges = row.querySelectorAll('.csi-badge');
+      if (!badges.length) continue;
+      const onlyLoading = badges.length === 1 && badges[0].classList?.contains('csi-badge-loading');
+      if (onlyLoading) continue;
+      n += 1;
+    }
+    return n;
+  }
+
+  function mountSoftUnlock() {
+    if (document.getElementById('csi-soft-unlock') || !document.body) return;
+    if (!CSI.ui?.buildSoftUnlockPrompt) return;
+    const holder = document.createElement('div');
+    holder.innerHTML = CSI.ui.buildSoftUnlockPrompt();
+    const el = holder.firstElementChild;
+    if (!el) return;
+    document.body.appendChild(el);
+    el.querySelector('[data-csi-soft-unlock-upgrade]')?.addEventListener('click', () => {
+      CSI.entitlement?.openUpgrade?.();
+    });
+    el.querySelector('[data-csi-soft-unlock-dismiss]')?.addEventListener('click', () => {
+      softUnlockDismissed = true;
+      el.remove();
+      CSI.storage?.saveSoftUnlockDismissed?.();
+    });
+  }
+
+  function maybeOfferSoftUnlock() {
+    if (!active || softUnlockDismissed) return;
+    if (document.getElementById('csi-soft-unlock')) return;
+    const offer = CSI.ui?.shouldOfferSoftUnlock?.({
+      hasPro: !!CSI.features?.hasPro?.(),
+      storeAllowed: CSI.features?.canUseActiveStore?.() !== false,
+      enrichedCount: countChemReadyCards(),
+      engaged: browseEngaged,
+      dismissed: softUnlockDismissed
+    });
+    if (!offer) return;
+    mountSoftUnlock();
+  }
+
+  function noteBrowseEngagement() {
+    if (browseEngaged) return;
+    browseEngaged = true;
+    maybeOfferSoftUnlock();
+  }
+
+  function onSoftUnlockScroll() {
+    if ((window.scrollY || 0) < SOFT_UNLOCK_SCROLL_PX) return;
+    noteBrowseEngagement();
+  }
+
   async function startListing() {
     if (active) {
       onListingPathChange();
@@ -620,6 +693,10 @@
       return;
     }
     document.getElementById('csi-store-gate')?.remove();
+
+    softUnlockDismissed = !!(await CSI.storage?.loadSoftUnlockDismissed?.());
+    window.addEventListener('scroll', onSoftUnlockScroll, { passive: true });
+    if ((window.scrollY || 0) >= SOFT_UNLOCK_SCROLL_PX) noteBrowseEngagement();
 
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();

@@ -187,6 +187,28 @@ Copy says “Preference match” and lists the preferred terpenes that are actua
 | Chip and terpene names do not name a retailer or make medical/effects claims | |
 | Chem stays in the floating panel, not the buy column | |
 
+## Soft Pro unlock mid-browse (v1.3.12+)
+
+Free listings that already show chemistry can offer one quiet note. It is not a wall. Badges, hover, Compare Select, and the product panel stay usable while it is on screen. It does not appear on the product page.
+
+The note waits until you have scrolled the menu (or hovered a card) and at least three cards have finished chemistry badges — not a lone “Loading…” chip. Fewer than three ready cards stays quiet. Pro never sees it. A store that is already behind the multi-store gate does not also show this note.
+
+**Upgrade** uses the same control as the filter-bar Upgrade: it opens `https://cannabissage.app/#pricing`, where Stripe Checkout runs on the site. The extension does not collect a card. **Not now** removes the note and stores `csi_soft_unlock_dismissed` in extension storage so it stays hidden after reload. Clear that key to see the note again.
+
+Copy says taste-map match and $/mg stay optional, and that chemistry and compare stay on the page. It does not name a retailer or make a medical or effects claim.
+
+| Step | Pass? |
+| --- | --- |
+| Free listing, no scroll or hover yet: no note, chem badges and Compare Select still appear | |
+| After scroll or hover, once three cards have chemistry (not only Loading): one note, bottom-left, not covering the compare tray | |
+| Note visible: hover still opens the chem tooltip; Compare Select still works; product page chem panel still opens | |
+| Upgrade opens cannabissage.app pricing (hosted checkout), not a card form in the extension | |
+| Not now hides the note; reload the listing and it stays hidden | |
+| Pro: no note | |
+| Menu with fewer than three chem-ready cards: no note | |
+| Store behind the multi-store gate: existing gate only, no second note | |
+| Note copy does not name a retailer or make medical/effects claims | |
+
 ## SPA / scroll
 
 | Step | Pass? |
@@ -199,7 +221,7 @@ Copy says “Preference match” and lists the preferred terpenes that are actua
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.11.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.12.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

@@ -6,6 +6,8 @@
 **PR:** https://github.com/shaiss/CannabisSage/pull/1 · branch `cursor/chrome-extension-mv3-4eb2`  
 **Target:** Chrome Web Store readiness **2026-09-20**
 
+**Admiral upload checklist:** [`CWS-UPLOAD-CHECKLIST.md`](CWS-UPLOAD-CHECKLIST.md)
+
 ## Status (shipped on PR #1)
 
 | Phase | Status | Where |

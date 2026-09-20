@@ -42,7 +42,7 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.0', 'extension 1.3.0');
+assert(manifest.version === '1.3.1', 'extension 1.3.1');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host');
 assert(manifest.web_accessible_resources[0].resources.includes('data/config.json'), 'config WAR');
 

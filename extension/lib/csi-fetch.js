@@ -189,31 +189,38 @@
     const adapter = CSI.registry?.getActiveAdapter?.();
     const bridgeProduct = await requestBridgeExtract(cardEl);
     const fromBridge = applyBridgeProduct(cardEl, bridgeProduct);
-    if (fromBridge?.url) return fromBridge.url;
+    if (fromBridge?.url) {
+      const clean = String(fromBridge.url).split(/[?#]/)[0].replace(/\/$/, '');
+      cardEl.dataset.csiUrl = clean;
+      return clean;
+    }
 
     if (bridgeProduct?.slug && adapter?.buildProductUrl) {
       const url = adapter.buildProductUrl(bridgeProduct.slug);
       if (url) {
-        cardEl.dataset.csiUrl = url;
-        storeElementProduct(cardEl, { url });
-        return url;
+        const clean = url.split(/[?#]/)[0].replace(/\/$/, '');
+        cardEl.dataset.csiUrl = clean;
+        storeElementProduct(cardEl, { url: clean });
+        return clean;
       }
     }
     if (bridgeProduct?.id && adapter?.buildProductUrl) {
       const url = adapter.buildProductUrl(bridgeProduct.id);
       // Only use id-built URLs when adapter produces a real PDP path (Sunnyside)
       if (url && adapter.isAllowedFetchUrl?.(url)) {
-        cardEl.dataset.csiUrl = url;
-        storeElementProduct(cardEl, { url });
-        return url;
+        const clean = url.split(/[?#]/)[0].replace(/\/$/, '');
+        cardEl.dataset.csiUrl = clean;
+        storeElementProduct(cardEl, { url: clean });
+        return clean;
       }
     }
 
     const fromDom = adapter?.resolveProductUrlFromDom?.(cardEl) || null;
     if (fromDom) {
-      cardEl.dataset.csiUrl = fromDom;
-      storeElementProduct(cardEl, { url: fromDom });
-      return fromDom;
+      const clean = fromDom.split(/[?#]/)[0].replace(/\/$/, '');
+      cardEl.dataset.csiUrl = clean;
+      storeElementProduct(cardEl, { url: clean });
+      return clean;
     }
 
     return null;

@@ -94,10 +94,39 @@
     return product;
   }
 
+  function applyPdpPanelBox(el) {
+    if (!el) return;
+    el.style.cssText = [
+      'position:fixed',
+      'top:72px',
+      'right:12px',
+      'left:auto',
+      'width:min(340px, calc(100vw - 24px))',
+      'max-height:calc(100vh - 96px)',
+      'overflow-y:auto',
+      'z-index:2147483646',
+      'background:#fff',
+      'border:3px solid #ff6b35',
+      'border-radius:10px',
+      'padding:12px 14px',
+      'box-shadow:0 12px 32px rgba(0,0,0,.28)',
+      'font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif',
+      'color:#2c3e50',
+      'display:block',
+      'visibility:visible',
+      'opacity:1',
+      'pointer-events:auto',
+      'transform:none',
+      'box-sizing:border-box'
+    ].join(';');
+  }
+
   function renderPanel(product) {
-    document.getElementById('csi-pdp-panel')?.remove();
+    document.querySelectorAll('#csi-pdp-panel,[data-csi-pdp]').forEach((n) => n.remove());
     const panel = document.createElement('div');
     panel.id = 'csi-pdp-panel';
+    panel.setAttribute('data-csi-pdp', '1');
+    applyPdpPanelBox(panel);
 
     let body = '';
     if (product.status === 'error') {
@@ -129,7 +158,7 @@
       </div>
       <p class="csi-pdp-footnote">* $/mg uses listed price and estimated THC% × package weight when available. Not medical advice.</p>
     `;
-    document.body.appendChild(panel);
+    document.documentElement.appendChild(panel);
     CSI.glossary?.wireTerpeneClicks(panel);
 
     panel.querySelector('.csi-pdp-close').addEventListener('click', () => panel.remove());

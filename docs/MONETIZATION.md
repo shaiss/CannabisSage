@@ -74,7 +74,12 @@ npm run dev                  # http://localhost:3000
 stripe listen --forward-to localhost:3000/api/webhook
 ```
 
-Extension `data/config.json` defaults `apiBaseUrl` to `http://localhost:3000`. Manifest includes `http://localhost:3000/*` host permission for activate/validate.
+Extension `data/config.json` defaults `apiBaseUrl` / `upgradeUrl` / `accountUrl` to **`https://cannabissage.vercel.app`** (CWS production). Manifest `host_permissions` includes that origin plus `http://localhost:3000/*` for unpacked local/dev.
+
+**Local/dev override (pick one):**
+
+1. Unpacked: set `chrome.storage.local.csi_api_base` to `http://localhost:3000` (popup/devtools), or temporarily edit `extension/data/config.json` to localhost before load.
+2. Keep `npm run dev` on port 3000; activate/validate then hit your local API.
 
 Optional mock license without Stripe:
 
@@ -91,9 +96,8 @@ curl -X POST http://localhost:3000/api/license/activate \
 1. Deploy `web/` to Vercel project **cannabissage** (alias `https://cannabissage.vercel.app`); Marketplace already attaches Neon (`cannabissage-db`) + Stripe sandbox (`cannabissage-stripe`).
 2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.vercel.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
 3. Point Stripe webhook (test mode until Cipher CLEAR) to `https://cannabissage.vercel.app/api/webhook`.
-4. Update `extension/data/config.json` `apiBaseUrl` / `upgradeUrl` / `accountUrl` to the prod origin.
-5. Add that origin to `manifest.json` `host_permissions` (or grant `optional_host_permissions` for `https://*.vercel.app/*` and request at runtime later).
-6. Rebuild extension zip (`./scripts/pack-extension.sh`).
+4. Extension already defaults to the prod origin in `data/config.json` (v1.3.2+); localhost remains in `host_permissions` for unpacked local/dev only.
+5. Rebuild extension zip (`./scripts/pack-extension.sh`) → `dist/cannabis-sage-1.3.2.zip`.
 
 License rows live in Neon (`licenses`); Stripe subscription metadata remains the entitlement source of truth (`web/lib/licenses.ts`, `web/lib/fulfillment.ts`).
 

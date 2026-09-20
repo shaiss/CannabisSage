@@ -1,6 +1,6 @@
 {
-  "apiBaseUrl": "http://localhost:3000",
-  "upgradeUrl": "http://localhost:3000/#pricing",
-  "accountUrl": "http://localhost:3000/account",
+  "apiBaseUrl": "https://cannabissage.vercel.app",
+  "upgradeUrl": "https://cannabissage.vercel.app/#pricing",
+  "accountUrl": "https://cannabissage.vercel.app/account",
   "productName": "CannabisSage Pro"
 }

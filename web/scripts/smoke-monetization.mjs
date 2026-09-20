@@ -77,6 +77,11 @@ assert(checkoutSrc.includes('resolveStripePriceId'), 'env price id');
 assert(checkoutSrc.includes('/success?session_id='), 'success url');
 assert(checkoutSrc.includes('/cancel'), 'cancel url');
 
+const fulfillmentSrc = fs.readFileSync(path.join(webRoot, 'lib/fulfillment.ts'), 'utf8');
+assert(fulfillmentSrc.includes('CSG_KEY_RE'), 'CSG key sanitize before Stripe search');
+assert(fulfillmentSrc.includes('subscriptions.search'), 'stripe subscription search');
+assert(fulfillmentSrc.includes("CSG-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"), 'CSG pattern');
+
 // Extension feature gates
 const feat = fs.readFileSync(path.join(extRoot, 'lib/csi-features.js'), 'utf8');
 assert(feat.includes('multiStore: true'), 'ext multiStore pro');
@@ -88,12 +93,15 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.1', 'extension 1.3.1');
-assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host');
+assert(manifest.version === '1.3.2', 'extension 1.3.2');
+assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host');
+assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');
 assert(manifest.web_accessible_resources[0].resources.includes('data/config.json'), 'config WAR');
 
 const config = JSON.parse(fs.readFileSync(path.join(extRoot, 'data/config.json'), 'utf8'));
-assert(config.apiBaseUrl, 'apiBaseUrl');
+assert(config.apiBaseUrl === 'https://cannabissage.vercel.app', 'prod apiBaseUrl');
+assert(config.upgradeUrl.includes('cannabissage.vercel.app'), 'prod upgradeUrl');
+assert(config.accountUrl.includes('cannabissage.vercel.app'), 'prod accountUrl');
 
 function generateLicenseKey() {
   const raw = randomBytes(9).toString('hex').toUpperCase();

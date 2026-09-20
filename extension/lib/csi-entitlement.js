@@ -22,14 +22,17 @@
     } catch {
       cachedConfig = {};
     }
-    // Allow override from storage (power users / staging)
+    // Local/dev override: chrome.storage.local.csi_api_base = 'http://localhost:3000'
+    // (or edit data/config.json when loading unpacked). Production default is cannabissage.vercel.app.
     try {
       const local = await chrome.storage.local.get(['csi_api_base']);
       if (local.csi_api_base) cachedConfig.apiBaseUrl = local.csi_api_base;
     } catch {
       /* ignore */
     }
-    cachedConfig.apiBaseUrl = (cachedConfig.apiBaseUrl || 'http://localhost:3000').replace(/\/$/, '');
+    cachedConfig.apiBaseUrl = (
+      cachedConfig.apiBaseUrl || 'https://cannabissage.vercel.app'
+    ).replace(/\/$/, '');
     cachedConfig.upgradeUrl = cachedConfig.upgradeUrl || `${cachedConfig.apiBaseUrl}/#pricing`;
     cachedConfig.accountUrl = cachedConfig.accountUrl || `${cachedConfig.apiBaseUrl}/account`;
     return cachedConfig;

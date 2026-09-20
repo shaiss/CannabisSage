@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "CannabisSage",
+  "version": "1.0.0",
+  "description": "Show cannabinoid and terpene profiles on Sunnyside product listings and compare up to three products side by side.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "CannabisSage",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.sunnyside.shop/products/*",
+        "https://sunnyside.shop/products/*"
+      ],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "host_permissions": [
+    "https://www.sunnyside.shop/*",
+    "https://sunnyside.shop/*"
+  ],
+  "permissions": []
+}

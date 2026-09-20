@@ -47,11 +47,12 @@ export const FEATURE_GATES = {
     'Product detail panel',
     'Sunnyside store'
   ],
+  /** Pro bullets lead with money-savers: match, Zen Leaf coverage, $/mg. */
   proLabels: [
-    'Taste-map match + editor',
+    'Taste-map match on listings',
+    'Zen Leaf + TerraVida coverage',
+    '$/mg and deal badges',
     'Listing filters & sort',
-    'CSV / JSON export',
-    'Deal / $/mg badges',
-    'Zen Leaf + TerraVida (multi-store)'
+    'CSV / JSON export'
   ]
 };

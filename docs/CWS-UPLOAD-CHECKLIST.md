@@ -38,7 +38,7 @@ Manual unpacked fallback:
 | --- | --- | --- | --- |
 | 1 | **Cipher** | CLEAR security review before merge / first public deploy | ☐ |
 | 2 | **Sage** | Accept Free/Pro split, promo copy, store listing tone | ☐ |
-| 3 | **Assay / Shai** | Stripe: **$9/yr + $4/mo promo**, **$99/yr + $9/mo regular** → `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY`, `STRIPE_PRICE_ID_REGULAR_ANNUAL`, `STRIPE_PRICE_ID_REGULAR_MONTHLY`; webhook → `https://<prod>/api/webhook`; Customer Portal | ☐ |
+| 3 | **Assay / Shai** | Stripe: **$9/yr + $4/mo promo**, **$59/yr + $9/mo regular** → `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY`, `STRIPE_PRICE_ID_REGULAR_ANNUAL`, `STRIPE_PRICE_ID_REGULAR_MONTHLY`; webhook → `https://<prod>/api/webhook`; Customer Portal | ☐ |
 | 4 | **Assay / Shai** | Deploy `web/` to Vercel; set env from `web/.env.example` (never invent keys) | ☐ |
 | 5 | **Assay** | Set real `LAUNCH_DATE` (promo = +30 days). Regular tier via `STRIPE_PRICE_ID_REGULAR_ANNUAL` + `STRIPE_PRICE_ID_REGULAR_MONTHLY` | ☐ |
 | 6 | **Assay** | ✅ Prod API **1.3.3** — `config.json` → `https://cannabissage.app`; manifest `host_permissions` includes `cannabissage.app` + `cannabissage.vercel.app` (+ localhost for unpacked local/dev). **1.3.2** already pending CWS review with vercel-only hosts | ☑ |

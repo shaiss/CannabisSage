@@ -39,7 +39,7 @@ Pro features (unlock after purchase on the CannabisSage website):
 
 Payments:
 • Subscription checkout uses Stripe Checkout on our website — never inside the extension
-• Launch promo: $9/year or $4/month for the first 30 days after launch — then $99/year or $9/month (see cannabissage.app for dates)
+• Launch promo: $9/year or $4/month for the first 30 days after launch — then $59/year or $9/month (see cannabissage.app for dates)
 • Activate a license key in the extension popup; manage/cancel via Stripe Customer Portal
 
 What it does not do

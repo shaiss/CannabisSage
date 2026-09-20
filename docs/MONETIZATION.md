@@ -7,7 +7,7 @@ Stripe Checkout (hosted) + license keys + extension entitlement. **No card colle
 | Window | Annual | Monthly | Stripe env |
 | --- | --- | --- | --- |
 | **Launch promo** (first **30 days** after `LAUNCH_DATE`) | **$9 / year** | **$4 / month** | `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY` |
-| **Regular** (after promo) | **$99 / year** | **$9 / month** | `STRIPE_PRICE_ID_REGULAR_ANNUAL` (alias: `STRIPE_PRICE_ID_AFTER_PROMO`), `STRIPE_PRICE_ID_REGULAR_MONTHLY` |
+| **Regular** (after promo) | **$59 / year** | **$9 / month** | `STRIPE_PRICE_ID_REGULAR_ANNUAL` (alias: `STRIPE_PRICE_ID_AFTER_PROMO`), `STRIPE_PRICE_ID_REGULAR_MONTHLY` |
 
 Display amounts live in `web/lib/pricing.ts` (`PRICE_*_CENTS`). Checkout always charges the configured Stripe Price IDs — not the cent constants alone.
 
@@ -18,18 +18,18 @@ Defaults:
 
 ### Marketplace sandbox (partial — Assay / Shai)
 
-Test-mode Price IDs already created (promo annual $9 and regular monthly $9 may be pending card approval):
+Test-mode Price IDs (Assay sets/updates on Vercel — **do not invent Price IDs in this repo**):
 
 | Price | Amount | Price ID (test) |
 | --- | --- | --- |
 | Promo monthly | $4/mo | `price_1UHikzATpHsAXg8mLqGkTbdi` |
-| Regular annual | $99/yr | `price_1UHikzATpHsAXg8mECO1ZvjR` |
+| Regular annual | **$59/yr** | Assay creates/updates `STRIPE_PRICE_ID_REGULAR_ANNUAL` on Vercel (was $99 sandbox id; replace when $59 Price is live) |
 
 Set on Vercel when approved:
 
 ```bash
 STRIPE_PRICE_ID_PROMO_MONTHLY=price_1UHikzATpHsAXg8mLqGkTbdi
-STRIPE_PRICE_ID_REGULAR_ANNUAL=price_1UHikzATpHsAXg8mECO1ZvjR
+# STRIPE_PRICE_ID_REGULAR_ANNUAL=price_...   # $59/yr — Assay sets on Vercel
 # Pending Shai approval:
 # STRIPE_PRICE_ID_PROMO=price_...
 # STRIPE_PRICE_ID_REGULAR_MONTHLY=price_...
@@ -44,10 +44,10 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | Free | Pro |
 | --- | --- |
 | Hover tooltips | Taste-map match on listings |
-| Basic THC / terpene badges | Filters & sort |
-| Compare tray (≤3) | CSV / JSON export |
-| PDP panel | Deal / $/mg badges |
-| Sunnyside store | Zen Leaf + TerraVida (multi-store) |
+| Basic THC / terpene badges | Zen Leaf + TerraVida coverage |
+| Compare tray (≤3) | $/mg and deal badges |
+| PDP panel | Filters & sort |
+| Sunnyside store | CSV / JSON export |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings only when Pro is active.
 
@@ -72,7 +72,7 @@ Extension popup ──Upgrade──► web/ landing ──► Stripe Checkout (h
 
 ## Stripe Dashboard setup
 
-1. Create Product **CannabisSage Pro** with four recurring Prices ($9/yr promo, $4/mo promo, $99/yr regular, $9/mo regular) → map to env vars above.
+1. Create Product **CannabisSage Pro** with four recurring Prices ($9/yr promo, $4/mo promo, $59/yr regular, $9/mo regular) → map to env vars above. Assay owns Stripe Price IDs on Vercel.
 2. Add webhook endpoint `https://<your-domain>/api/webhook` for:
    - `checkout.session.completed`
    - `customer.subscription.created`

@@ -135,7 +135,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.5', 'version bump');
+assert(manifest.version === '1.3.6', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -168,5 +168,22 @@ assert(
   !manifest.host_permissions.some((h) => /terravidahc|terravida\.com/.test(h)),
   'no bogus TerraVida ecommerce host'
 );
+
+// Denylist wiring (v1.3.6)
+assert(
+  fs.existsSync(path.join(ext, 'lib/csi-denylist.js')),
+  'csi-denylist.js present'
+);
+assert(
+  manifest.content_scripts?.[1]?.js?.includes('lib/csi-denylist.js'),
+  'denylist content script listed'
+);
+const cfg = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
+assert(cfg.denylistPath === '/denylist.json', 'denylistPath in config');
+const denylistPublic = path.join(root, 'web', 'public', 'denylist.json');
+assert(fs.existsSync(denylistPublic), 'web/public/denylist.json');
+const denyDoc = JSON.parse(fs.readFileSync(denylistPublic, 'utf8'));
+assert(Array.isArray(denyDoc.hosts), 'denylist hosts array');
+assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
 
 console.log('smoke-adapters: OK');

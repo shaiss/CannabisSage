@@ -512,7 +512,7 @@
     el.id = 'csi-store-gate';
     el.innerHTML = `
       <strong>CannabisSage Pro</strong>
-      <span>Multi-store (Zen Leaf / TerraVida) requires Pro.</span>
+      <span>Multi-store coverage requires Pro.</span>
       <button type="button" id="csi-store-upgrade">Upgrade</button>
     `;
     document.body.appendChild(el);

@@ -2,7 +2,7 @@
 
 Chrome extension (**Manifest V3**, v1.3) that enhances supported dispensary listing and product pages with retailer-published cannabinoid and terpene information, comparison, filters, sorting, and a local taste-map match score. Optional **Pro** unlocks via Stripe Checkout on the website (never inside the extension).
 
-**Stores:** [Sunnyside](https://www.sunnyside.shop) (primary), [Zen Leaf](https://zenleafdispensaries.com) (including Malvern / TerraVida alias). See [`docs/ADAPTERS.md`](docs/ADAPTERS.md).
+**Stores:** Supported dispensary menus via in-repo adapters — see [`docs/ADAPTERS.md`](docs/ADAPTERS.md). Ops can pause a host without a rebuild — see [`docs/DENYLIST.md`](docs/DENYLIST.md).
 
 **Monetization:** [`docs/MONETIZATION.md`](docs/MONETIZATION.md) · landing + API in [`web/`](web/).
 
@@ -13,7 +13,7 @@ Chrome extension (**Manifest V3**, v1.3) that enhances supported dispensary list
 1. Open `chrome://extensions`
 2. Enable **Developer mode**
 3. **Load unpacked** → select the `extension/` folder
-4. Open a listing such as [Sunnyside Flower](https://www.sunnyside.shop/products/flower)
+4. Open a supported dispensary listing or product page
 5. Toolbar popup: taste map + **Upgrade / Activate license**
 
 ### Pack for Chrome Web Store

@@ -98,7 +98,7 @@
       licenseKeyInput.value = rec.licenseKey;
       deactivateBtn.hidden = false;
     } else {
-      licenseStatus.textContent = 'Free plan — hover, badges, compare, Sunnyside PDP.';
+      licenseStatus.textContent = 'Free plan — hover, badges, compare, product detail.';
       deactivateBtn.hidden = true;
     }
     setTasteEnabled(pro);

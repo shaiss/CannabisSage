@@ -116,11 +116,20 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.5.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.6.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
 | `node web/scripts/smoke-monetization.mjs` exits 0 | |
+
+## Remote denylist (v1.3.6+)
+
+| Step | Pass? |
+| --- | --- |
+| `https://cannabissage.app/denylist.json` (or local `web/public/denylist.json`) is `{ version, hosts: [] }` by default | |
+| Adding a host → calm notice “Support for this store is paused.”; no badges/compare inject | |
+| Manifest `host_permissions` for retailer hosts unchanged | |
+| Ops notes in `docs/DENYLIST.md` | |
 
 ## P3 — Monetization (Stripe test mode)
 

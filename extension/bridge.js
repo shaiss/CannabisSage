@@ -25,7 +25,7 @@
             if (inv.product) return inv.product;
             if (inv.id || inv.sku) return inv;
           }
-          // Zen Leaf / Sweed-style card props
+          // Location-menu card props (Sweed-style)
           if (props.labTests || (props.name && props.price != null && (props.sku || props.id))) {
             return props;
           }

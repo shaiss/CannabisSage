@@ -5,11 +5,11 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.5';
+  const VERSION = '1.3.6';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
-  const SUNNYSIDE_ORANGE = '#FF6B35';
-  const SUNNYSIDE_DARK = '#2C3E50';
+  const ACCENT_ORANGE = '#FF6B35';
+  const ACCENT_DARK = '#2C3E50';
 
   const DEBUG =
     (typeof localStorage !== 'undefined' && localStorage.getItem('cannabisSageDebug') === '1') ||
@@ -245,10 +245,7 @@
   function buildProductUrl(idOrSlug) {
     const adapter = activeAdapter();
     if (adapter?.buildProductUrl) return adapter.buildProductUrl(idOrSlug);
-    if (!idOrSlug) return null;
-    const cleaned = String(idOrSlug).replace(/^\/product\//, '').replace(/^\//, '');
-    if (!cleaned) return null;
-    return `https://www.sunnyside.shop/product/${cleaned}`;
+    return null;
   }
 
   function extractProductData(productObj, fallbackUrl) {
@@ -390,8 +387,8 @@
     VERSION,
     MAX_COMPARE,
     CACHE_TTL_MS,
-    SUNNYSIDE_ORANGE,
-    SUNNYSIDE_DARK,
+    ACCENT_ORANGE,
+    ACCENT_DARK,
     DEBUG,
     TERPENE_CANON,
     log,

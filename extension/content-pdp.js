@@ -95,6 +95,12 @@
     return product;
   }
 
+  function clearPdpBuyboxChemInject() {
+    document
+      .querySelectorAll('#csi-pdp-inline, [data-csi-pdp-inline], .csi-pdp-buybox-chem')
+      .forEach((n) => n.remove());
+  }
+
   function applyPdpPanelBox(el) {
     if (!el) return;
     el.style.cssText = [
@@ -123,6 +129,7 @@
   }
 
   function renderPanel(product) {
+    clearPdpBuyboxChemInject();
     document.querySelectorAll('#csi-pdp-panel,[data-csi-pdp]').forEach((n) => n.remove());
     const panel = document.createElement('div');
     panel.id = 'csi-pdp-panel';
@@ -189,6 +196,7 @@
 
   function teardownPdp() {
     active = false;
+    clearPdpBuyboxChemInject();
     document.getElementById('csi-pdp-panel')?.remove();
   }
 
@@ -209,6 +217,7 @@
       if (!active) return;
       const adapter = CSI.registry?.refreshActiveAdapter?.() || CSI.registry?.getActiveAdapter?.();
       if (!adapter || adapter.routeMode(location.pathname) !== 'pdp') return;
+      clearPdpBuyboxChemInject();
       document.getElementById('csi-pdp-panel')?.remove();
       const loading = document.createElement('div');
       loading.id = 'csi-pdp-panel';

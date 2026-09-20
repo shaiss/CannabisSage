@@ -110,6 +110,28 @@
     };
   }
 
+  /** Sunnyside cards already show THC/CBD potency in retail UI — avoid duplicate badges. */
+  function shouldSuppressListingCannabinoidBadges(cardEl) {
+    const host = cardHost(cardEl);
+    const root =
+      host?.querySelector?.('[data-cy="ProductListItem"]') ||
+      cardEl?.closest?.('[data-cy="ProductListItem"]') ||
+      host ||
+      cardEl;
+    if (!root) return false;
+    if (
+      root.querySelector?.(
+        '[data-cy="ProductCardPotency"], [data-cy="product-potency"], [data-testid="product-potency"]'
+      )
+    ) {
+      return true;
+    }
+    const text = String(root.textContent || '').replace(/\s+/g, ' ');
+    if (/\bTHC\b[^%]{0,24}\d+(?:\.\d+)?\s*%/i.test(text)) return true;
+    if (/\bCBD\b[^%]{0,24}\d+(?:\.\d+)?\s*%/i.test(text)) return true;
+    return false;
+  }
+
   /** Generic HTML chem scrape used when React bridge lacks detail. */
   function parseProductHtml(html, url) {
     const parser = new DOMParser();
@@ -198,8 +220,10 @@
     cardHost,
     resolveProductUrlFromDom,
     parseListingHints,
+    shouldSuppressListingCannabinoidBadges,
     isAllowedFetchUrl,
     bridgeStrategy: 'sunnyside',
+    pdpChemSurface: 'floating-panel',
     notes: 'Primary built-in adapter. React fiber bridge supplies listing/PDP props.'
   };
 

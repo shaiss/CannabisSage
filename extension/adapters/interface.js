@@ -13,6 +13,8 @@
  *
  * Optional:
  *   parseListingHints(cardEl) → { price, onSale, weightText, cannabinoids, terpenes }
+ *   shouldSuppressListingCannabinoidBadges(cardEl) → boolean (retail already shows THC/CBD)
+ *   pdpChemSurface: 'floating-panel' | 'inline-buybox' (default: floating-panel only in core)
  *   detectSale(el), categoryUrlPatterns, notes
  *
  * Do NOT load adapters from the network — Chrome Web Store forbids remote code.

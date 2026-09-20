@@ -32,7 +32,7 @@ For each URL, confirm badges, Compare Select, filter bar, and hover tooltip:
 Checks per listing:
 
 - [ ] Filter bar visible; title includes **Sunnyside**
-- [ ] Cards show THC% and/or top-terp badge (or explicit “No chem data” / “Chem unavailable”)
+- [ ] Cards show **top-terp badge** when we have terp data (Sunnyside already shows THC/CBD on-card — no duplicate cann badges)
 - [ ] Hover shows loading → profile or clear empty/error message (never silent)
 - [ ] “Map match” appears when score ≥ threshold
 - [ ] Sale / `$/mg` badges only when DOM provides sale cues and weight+price+THC
@@ -42,6 +42,7 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | Open any `/product/<id>` from a listing | |
+| **No** CannabisSage chem block in the size/quantity / buy column — chem only in the **floating** right-side panel | |
 | PDP panel appears with chem readout or empty/error state | |
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
@@ -115,7 +116,7 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.3.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.4.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

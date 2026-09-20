@@ -135,7 +135,23 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.3', 'version bump');
+assert(manifest.version === '1.3.4', 'version bump');
+
+const mockCard = {
+  textContent: 'Blue Dream THC 24.5% $45',
+  querySelector: () => null,
+  closest: () => null,
+  parentElement: null
+};
+assert(
+  sy.shouldSuppressListingCannabinoidBadges(mockCard) === true,
+  'sunnyside suppresses duplicate THC listing badge'
+);
+assert(
+  sy.shouldSuppressListingCannabinoidBadges({ textContent: 'Mystery strain $40', querySelector: () => null, closest: () => null, parentElement: null }) === false,
+  'sunnyside shows THC badge when retail omits potency'
+);
+assert(sy.pdpChemSurface === 'floating-panel', 'sunnyside PDP chem is floating panel only');
 assert(
   manifest.host_permissions.includes('https://zenleafdispensaries.com/*'),
   'zenleaf host perm'

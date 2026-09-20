@@ -58,6 +58,67 @@
     return `<strong style="color:${CSI.SUNNYSIDE_ORANGE};">Terpenes:</strong><br>${parts.join(', ')}`;
   }
 
+  function shouldSuppressListingCannabinoidBadges(adapter, cardEl) {
+    if (!adapter || !cardEl) return false;
+    if (typeof adapter.shouldSuppressListingCannabinoidBadges === 'function') {
+      return adapter.shouldSuppressListingCannabinoidBadges(cardEl);
+    }
+    return false;
+  }
+
+  /**
+   * Listing card chips (terp gap on Sunnyside when retail already shows THC/CBD).
+   */
+  function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
+    const chips = [];
+    const thc = CSI.readThcPercent(product?.cannabinoids);
+    const cbd = CSI.parsePercent(product?.cannabinoids?.CBD ?? product?.cannabinoids?.cbd);
+    const top = CSI.topTerpene(product?.terpenes);
+    const suppressCann = shouldSuppressListingCannabinoidBadges(adapter, cardEl);
+    const match = product?.matchScore;
+
+    if (status === 'loading') {
+      chips.push(`<span class="csi-badge csi-badge-loading">Loading…</span>`);
+    } else if (status === 'error') {
+      chips.push(
+        `<span class="csi-badge csi-badge-error" title="${CSI.escapeHtml(product?.error || 'Fetch failed')}">Chem unavailable</span>`
+      );
+    } else {
+      const hasVisibleChem =
+        !!top || (!suppressCann && (thc != null || (cbd != null && cbd > 0)));
+      if (status === 'empty' || !hasVisibleChem) {
+        chips.push(`<span class="csi-badge csi-badge-empty">No chem data</span>`);
+      } else {
+        if (!suppressCann) {
+          if (thc != null) {
+            chips.push(`<span class="csi-badge csi-badge-thc">THC ${thc.toFixed(1)}%</span>`);
+          }
+          if (cbd != null && cbd > 0) {
+            chips.push(`<span class="csi-badge csi-badge-thc">CBD ${cbd.toFixed(1)}%</span>`);
+          }
+        }
+        if (top) {
+          chips.push(
+            `<span class="csi-badge csi-badge-terp" data-csi-terp="${CSI.escapeHtml(top.name)}">${CSI.escapeHtml(top.name)}</span>`
+          );
+        }
+      }
+    }
+
+    if (CSI.features?.can?.('tasteMap') && match != null && match >= minMatch) {
+      chips.push(
+        `<span class="csi-badge csi-badge-match" title="Taste-map match ${Math.round(match * 100)}%">Map match</span>`
+      );
+    }
+    if (CSI.features?.can?.('dealBadges') && product?.onSale) {
+      chips.push(`<span class="csi-badge csi-badge-deal">Sale</span>`);
+    }
+    if (CSI.features?.can?.('dealBadges') && product?.dollarsPerMg != null) {
+      chips.push(`<span class="csi-badge csi-badge-deal">$${product.dollarsPerMg.toFixed(2)}/mg</span>`);
+    }
+    return chips;
+  }
+
   function buildTooltipContent(insights, extra = {}) {
     if (!insights) {
       return `<div class="csi-status csi-status-error">No product data available.</div>`;
@@ -395,6 +456,7 @@
   CSI.ui = {
     formatCannabinoids,
     formatTerpenes,
+    buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,
     hideTooltip,

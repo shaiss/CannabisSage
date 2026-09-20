@@ -43,13 +43,13 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 
 | Free | Pro |
 | --- | --- |
-| Hover tooltips | Taste-map match on listings |
+| Hover tooltips | Taste-map match on listings and the product page |
 | Basic THC / terpene badges | More stores you shop (multi-store) |
 | Compare tray (≤3) | $/mg and deal badges |
 | PDP panel | Filters & sort |
 | Core supported menus | CSV / JSON export |
 
-Taste prefs can still be edited in the popup on Free; they apply on listings only when Pro is active.
+Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match.
 
 ## Architecture
 

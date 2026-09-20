@@ -106,8 +106,24 @@
 
   async function loadTasteMap() {
     const data = await storageGet([KEYS.TASTE]);
-    if (data[KEYS.TASTE] && typeof data[KEYS.TASTE] === 'object') {
-      return { ...DEFAULT_TASTE, ...data[KEYS.TASTE], preferredTerpenes: { ...DEFAULT_TASTE.preferredTerpenes, ...(data[KEYS.TASTE].preferredTerpenes || {}) } };
+    const stored = data[KEYS.TASTE];
+    if (stored && typeof stored === 'object') {
+      // Saved prefs win, including an explicit empty preferred list, so
+      // listing badges and the product panel can stay quiet. A saved map
+      // with no preferredTerpenes object still uses the seeded defaults.
+      const storedPrefs = stored.preferredTerpenes;
+      const preferredTerpenes =
+        storedPrefs && typeof storedPrefs === 'object' && !Array.isArray(storedPrefs)
+          ? storedPrefs
+          : { ...DEFAULT_TASTE.preferredTerpenes };
+      return {
+        ...DEFAULT_TASTE,
+        ...stored,
+        preferredTerpenes,
+        avoidTerpenes: Array.isArray(stored.avoidTerpenes)
+          ? stored.avoidTerpenes
+          : DEFAULT_TASTE.avoidTerpenes
+      };
     }
     // Try bundled default
     try {

@@ -78,10 +78,15 @@
     preferTerps.checked = !!map.preferHighTotalTerps;
   }
 
-  function setTasteEnabled(pro) {
-    tasteProNote.textContent = pro
-      ? 'Applied on listings.'
-      : 'Saved locally; Map match on listings requires Pro.';
+  function setTasteEnabled(allowed) {
+    const tasteIsPro = !!CSI.features?.PRO_FEATURES?.tasteMap;
+    if (allowed) {
+      tasteProNote.textContent = 'Applied on listings and product pages.';
+      return;
+    }
+    tasteProNote.textContent = tasteIsPro
+      ? 'Saved locally. Map match on listings and product pages requires Pro.'
+      : 'Saved locally. Map match on listings and product pages follows your taste-map prefs.';
   }
 
   async function refreshLicenseUi() {
@@ -101,7 +106,7 @@
       licenseStatus.textContent = 'Free plan — hover, badges, compare, product detail.';
       deactivateBtn.hidden = true;
     }
-    setTasteEnabled(pro);
+    setTasteEnabled(!!CSI.features?.can?.('tasteMap'));
   }
 
   async function loadTaste() {

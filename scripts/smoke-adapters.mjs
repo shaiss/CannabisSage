@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.10', 'version bump');
+assert(manifest.version === '1.3.11', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -190,7 +190,7 @@ assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.10', 'core version 1.3.10');
+assert(CSI.VERSION === '1.3.11', 'core version 1.3.11');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -530,5 +530,83 @@ assert(bridgeProv.includes('source_sku') && bridgeProv.includes('mfg_date'), 'br
 assert(bridgeProv.includes('labName') && bridgeProv.includes('testedAt'), 'bridge forwards lab name and test date when present');
 assert(!bridgeProv.includes('displayThc') && !bridgeProv.includes('sourceUrl'), 'bridge does not treat potency or image urls as provenance');
 assert(!/startDate|updated_ago|exp_date|brand/.test(bridgeProv), 'bridge does not forward promo, relative, expiry, or brand fields');
+
+// Preference match on the floating PDP (v1.3.11) — same tasteMap gate, quiet when empty
+const prefCopy = Object.values(CSI.ui.PREFERENCE_MATCH_COPY).join(' ');
+assert(CSI.ui.PREFERENCE_MATCH_COPY.chip === 'Preference match', 'chip label');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida|savvy/i.test(prefCopy), 'no retailer brand in preference copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(prefCopy),
+  'no medical or effects claims in preference copy'
+);
+const prefUi = uiSrc.slice(uiSrc.indexOf('const PREFERENCE_MATCH_COPY'), uiSrc.indexOf('function exportCompareJson'));
+assert(prefUi.includes("can?.('tasteMap')"), 'preference panel uses the tasteMap gate');
+assert(!/openUpgrade/.test(prefUi), 'preference panel has no upgrade control');
+assert(prefUi.includes('function summarizePreferenceMatch'), 'quiet summary lives with the panel');
+
+const seed = JSON.parse(fs.readFileSync(path.join(ext, 'data/default-taste-map.json'), 'utf8'));
+assert(seed.preferredTerpenes && seed.preferredTerpenes.Limonene > 0, 'seed prefs include limonene');
+assert(CSI.ui.summarizePreferenceMatch({ terpenes: { Limonene: 0.4 } }, { preferredTerpenes: {} }) === null, 'no prefs stays quiet');
+assert(
+  CSI.ui.summarizePreferenceMatch(
+    { terpenes: { 'Total Terpenes': 2.4 } },
+    { preferredTerpenes: { Limonene: 0.9 }, minMatchScore: 0 }
+  ) === null,
+  'total terpenes alone is not overlap'
+);
+assert(
+  CSI.ui.summarizePreferenceMatch(
+    { terpenes: { Limonene: 0.1 } },
+    { preferredTerpenes: { Limonene: 1 }, minMatchScore: 0.9, preferHighTotalTerps: false }
+  ) === null,
+  'score under the saved minimum stays quiet'
+);
+const matched = CSI.ui.summarizePreferenceMatch(
+  { terpenes: [{ name: 'Limonene', percentage: 0.55 }, { name: 'Myrcene', percentage: 0.2 }] },
+  {
+    preferredTerpenes: { Limonene: 0.95, 'Beta-Myrcene': 0.4, Linalool: 0.8 },
+    avoidTerpenes: ['myrcene'],
+    minMatchScore: 0.2,
+    preferHighTotalTerps: false
+  }
+);
+assert(matched && matched.overlaps[0].name === 'Limonene', 'overlap lists a preferred terpene that is present');
+assert(matched.overlaps.some((row) => row.name === 'Beta-Myrcene'), 'myrcene alias counts as overlap');
+assert(!matched.overlaps.some((row) => row.name === 'Linalool'), 'a preferred terpene that is absent is omitted');
+assert(matched.avoid.some((row) => row.name === 'Beta-Myrcene'), 'avoid list only names a terpene that is listed');
+
+sandbox.CSI.features = { can: () => false };
+assert(CSI.ui.buildPreferenceMatchPanel({ terpenes: { Limonene: 0.55 } }, seed) === '', 'gate off renders nothing');
+sandbox.CSI.features = { can: (id) => id === 'tasteMap' };
+const prefHtml = CSI.ui.buildPreferenceMatchPanel(
+  { terpenes: { Limonene: 0.55, Myrcene: 0.2 } },
+  {
+    preferredTerpenes: { Limonene: 0.95, Linalool: 0.2 },
+    avoidTerpenes: ['Myrcene'],
+    minMatchScore: 0.2,
+    preferHighTotalTerps: false
+  }
+);
+assert(prefHtml.includes('data-csi-pref-match="1"'), 'panel marker');
+assert(prefHtml.includes('Preference match'), 'chip copy');
+assert(prefHtml.includes('data-csi-terp="Limonene"'), 'overlapping terpene is tappable');
+assert(prefHtml.includes('Also on your avoid list'), 'avoid line only when that terpene is listed');
+assert(!/sunnyside|zenleaf|terravida|Upgrade/i.test(prefHtml), 'panel has no retailer name or upgrade control');
+assert(
+  CSI.ui.buildPreferenceMatchPanel({ terpenes: { Pinene: 0.2 } }, { preferredTerpenes: { Linalool: 1 }, minMatchScore: 0 }) === '',
+  'no chem overlap renders nothing'
+);
+delete sandbox.CSI.features;
+
+const prefAttach = pdpSrc.slice(pdpSrc.indexOf('async function attachPreferenceMatch'), pdpSrc.indexOf('async function attachDealVsMedian'));
+assert(prefAttach.includes("can?.('tasteMap')"), 'pdp match uses tasteMap');
+assert(prefAttach.includes('loadTasteMap'), 'pdp reads saved taste map');
+assert(!/openUpgrade/.test(prefAttach), 'missing match does not nag to upgrade');
+assert(pdpSrc.includes('buildPreferenceMatchPanel(product, product.tasteMap)'), 'floating panel mounts the match');
+assert(!pdpSrc.includes('Map match ${'), 'pdp no longer uses the ungated percent badge');
+assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'preference match stays out of the buy column');
+const featuresSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-features.js'), 'utf8');
+assert(/tasteMap:\s*true/.test(featuresSrcPref), 'tasteMap stays the existing gate');
+assert(!/preferenceMatch:/.test(featuresSrcPref), 'no second gate for the product-page match');
 
 console.log('smoke-adapters: OK');

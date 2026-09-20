@@ -70,6 +70,7 @@
         const failed = { ...product, url, status: 'error', error: data.error };
         failed.price = failed.price ?? CSI.parsePrice(document.body?.innerText || '');
         await attachDealVsMedian(failed);
+        await attachPreferenceMatch(failed);
         return failed;
       }
       product = {
@@ -97,10 +98,24 @@
       ? CSI.dollarsPerMgThc(product.price, product.cannabinoids, weightGrams)
       : null;
 
-    const taste = await CSI.storage.loadTasteMap();
-    product.matchScore = CSI.scoreTasteMatch(product, taste);
     await attachDealVsMedian(product);
+    await attachPreferenceMatch(product);
     return product;
+  }
+
+  /**
+   * Preference match uses the saved taste map (or the bundled seed).
+   * Same tasteMap gate as listing badges — no separate upgrade wall.
+   * When the gate is off, the score stays unset so compare does not
+   * show a match the plan does not include.
+   */
+  async function attachPreferenceMatch(product) {
+    product.matchScore = null;
+    product.tasteMap = null;
+    if (!CSI.features?.can?.('tasteMap')) return;
+    const taste = await CSI.storage.loadTasteMap();
+    product.tasteMap = taste || null;
+    product.matchScore = taste ? CSI.scoreTasteMatch(product, taste) : null;
   }
 
   /**
@@ -176,7 +191,7 @@
     } else if (product.status === 'empty') {
       body = `<div class="csi-status csi-status-empty">No cannabinoid or terpene details were published for this product.</div>`;
     } else {
-      body = CSI.ui.buildTooltipContent(product, { matchScore: product.matchScore });
+      body = CSI.ui.buildTooltipContent(product);
     }
 
     const dealBits = [];
@@ -184,9 +199,7 @@
     if (product.dollarsPerMg != null) {
       dealBits.push(`<span class="csi-badge csi-badge-deal">≈ $${product.dollarsPerMg.toFixed(3)}/mg THC*</span>`);
     }
-    if (product.matchScore != null && product.matchScore >= 0.35) {
-      dealBits.push(`<span class="csi-badge csi-badge-match">Map match ${Math.round(product.matchScore * 100)}%</span>`);
-    }
+    const prefMatch = CSI.ui.buildPreferenceMatchPanel(product, product.tasteMap) || '';
     let medianStrip = '';
     if (CSI.features?.can?.('dealBadges')) {
       const medianBadge = CSI.ui.buildDealVsMedianBadge(product.belowCategoryMedian);
@@ -197,6 +210,7 @@
     panel.innerHTML = `
       ${CSI.ui.buildPdpHeader({ showClose: true })}
       ${CSI.ui.buildProvenanceStrip(product.provenance)}
+      ${prefMatch}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
       ${medianStrip}
       <div class="csi-pdp-body">${body}</div>

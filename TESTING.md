@@ -47,6 +47,7 @@ Checks per listing:
 | **No** CannabisSage chem block in the size/quantity / buy column — chem only in the **floating** right-side panel | |
 | Floating panel **header** shows the same **what CannabisSage adds** chip (loading and loaded). Expand stays calm; no retailer name; no new Pro button | |
 | PDP panel appears with chem readout or empty/error state | |
+| Preference match, when taste-map is on and chem overlaps saved prefs (see v1.3.11). Otherwise the panel stays quiet | |
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
 
@@ -165,6 +166,27 @@ Listing cards add a quiet line under the chem badges only when a lab label or a 
 | Listing with only a menu-source id: no extra line on the card. The id still shows on the product panel | |
 | Strip and listing line do not name a retailer or make medical/effects claims | |
 
+## Preference match on the product page (v1.3.11+)
+
+The floating product panel shows a preference match when taste-map is already allowed for this plan and the saved prefs share a named terpene with the product. Prefs are the popup taste map. If nothing has been saved, the panel uses `extension/data/default-taste-map.json`. Clearing every preferred row and saving counts as no prefs.
+
+Nothing is rendered when there are no preferred terpenes, when none of those names are listed on the product, or when the score is under the saved minimum. A total-terpene number by itself is not overlap. There is no “no match” line and no Upgrade button for the missing panel. Chemistry, compare, and the rest of the product panel stay as they are.
+
+The gate is the existing `tasteMap` feature, the same one as “Map match” on listing cards. It is Pro today. This does not add a second lock. If taste-map is enabled for the plan, the match shows; if it is not, the panel is omitted.
+
+Copy says “Preference match” and lists the preferred terpenes that are actually on the product. It does not name a retailer or make a medical or effects claim. An avoid name appears only when that terpene is listed on the product.
+
+| Step | Pass? |
+| --- | --- |
+| Taste-map allowed, product lists a preferred terpene at or above the saved minimum: chip plus those terpene names inside the floating panel | |
+| Nothing saved yet: seeded default prefs are used (same names as the popup before the first Save) | |
+| Preferred list saved empty, or no preferred name on the product: no chip, no empty note | |
+| Score under the saved minimum: no chip | |
+| Total terpenes only, no named overlap: no chip | |
+| Taste-map not enabled (Free, while taste-map stays Pro): no chip and no new Upgrade control. Chem and compare still show | |
+| Chip and terpene names do not name a retailer or make medical/effects claims | |
+| Chem stays in the floating panel, not the buy column | |
+
 ## SPA / scroll
 
 | Step | Pass? |
@@ -177,7 +199,7 @@ Listing cards add a quiet line under the chem badges only when a lab label or a 
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.10.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.11.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

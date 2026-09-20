@@ -25,7 +25,7 @@ export async function ensureLicenseForSubscription(
   const stripe = getStripe();
   const sub = await stripe.subscriptions.retrieve(subscriptionId);
   const existingKey = sub.metadata?.license_key;
-  const existing = existingKey ? findBySubscriptionId(subscriptionId) : findBySubscriptionId(subscriptionId);
+  const existing = await findBySubscriptionId(subscriptionId);
 
   let licenseKey = (existingKey || existing?.licenseKey || generateLicenseKey()).toUpperCase();
 
@@ -65,7 +65,7 @@ export async function ensureLicenseForSubscription(
 
 export async function syncSubscription(subscription: Stripe.Subscription): Promise<LicenseRecord | null> {
   const key = subscription.metadata?.license_key;
-  const existing = findBySubscriptionId(subscription.id);
+  const existing = await findBySubscriptionId(subscription.id);
   const licenseKey = (key || existing?.licenseKey || '').toUpperCase();
   if (!licenseKey) {
     // Create if missing (e.g. subscription created outside our checkout flow)
@@ -83,7 +83,7 @@ export async function syncSubscription(subscription: Stripe.Subscription): Promi
   });
 }
 
-/** Stripe is source of truth; local JSON is a cache + offline fallback. */
+/** Stripe is source of truth; Neon (or local .data under ALLOW_DEV_MOCK) is the durable cache. */
 export async function lookupLicenseViaStripe(licenseKey: string): Promise<LicenseRecord | null> {
   const key = licenseKey.trim().toUpperCase();
   if (!key) return null;

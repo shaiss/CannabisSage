@@ -9,7 +9,7 @@ export async function POST(req: NextRequest) {
     const licenseKey = String(body.licenseKey || '')
       .trim()
       .toUpperCase();
-    let record = licenseKey ? getLicense(licenseKey) : null;
+    let record = licenseKey ? await getLicense(licenseKey) : null;
     if (licenseKey && !record) {
       record = await lookupLicenseViaStripe(licenseKey);
     }

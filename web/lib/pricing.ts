@@ -59,13 +59,22 @@ export function activePriceLabel(now = new Date()): {
   };
 }
 
-/** Resolve which Stripe Price ID to use for Checkout. */
+/**
+ * Resolve which Stripe Price ID to use for Checkout.
+ * Env-driven only — no invented Price IDs or live keys in code.
+ * Optional alias: STRIPE_PRICE_ID → same as STRIPE_PRICE_ID_PROMO.
+ */
 export function resolveStripePriceId(): string {
-  const promoId = process.env.STRIPE_PRICE_ID_PROMO || '';
+  const promoId = process.env.STRIPE_PRICE_ID_PROMO || process.env.STRIPE_PRICE_ID || '';
   const afterId = process.env.STRIPE_PRICE_ID_AFTER_PROMO || '';
   if (isPromoActive()) {
-    if (!promoId) throw new Error('STRIPE_PRICE_ID_PROMO is not configured');
+    if (!promoId) {
+      throw new Error('STRIPE_PRICE_ID_PROMO (or STRIPE_PRICE_ID) is not configured');
+    }
     return promoId;
+  }
+  if (!afterId && !promoId) {
+    throw new Error('STRIPE_PRICE_ID_PROMO (or STRIPE_PRICE_ID) is not configured');
   }
   return afterId || promoId;
 }

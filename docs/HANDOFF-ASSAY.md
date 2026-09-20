@@ -27,13 +27,21 @@ Tweak: `extension/lib/csi-features.js` (+ landing copy in `web/lib/pricing-publi
 
 ## Assay take-over checklist (human / SA)
 
-1. **Cipher CLEAR** — security review before merge or first public deploy.
-2. **Stripe (test → live)** — Product “CannabisSage Pro”, yearly $10 Price → `STRIPE_PRICE_ID_PROMO`; webhook → `/api/webhook`; Customer Portal on. See `docs/MONETIZATION.md`.
-3. **Deploy `web/`** to Vercel; set env from `web/.env.example` (never commit secrets).
-4. **Set `LAUNCH_DATE`** to real public/CWS day (promo = +30 days). `PRICE_AFTER_PROMO_*` only when Sage decides post-promo price — do not invent a higher amount.
-5. **Point extension at prod API** — `extension/data/config.json` + add prod origin to `manifest.json` `host_permissions` (localhost is for dev).
-6. **CWS upload** — zip from pack script; copy from `STORE_LISTING.md`; host `PRIVACY.md` on HTTPS; screenshots; age-restricted vertical; no medical claims.
-7. **Sage product sign-off** — Free/Pro split, promo copy, store listing tone.
+1. **Cipher CLEAR** — security review before merge or first public deploy (test-mode Stripe only until CLEAR).
+2. **Stack flip-in (Neon + Checkout)** — durable licenses on Neon via `DATABASE_URL`; hosted Checkout `$10/yr` promo via `STRIPE_PRICE_ID_PROMO` + `LAUNCH_DATE`. Schema: `web/db/migrations/001_licenses.sql`. CRUD stays in `web/lib/licenses.ts`.
+3. **Stripe (test → live after Cipher)** — Product “CannabisSage Pro”, yearly $10 Price → `STRIPE_PRICE_ID_PROMO`; webhook → `/api/webhook`; Customer Portal on. See `docs/MONETIZATION.md`.
+4. **Deploy `web/`** to Vercel project `cannabissage` (`https://cannabissage.vercel.app`); set env from `web/.env.example` (never commit secrets; no `ALLOW_DEV_MOCK` in prod).
+5. **Set `LAUNCH_DATE`** to real public/CWS day (promo = +30 days). `PRICE_AFTER_PROMO_*` only when Sage decides post-promo price — do not invent a higher amount.
+6. **Point extension at prod API** — `extension/data/config.json` + add `https://cannabissage.vercel.app/*` to `manifest.json` `host_permissions` (localhost is for dev).
+7. **CWS upload** — zip from pack script; copy from `STORE_LISTING.md`; host `PRIVACY.md` on HTTPS; screenshots; age-restricted vertical; no medical claims.
+8. **Sage product sign-off** — Free/Pro split, promo copy, store listing tone.
+
+### SA-CLEAR path (this flip-in)
+
+1. `cd web && npm ci && npm run smoke && npm run typecheck && npm run build`
+2. Confirm Vercel env has Neon `DATABASE_URL` + Stripe **test** keys + `STRIPE_PRICE_ID_PROMO` (no live keys until Cipher).
+3. Optional: `SMOKE_LIVE=1` only with `sk_test_` + `DATABASE_URL`.
+4. Cipher reviews webhook signature verify, no secrets in repo, fail-closed without DB, no extension card collection.
 
 ## Verify quickly
 

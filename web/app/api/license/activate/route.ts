@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
       licenseKey = generateLicenseKey();
       const end = new Date();
       end.setFullYear(end.getFullYear() + 1);
-      const record = upsertLicense({
+      const record = await upsertLicense({
         licenseKey,
         status: 'active',
         email: body.email || 'dev@example.com',
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let record = getLicense(licenseKey);
+    let record = await getLicense(licenseKey);
     if (!record || !record.stripeSubscriptionId) {
       const fromStripe = await lookupLicenseViaStripe(licenseKey);
       if (fromStripe) record = fromStripe;

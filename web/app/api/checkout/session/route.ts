@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getStripe } from '@/lib/stripe';
 import { ensureLicenseForSubscription } from '@/lib/fulfillment';
-import { getLicense, toEntitlementResponse } from '@/lib/licenses';
+import { toEntitlementResponse } from '@/lib/licenses';
 
 /** Success page helper: resolve license for a Checkout session id. */
 export async function GET(req: NextRequest) {
@@ -25,7 +25,6 @@ export async function GET(req: NextRequest) {
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Lookup failed';
-    // Fallback: if webhook already wrote local cache, try nothing else
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

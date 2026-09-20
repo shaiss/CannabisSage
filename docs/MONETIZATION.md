@@ -36,14 +36,16 @@ Extension popup ──Upgrade──► web/ landing ──► Stripe Checkout (h
        │                                              │
        │ Activate CSG-… key                           ▼
        ▼                                    webhook → license in Stripe
-  chrome.storage entitlement                metadata + local .data cache
+  chrome.storage entitlement                metadata + Neon `licenses`
        │
        ▼
   csi-features.can(...) gates listing UI
 ```
 
 - **Source of truth:** Stripe Subscription status + `metadata.license_key`
-- **Local cache:** `web/.data/licenses.json` (dev / webhook convenience; not for multi-instance prod without shared storage)
+- **Durable store:** Neon Postgres via `DATABASE_URL` (or `POSTGRES_URL`) — schema `web/db/migrations/001_licenses.sql`; CRUD only in `web/lib/licenses.ts`
+- **Dev fallback:** `web/.data/licenses.json` only when `ALLOW_DEV_MOCK=1` **and** no `DATABASE_URL` (prod fails closed without DB)
+- **Prod API alias:** `https://cannabissage.vercel.app`
 - **APIs:** `/api/checkout`, `/api/webhook`, `/api/license/activate`, `/api/license/validate`, `/api/portal`, `/api/checkout/session`
 
 ## Stripe Dashboard setup
@@ -86,13 +88,14 @@ curl -X POST http://localhost:3000/api/license/activate \
 
 ## Production / Vercel
 
-1. Deploy `web/` to Vercel; set env vars in the project.
-2. Point Stripe webhook to `https://<prod>/api/webhook`.
-3. Update `extension/data/config.json` `apiBaseUrl` / `upgradeUrl` / `accountUrl` to the prod origin.
-4. Add that origin to `manifest.json` `host_permissions` (or grant `optional_host_permissions` for `https://*.vercel.app/*` and request at runtime later).
-5. Rebuild extension zip (`./scripts/pack-extension.sh`).
+1. Deploy `web/` to Vercel project **cannabissage** (alias `https://cannabissage.vercel.app`); Marketplace already attaches Neon (`cannabissage-db`) + Stripe sandbox (`cannabissage-stripe`).
+2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.vercel.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
+3. Point Stripe webhook (test mode until Cipher CLEAR) to `https://cannabissage.vercel.app/api/webhook`.
+4. Update `extension/data/config.json` `apiBaseUrl` / `upgradeUrl` / `accountUrl` to the prod origin.
+5. Add that origin to `manifest.json` `host_permissions` (or grant `optional_host_permissions` for `https://*.vercel.app/*` and request at runtime later).
+6. Rebuild extension zip (`./scripts/pack-extension.sh`).
 
-For multi-instance production, replace the JSON file store with Postgres/KV while keeping Stripe metadata as source of truth (`web/lib/licenses.ts`, `web/lib/fulfillment.ts`).
+License rows live in Neon (`licenses`); Stripe subscription metadata remains the entitlement source of truth (`web/lib/licenses.ts`, `web/lib/fulfillment.ts`).
 
 ## CWS payment policy notes
 

@@ -22,6 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 400 });
   }
 
+  // Log event type only — never dump secrets, signatures, or full payloads.
+  console.log('stripe webhook', event.type);
+
   try {
     switch (event.type) {
       case 'checkout.session.completed': {
@@ -51,5 +54,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 });
   }
 
-  return NextResponse.json({ received: true });
+  return NextResponse.json({ received: true, type: event.type });
 }

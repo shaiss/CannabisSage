@@ -8,12 +8,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: false, active: false, error: 'Missing key' }, { status: 400 });
   }
 
-  let record = getLicense(licenseKey);
-  if (!record) {
-    record = await lookupLicenseViaStripe(licenseKey);
+  try {
+    let record = await getLicense(licenseKey);
+    if (!record) {
+      record = await lookupLicenseViaStripe(licenseKey);
+    }
+    const response = toEntitlementResponse(record);
+    return NextResponse.json(response, { status: response.ok ? 200 : 404 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Validate failed';
+    return NextResponse.json({ ok: false, active: false, error: message }, { status: 500 });
   }
-  const response = toEntitlementResponse(record);
-  return NextResponse.json(response, { status: response.ok ? 200 : 404 });
 }
 
 export async function POST(req: NextRequest) {
@@ -24,10 +29,15 @@ export async function POST(req: NextRequest) {
   if (!licenseKey) {
     return NextResponse.json({ ok: false, active: false, error: 'Missing key' }, { status: 400 });
   }
-  let record = getLicense(licenseKey);
-  if (!record) {
-    record = await lookupLicenseViaStripe(licenseKey);
+  try {
+    let record = await getLicense(licenseKey);
+    if (!record) {
+      record = await lookupLicenseViaStripe(licenseKey);
+    }
+    const response = toEntitlementResponse(record);
+    return NextResponse.json(response, { status: response.ok ? 200 : 404 });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Validate failed';
+    return NextResponse.json({ ok: false, active: false, error: message }, { status: 500 });
   }
-  const response = toEntitlementResponse(record);
-  return NextResponse.json(response, { status: response.ok ? 200 : 404 });
 }

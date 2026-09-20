@@ -21,8 +21,8 @@ Version: **extension 1.3.3** · Pack: `./scripts/pack-extension.sh` → `dist/ca
 
 ## Feature gates (Pro)
 
-Free: hover, basic badges, compare, PDP, Sunnyside.  
-Pro: taste-map on listings, filters/sort, export, deal badges, Zen Leaf + TerraVida.  
+Free: hover, basic badges, compare, PDP on supported menus.  
+Pro: taste-map on listings, filters/sort, export, deal badges, multi-store across stores you shop.  
 Tweak: `extension/lib/csi-features.js` (+ landing copy in `web/lib/pricing-public.ts`).
 
 ## Assay take-over checklist (human / SA)

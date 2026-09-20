@@ -67,7 +67,37 @@
   }
 
   /**
+   * Calm "what CannabisSage adds" chip.
+   * One line + optional expand. No retailer brand names, no medical/effects claims,
+   * no Upgrade button (soft Pro mention only — chemistry is not gated).
+   * Same copy on listing and PDP so the chip never names the store.
+   */
+  const WHAT_SAGE_ADDS = {
+    summary: 'Adds chem badges and compare beside the store page',
+    detail:
+      'Badges, a hover profile, and compare sit beside this menu — they do not replace the store page. Filters, taste-map, and more supported stores are optional Pro tools. Published chemistry stays available without Pro.'
+  };
+
+  function buildWhatSageAddsChip() {
+    return `<details class="csi-adds-chip" data-csi-adds="1"><summary>${CSI.escapeHtml(
+      WHAT_SAGE_ADDS.summary
+    )}</summary><p class="csi-adds-detail">${CSI.escapeHtml(WHAT_SAGE_ADDS.detail)}</p></details>`;
+  }
+
+  /**
+   * Floating PDP header. Chem stays in this panel (never the buy column).
+   * Chip lives in the header so it is visible while loading and after render.
+   */
+  function buildPdpHeader({ showClose = false } = {}) {
+    const close = showClose
+      ? '<button type="button" class="csi-pdp-close" aria-label="Close">✕</button>'
+      : '';
+    return `<div class="csi-pdp-header"><div class="csi-pdp-header-row"><strong>CannabisSage</strong>${close}</div>${buildWhatSageAddsChip()}</div>`;
+  }
+
+  /**
    * Listing card chips (terp-only when retail already shows THC/CBD on-card).
+   * Explainer chip is NOT repeated here — once per listing, in the filter bar.
    */
   function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
     const chips = [];
@@ -454,8 +484,11 @@
   }
 
   CSI.ui = {
+    WHAT_SAGE_ADDS,
     formatCannabinoids,
     formatTerpenes,
+    buildWhatSageAddsChip,
+    buildPdpHeader,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

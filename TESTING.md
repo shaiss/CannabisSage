@@ -32,6 +32,8 @@ For each URL, confirm badges, Compare Select, filter bar, and hover tooltip:
 Checks per listing:
 
 - [ ] Filter bar visible; title includes **Sunnyside**
+- [ ] **What CannabisSage adds** chip is present **once** in the filter bar (not repeated on each card). One line: “Adds chem badges and compare beside the store page”. Expand is optional and does not name the retailer
+- [ ] Free plan still shows the chip; chem badges and compare are not hidden behind Pro. No extra Upgrade button inside the chip (existing filter-bar Upgrade stays)
 - [ ] Cards show **top-terp badge** when we have terp data (Sunnyside already shows THC/CBD on-card — no duplicate cann badges)
 - [ ] Hover shows loading → profile or clear empty/error message (never silent)
 - [ ] “Map match” appears when score ≥ threshold
@@ -43,6 +45,7 @@ Checks per listing:
 | --- | --- |
 | Open any `/product/<id>` from a listing | |
 | **No** CannabisSage chem block in the size/quantity / buy column — chem only in the **floating** right-side panel | |
+| Floating panel **header** shows the same **what CannabisSage adds** chip (loading and loaded). Expand stays calm; no retailer name; no new Pro button | |
 | PDP panel appears with chem readout or empty/error state | |
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
@@ -116,11 +119,22 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.6.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.7.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
 | `node web/scripts/smoke-monetization.mjs` exits 0 | |
+
+## What CannabisSage adds (v1.3.7+)
+
+One calm chip, free and Pro. Copy must not name a retailer or make medical/effects claims.
+
+| Step | Pass? |
+| --- | --- |
+| Listing: chip once in the filter bar, next to the title — not on every badge row | |
+| PDP: chip inside the floating panel header (not the buy column) | |
+| Expand mentions chem badges, compare, and optional Pro tools; chemistry still visible on Free | |
+| Chip has no Upgrade control (soft Pro line only). Existing Upgrade on the Free filter bar is unchanged | |
 
 ## Remote denylist (v1.3.6+)
 

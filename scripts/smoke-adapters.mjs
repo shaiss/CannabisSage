@@ -135,7 +135,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.6', 'version bump');
+assert(manifest.version === '1.3.7', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -185,5 +185,40 @@ assert(fs.existsSync(denylistPublic), 'web/public/denylist.json');
 const denyDoc = JSON.parse(fs.readFileSync(denylistPublic, 'utf8'));
 assert(Array.isArray(denyDoc.hosts), 'denylist hosts array');
 assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
+
+// What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
+loadScripts(['lib/csi-ui.js'], sandbox);
+assert(CSI.VERSION === '1.3.7', 'core version 1.3.7');
+const adds = CSI.ui.WHAT_SAGE_ADDS;
+const addsCopy = `${adds.summary} ${adds.detail}`;
+assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
+assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida/i.test(addsCopy), 'no retailer brand in chip copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(addsCopy),
+  'no medical or effects claims in chip copy'
+);
+const chipHtml = CSI.ui.buildWhatSageAddsChip();
+assert(chipHtml.includes('data-csi-adds="1"'), 'chip marker');
+assert(chipHtml.includes('<summary>'), 'one-line summary');
+assert(chipHtml.includes('csi-adds-detail'), 'optional expand');
+assert(!/<button|openUpgrade|Upgrade/i.test(chipHtml), 'chip has no Pro CTA button');
+const headerHtml = CSI.ui.buildPdpHeader({ showClose: true });
+assert(headerHtml.includes('csi-pdp-header') && headerHtml.includes('data-csi-adds="1"'), 'chip in PDP header');
+assert(headerHtml.includes('csi-pdp-close'), 'PDP close stays in header');
+const cardBadges = CSI.ui.buildListingBadgeChips({ product: { cannabinoids: { THC: 20 } }, status: 'ok' });
+assert(!cardBadges.join('').includes('data-csi-adds'), 'chip is not a per-card badge');
+
+const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
+const pdpSrc = fs.readFileSync(path.join(ext, 'content-pdp.js'), 'utf8');
+assert(listingSrc.includes('${CSI.ui.buildWhatSageAddsChip()}'), 'listing filter bar mounts chip');
+const renderBadgesFn = listingSrc.slice(
+  listingSrc.indexOf('function renderBadges'),
+  listingSrc.indexOf('async function enrichCard')
+);
+assert(!renderBadgesFn.includes('buildWhatSageAddsChip'), 'listing badges stay chem-only');
+assert(pdpSrc.includes('CSI.ui.buildPdpHeader({ showClose: true })'), 'loaded PDP uses header helper');
+assert(pdpSrc.includes('CSI.ui.buildPdpHeader({ showClose: false })'), 'loading PDP includes chip');
+assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'PDP still refuses buy-column chem');
 
 console.log('smoke-adapters: OK');

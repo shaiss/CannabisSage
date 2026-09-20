@@ -104,7 +104,7 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.6', 'extension 1.3.6');
+assert(manifest.version === '1.3.7', 'extension 1.3.7');
 assert(manifest.host_permissions.includes('https://cannabissage.app/*'), 'prod API host (custom domain)');
 assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host (vercel fallback)');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');

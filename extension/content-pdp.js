@@ -155,10 +155,7 @@
     }
 
     panel.innerHTML = `
-      <div class="csi-pdp-header">
-        <strong>CannabisSage</strong>
-        <button type="button" class="csi-pdp-close" aria-label="Close">✕</button>
-      </div>
+      ${CSI.ui.buildPdpHeader({ showClose: true })}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
       <div class="csi-pdp-body">${body}</div>
       <div class="csi-pdp-actions">
@@ -223,7 +220,7 @@
       loading.id = 'csi-pdp-panel';
       loading.setAttribute('data-csi-pdp', '1');
       applyPdpPanelBox(loading);
-      loading.innerHTML = `<div class="csi-pdp-header"><strong>CannabisSage</strong></div><div class="csi-status csi-status-loading">Loading profile…</div>`;
+      loading.innerHTML = `${CSI.ui.buildPdpHeader({ showClose: false })}<div class="csi-status csi-status-loading">Loading profile…</div>`;
       (document.documentElement || document.body).appendChild(loading);
       loadProfile()
         .then((product) => {

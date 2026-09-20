@@ -97,7 +97,32 @@ button,
 }
 
 .hero-inner {
-  max-width: 40rem;
+  max-width: 42rem;
+}
+
+.hero-eyebrow {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+  animation: riseIn 0.75s ease-out both;
+}
+
+.hero-footnote {
+  margin: 1.1rem 0 0;
+  font-size: 0.9rem;
+  max-width: 34rem;
+  animation: riseIn 1.05s ease-out 0.22s both;
+}
+
+.hero-footnote a {
+  color: #ffd4c4;
+}
+
+.muted-on-dark {
+  opacity: 0.88;
 }
 
 .hero .brand-hero {
@@ -161,6 +186,140 @@ button,
   background: transparent;
   color: #f7f3ea;
   border-color: rgba(247, 243, 234, 0.45);
+}
+
+.btn-outline {
+  background: #fff;
+  color: var(--moss);
+  border-color: var(--sand);
+}
+
+.cta-row-light .btn-ghost {
+  color: var(--ink);
+  border-color: var(--sand);
+  background: #fff;
+}
+
+.trust-strip {
+  background: #fff;
+  border-bottom: 1px solid var(--sand);
+  padding: 0.85rem 1.5rem;
+  text-align: center;
+  font-size: 0.88rem;
+  color: #405248;
+}
+
+.trust-strip p {
+  margin: 0;
+  max-width: 52rem;
+  margin-inline: auto;
+  line-height: 1.45;
+}
+
+.trust-strip a {
+  color: var(--leaf);
+  font-weight: 600;
+}
+
+.proof-grid {
+  display: grid;
+  gap: 1.75rem;
+}
+
+.proof-card {
+  margin: 0;
+}
+
+.proof-shot {
+  width: 100%;
+  height: auto;
+  border-radius: 10px;
+  border: 1px solid var(--sand);
+  box-shadow: 0 12px 32px rgba(26, 46, 36, 0.08);
+}
+
+.proof-card figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.95rem;
+  color: #405248;
+  line-height: 1.45;
+}
+
+.section-alt {
+  background: #f8f5ef;
+  max-width: none;
+  padding-inline: 1.5rem;
+}
+
+.section-alt > h2,
+.section-alt > p,
+.section-alt .why-grid {
+  max-width: 960px;
+  margin-inline: auto;
+}
+
+.why-grid {
+  display: grid;
+  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.why-card {
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: 12px;
+  padding: 1.35rem 1.25rem;
+}
+
+.why-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  margin: 0 0 0.5rem;
+  color: var(--moss);
+}
+
+.why-card p {
+  margin: 0;
+  font-size: 0.95rem;
+  color: #405248;
+  line-height: 1.5;
+}
+
+.price-card-wide {
+  max-width: 36rem;
+}
+
+.pricing-unlock {
+  margin-top: 1rem;
+  padding: 1rem 1.1rem;
+  background: #f8f5ef;
+  border-radius: 8px;
+  border: 1px solid var(--sand);
+  font-size: 0.92rem;
+  color: #405248;
+}
+
+.pricing-unlock p {
+  margin: 0;
+  line-height: 1.5;
+}
+
+.plan-details {
+  margin-top: 1.5rem;
+  font-size: 0.92rem;
+}
+
+.plan-details summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--moss);
+}
+
+.plan-columns {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  margin-top: 1rem;
 }
 
 .section {

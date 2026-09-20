@@ -183,8 +183,9 @@
 
     const title = doc.querySelector('h1')?.textContent?.trim() || doc.title?.split('|')[0]?.trim();
     const price = CSI.parsePrice(doc.body?.innerText || '');
+    const provenance = CSI.scrapeProvenanceFromHtml(html);
 
-    return {
+    const result = {
       cannabinoids,
       terpenes: terpeneResult || terpenes,
       url,
@@ -192,6 +193,8 @@
       price: price || undefined,
       status: 'ok'
     };
+    if (provenance) result.provenance = provenance;
+    return result;
   }
 
   const sunnysideAdapter = {

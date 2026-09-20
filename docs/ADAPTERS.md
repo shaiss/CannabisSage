@@ -38,6 +38,19 @@ Each adapter is a plain object with at least:
 | `isAllowedFetchUrl(url)` | Background fetch allowlist mirror |
 | `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'none'` |
 
+### Provenance
+
+The floating product panel shows a provenance strip only for fields the active adapter actually parsed. Anything missing is omitted — the strip is not rendered at all when source, lab, and timestamp are all absent.
+
+| Payload field | Shown as | Where it exists today |
+| --- | --- | --- |
+| `source_sku` or `menuSource` | Menu source | Sunnyside inventory. Not an image `sourceUrl`, not the retailer name. |
+| `labName` / `laboratory` / `labTests.labName` | Lab | Only when that key is present. Zen Leaf `displayThc.label` (`THC` / `THCA`) is potency, not a lab. |
+| `testedAt` (and `testDate` / `labTestedAt`) | Tested YYYY-MM-DD | Only a real calendar date. |
+| `mfg_date` / `packagedAt` | Packaged YYYY-MM-DD | Sunnyside manufacturing date. Not `exp_date`, not promo `startDate`, not `updated_ago`. |
+
+Listing cards repeat that line only when a lab label or a date is present, as quiet text under the chem badges. A menu-source id alone stays on the product panel so the grid does not grow a line on every card.
+
 ## Built-in stores
 
 ### Sunnyside (primary)

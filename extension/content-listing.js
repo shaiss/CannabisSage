@@ -77,6 +77,8 @@
       minMatch
     });
     row.innerHTML = chips.join('');
+    const note = CSI.ui.buildProvenanceListingNote?.(product?.provenance);
+    if (note) row.insertAdjacentHTML('beforeend', note);
     CSI.glossary?.wireTerpeneClicks(row);
   }
 
@@ -138,6 +140,8 @@
         price: data.price ?? product.price,
         status: data.status || 'ok'
       };
+      const mergedProvenance = CSI.mergeProvenance?.(product.provenance, data.provenance);
+      if (mergedProvenance) product.provenance = mergedProvenance;
     } else if (!url) {
       product = { ...product, status: 'error', error: 'Unable to find product URL' };
       CSI.storeElementProduct(cardEl, product);

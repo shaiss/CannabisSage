@@ -206,7 +206,7 @@
     }
     if (bridgeProduct?.id && adapter?.buildProductUrl) {
       const url = adapter.buildProductUrl(bridgeProduct.id);
-      // Only use id-built URLs when adapter produces a real PDP path (Sunnyside)
+      // Only use id-built URLs when adapter produces a real PDP path (primary store)
       if (url && adapter.isAllowedFetchUrl?.(url)) {
         const clean = url.split(/[?#]/)[0].replace(/\/$/, '');
         cardEl.dataset.csiUrl = clean;

@@ -2,5 +2,6 @@
   "apiBaseUrl": "https://cannabissage.app",
   "upgradeUrl": "https://cannabissage.app/#pricing",
   "accountUrl": "https://cannabissage.app/account",
+  "denylistPath": "/denylist.json",
   "productName": "CannabisSage Pro"
 }

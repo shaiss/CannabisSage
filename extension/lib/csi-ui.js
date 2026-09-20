@@ -10,7 +10,7 @@
     if (!data || Object.keys(data).length === 0) {
       return '<strong>Cannabinoids:</strong><br><span class="csi-muted">Not listed on this page</span>';
     }
-    let html = `<strong style="color:${CSI.SUNNYSIDE_ORANGE};">Cannabinoids:</strong><br>`;
+    let html = `<strong style="color:${CSI.ACCENT_ORANGE};">Cannabinoids:</strong><br>`;
     const entries = [];
     const add = (label, value) => {
       if (value == null) return;
@@ -51,11 +51,11 @@
       );
     if (!parts.length) {
       if (typeof terpenes === 'object' && terpenes['Total Terpenes'] != null) {
-        return `<strong style="color:${CSI.SUNNYSIDE_ORANGE};">Terpenes:</strong><br>Total: ${CSI.parsePercent(terpenes['Total Terpenes'])}%`;
+        return `<strong style="color:${CSI.ACCENT_ORANGE};">Terpenes:</strong><br>Total: ${CSI.parsePercent(terpenes['Total Terpenes'])}%`;
       }
       return '<strong>Terpenes:</strong><br><span class="csi-muted">Not listed on this page</span>';
     }
-    return `<strong style="color:${CSI.SUNNYSIDE_ORANGE};">Terpenes:</strong><br>${parts.join(', ')}`;
+    return `<strong style="color:${CSI.ACCENT_ORANGE};">Terpenes:</strong><br>${parts.join(', ')}`;
   }
 
   function shouldSuppressListingCannabinoidBadges(adapter, cardEl) {
@@ -67,7 +67,7 @@
   }
 
   /**
-   * Listing card chips (terp gap on Sunnyside when retail already shows THC/CBD).
+   * Listing card chips (terp-only when retail already shows THC/CBD on-card).
    */
   function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
     const chips = [];
@@ -337,7 +337,7 @@
     function renderTable(container, productData, tasteMap) {
       const table = document.createElement('table');
       const header = document.createElement('tr');
-      header.style.cssText = `background:${CSI.SUNNYSIDE_ORANGE};color:#fff;`;
+      header.style.cssText = `background:${CSI.ACCENT_ORANGE};color:#fff;`;
       header.appendChild(document.createElement('th'));
       productData.forEach((p) => {
         const th = document.createElement('th');

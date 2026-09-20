@@ -31,12 +31,11 @@ export default function PrivacyPage() {
           </p>
           <p>
             CannabisSage is a Chrome extension that helps shoppers view cannabinoid and terpene
-            information on supported retailer product listing and detail pages (Sunnyside; Zen Leaf
-            Dispensaries; TerraVida shopping via Zen Leaf Malvern), compare a small number of
-            products, filter/sort visible cards, and score products against a local taste preference
-            map. Optional <strong>Pro</strong> features unlock after a subscription purchased on
-            the CannabisSage website via <strong>Stripe Checkout</strong> (not inside the
-            extension).
+            information on supported retailer product listing and detail pages, compare a small
+            number of products, filter/sort visible cards, and score products against a local taste
+            preference map. Optional <strong>Pro</strong> features unlock after a subscription
+            purchased on the CannabisSage website via <strong>Stripe Checkout</strong> (not inside
+            the extension).
           </p>
 
           <h2>Summary</h2>
@@ -59,12 +58,17 @@ export default function PrivacyPage() {
             </li>
             <li>
               <strong>Local extension storage (`chrome.storage.local`):</strong> Compare selections,
-              taste-map preferences, filters, TTL product cache, and (if you activate Pro) license
-              key + entitlement expiry.
+              taste-map preferences, filters, TTL product cache, remote denylist cache, and (if you
+              activate Pro) license key + entitlement expiry.
             </li>
             <li>
               <strong>Bundled JSON:</strong> Default taste-map seeds, terpene glossary, and API base
               URL config.
+            </li>
+            <li>
+              <strong>CannabisSage site (network):</strong> Entitlement APIs and a small HTTPS{' '}
+              <strong>denylist JSON</strong> (<code>/denylist.json</code>) — configuration only,
+              never executable code.
             </li>
           </ol>
 
@@ -112,32 +116,35 @@ export default function PrivacyPage() {
                     <code>https://www.sunnyside.shop/*</code>,{' '}
                     <code>https://sunnyside.shop/*</code>
                   </td>
-                  <td>Sunnyside listings/PDPs and same-site product HTML.</td>
+                  <td>Supported retailer listings/PDPs and same-site product HTML on this host.</td>
                 </tr>
                 <tr>
                   <td>
                     <code>https://zenleafdispensaries.com/*</code>,{' '}
                     <code>https://www.zenleafdispensaries.com/*</code>
                   </td>
-                  <td>Zen Leaf / Malvern (TerraVida alias) menus and PDPs.</td>
+                  <td>
+                    Supported retailer menus/PDPs and same-site product HTML on this host (including
+                    location path aliases).
+                  </td>
                 </tr>
                 <tr>
                   <td><code>https://cannabissage.app/*</code></td>
                   <td>
                     Primary production origin: entitlement activate/validate against the CannabisSage
-                    API; Upgrade/Manage deep links.
+                    API; Upgrade/Manage deep links; remote denylist JSON.
                   </td>
                 </tr>
                 <tr>
                   <td><code>https://cannabissage.vercel.app/*</code></td>
-                  <td>Vercel deployment fallback for the same APIs and deep links.</td>
+                  <td>Vercel deployment fallback for the same APIs, deep links, and denylist.</td>
                 </tr>
                 <tr>
                   <td><code>http://localhost:3000/*</code> (unpacked local/dev only)</td>
                   <td>
-                    Same entitlement APIs when running <code>web/</code> locally; keep for unpacked
-                    testing. Override via <code>chrome.storage.local.csi_api_base</code> or edit{' '}
-                    <code>data/config.json</code>.
+                    Same entitlement APIs / denylist when running <code>web/</code> locally; keep for
+                    unpacked testing. Override via <code>chrome.storage.local.csi_api_base</code> or
+                    edit <code>data/config.json</code>.
                   </td>
                 </tr>
                 <tr>
@@ -146,7 +153,10 @@ export default function PrivacyPage() {
                 </tr>
                 <tr>
                   <td><code>storage</code></td>
-                  <td>Persist compare, prefs, filters, cache, and license entitlement on device.</td>
+                  <td>
+                    Persist compare, prefs, filters, cache, denylist cache, and license entitlement
+                    on device.
+                  </td>
                 </tr>
               </tbody>
             </table>

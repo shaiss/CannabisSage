@@ -78,6 +78,21 @@ Checks per listing:
 | SPA navigate within store → selection survives | |
 | **Clear** empties tray and resets buttons | |
 | Sidebar **JSON** / **CSV** copies to clipboard | |
+| Sidebar shows **Terpene overlap** above the chem table (free; no Upgrade control) | |
+
+## Terpene overlap (v1.3.8+)
+
+Compare stays free. Overlap copy must not name a retailer or make medical/effects claims. Missing chemistry stays quiet — no red error banner, no page URLs.
+
+| Step | Pass? |
+| --- | --- |
+| Two picks that share a named terpene list it under **Shared**; a terpene on only one pick is **Only on one** | |
+| Three picks: a terpene on two of them shows under **On some** (not Shared) | |
+| No named terpenes (or total-only) → calm note, no chip list | |
+| One pick, or a failed load that leaves fewer than two → calm note, not an error banner | |
+| A failed pick is left out of Shared; note says overlap uses the picks that loaded | |
+| Terpene names in the overlap block still open the glossary note | |
+| Free plan shows overlap. Export stays the existing Pro control; overlap adds none | |
 
 ## Filters & sort
 
@@ -119,7 +134,7 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.7.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.8.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

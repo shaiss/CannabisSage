@@ -375,53 +375,88 @@
     return `${formatCannabinoids(insights?.cannabinoids)}<br><br>${formatTerpenes(insights?.terpenes)}`;
   }
 
-  function readReactProduct(el) {
-    try {
-      const reactKey = Object.keys(el).find(
-        (key) => key.startsWith('__reactFiber') || key.startsWith('__reactInternalInstance')
-      );
-      if (!reactKey) return null;
-      let fiber = el[reactKey];
-      for (let i = 0; i < 12 && fiber; i++) {
-        const props = fiber.memoizedProps || fiber.pendingProps;
-        if (props) {
-          if (props.product && typeof props.product === 'object') return props.product;
-          if (props.inventoryItem && typeof props.inventoryItem === 'object') {
-            // Inventory model may wrap product
-            const inv = props.inventoryItem;
-            if (inv.product) return inv.product;
-            if (inv.id || inv.sku) return inv;
-          }
-          if (props.href && String(props.href).includes('/product/')) {
-            return { id: String(props.href).split('/product/')[1]?.split(/[?#]/)[0] };
-          }
-        }
-        fiber = fiber.return || fiber._owner;
+  let bridgeSeq = 0;
+  const BRIDGE_SOURCE = 'cannabis-sage-bridge';
+
+  function requestBridgeExtract(cardEl, timeoutMs = 800) {
+    return new Promise((resolve) => {
+      if (!cardEl) {
+        resolve(null);
+        return;
       }
-    } catch (e) {
-      warn('React inspection failed', e);
-    }
-    return null;
+      const requestId = `csi-${Date.now()}-${++bridgeSeq}`;
+      const marker = requestId;
+      cardEl.dataset.csiBridgeId = marker;
+
+      const onMessage = (event) => {
+        if (event.source !== window) return;
+        const data = event.data;
+        if (!data || data.source !== BRIDGE_SOURCE || data.direction !== 'result') return;
+        if (data.requestId !== requestId) return;
+        window.removeEventListener('message', onMessage);
+        clearTimeout(timer);
+        resolve(data.result || null);
+      };
+
+      const timer = setTimeout(() => {
+        window.removeEventListener('message', onMessage);
+        resolve(null);
+      }, timeoutMs);
+
+      window.addEventListener('message', onMessage);
+      window.postMessage(
+        {
+          source: BRIDGE_SOURCE,
+          direction: 'request',
+          requestId,
+          action: 'extractProduct',
+          marker
+        },
+        '*'
+      );
+    });
   }
 
-  function getProductUrl(cardEl) {
+  function applyBridgeProduct(cardEl, bridgeProduct) {
+    if (!cardEl || !bridgeProduct || bridgeProduct.error) return null;
+    const productObj = {
+      id: bridgeProduct.id,
+      slug: bridgeProduct.slug,
+      name: bridgeProduct.name,
+      ecomm_display_name: bridgeProduct.name,
+      cannabinoids: bridgeProduct.cannabinoids,
+      potency: bridgeProduct.potency,
+      terpenes: bridgeProduct.terpenes
+    };
+    const extracted = extractProductData(productObj, cardEl.dataset.csiUrl);
+    if (extracted) {
+      storeProductData(cardEl, extracted);
+      if (extracted.url) cardEl.dataset.csiUrl = extracted.url;
+    }
+    return extracted;
+  }
+
+  async function resolveProductUrl(cardEl) {
     if (!cardEl) return null;
     if (cardEl.dataset.csiUrl) return cardEl.dataset.csiUrl;
 
-    // Prefer React product object (current Sunnyside SPA)
-    const productObj = readReactProduct(cardEl);
-    if (productObj) {
-      const extracted = extractProductData(productObj, cardEl.dataset.csiUrl);
-      if (extracted) {
-        storeProductData(cardEl, extracted);
-        if (extracted.url) {
-          cardEl.dataset.csiUrl = extracted.url;
-          return extracted.url;
-        }
+    // MAIN-world React props (reliable on current Sunnyside SPA)
+    const bridgeProduct = await requestBridgeExtract(cardEl);
+    const fromBridge = applyBridgeProduct(cardEl, bridgeProduct);
+    if (fromBridge?.url) return fromBridge.url;
+    if (bridgeProduct?.id) {
+      const url = buildProductUrl(bridgeProduct.id);
+      if (url) {
+        cardEl.dataset.csiUrl = url;
+        return url;
       }
     }
 
-    const root = cardEl.closest('[data-cy="ProductListItem"]') || cardEl.closest('li') || cardEl.parentElement || cardEl;
+    const root =
+      cardEl.closest('[data-cy="ProductListItem"]') ||
+      cardEl.closest('li') ||
+      cardEl.parentElement ||
+      cardEl;
 
     const linkSelectors = ['a[href*="/product/"]', '[href*="/product/"]', 'a[href]'];
     for (const selector of linkSelectors) {
@@ -429,7 +464,9 @@
       if (!link) continue;
       const href = link.getAttribute('href') || link.href;
       if (href && href.includes('/product/')) {
-        const url = href.startsWith('http') ? href.split(/[?#]/)[0] : `https://www.sunnyside.shop${href.split(/[?#]/)[0]}`;
+        const url = href.startsWith('http')
+          ? href.split(/[?#]/)[0]
+          : `https://www.sunnyside.shop${href.split(/[?#]/)[0]}`;
         cardEl.dataset.csiUrl = url;
         return url;
       }
@@ -624,7 +661,7 @@
 
   async function handleProductHover(event, cardEl) {
     let cachedProduct = getCachedProductData(cardEl);
-    const url = getProductUrl(cardEl);
+    const url = await resolveProductUrl(cardEl);
     if (!cachedProduct) cachedProduct = getCachedProductData(cardEl);
 
     const hasCachedCannabinoids = hasCannabinoidInfo(cachedProduct?.cannabinoids);
@@ -735,18 +772,22 @@
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'cannabis-sage-select-btn';
-    btn.textContent = 'Select';
+    btn.textContent = 'Compare Select';
+    btn.title = 'CannabisSage: select for comparison';
 
-    btn.addEventListener('click', (e) => {
+    btn.addEventListener('click', async (e) => {
       e.stopPropagation();
       e.preventDefault();
 
-      const url = getProductUrl(cardEl);
+      btn.disabled = true;
+      const url = await resolveProductUrl(cardEl);
+      btn.disabled = false;
       if (!url) {
         warn('Could not get URL for selection');
         btn.textContent = 'Unavailable';
         setTimeout(() => {
           btn.textContent = 'Select';
+          btn.classList.remove('is-selected');
         }, 1500);
         return;
       }
@@ -754,7 +795,7 @@
       const index = selectedProducts.findIndex((p) => p.url === url);
       if (index > -1) {
         selectedProducts.splice(index, 1);
-        btn.textContent = 'Select';
+        btn.textContent = 'Compare Select';
         btn.classList.remove('is-selected');
         updateCompareButton();
         return;

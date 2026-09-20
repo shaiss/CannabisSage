@@ -45,7 +45,7 @@ Extension popup ──Upgrade──► web/ landing ──► Stripe Checkout (h
 - **Source of truth:** Stripe Subscription status + `metadata.license_key`
 - **Durable store:** Neon Postgres via `DATABASE_URL` (or `POSTGRES_URL`) — schema `web/db/migrations/001_licenses.sql`; CRUD only in `web/lib/licenses.ts`
 - **Dev fallback:** `web/.data/licenses.json` only when `ALLOW_DEV_MOCK=1` **and** no `DATABASE_URL` (prod fails closed without DB)
-- **Prod API alias:** `https://cannabissage.vercel.app`
+- **Prod API:** `https://cannabissage.app` (Vercel fallback: `https://cannabissage.vercel.app`)
 - **APIs:** `/api/checkout`, `/api/webhook`, `/api/license/activate`, `/api/license/validate`, `/api/portal`, `/api/checkout/session`
 
 ## Stripe Dashboard setup
@@ -74,7 +74,7 @@ npm run dev                  # http://localhost:3000
 stripe listen --forward-to localhost:3000/api/webhook
 ```
 
-Extension `data/config.json` defaults `apiBaseUrl` / `upgradeUrl` / `accountUrl` to **`https://cannabissage.vercel.app`** (CWS production). Manifest `host_permissions` includes that origin plus `http://localhost:3000/*` for unpacked local/dev.
+Extension `data/config.json` defaults `apiBaseUrl` / `upgradeUrl` / `accountUrl` to **`https://cannabissage.app`** (CWS production). Manifest `host_permissions` includes that origin, **`https://cannabissage.vercel.app/*`** (fallback), plus `http://localhost:3000/*` for unpacked local/dev.
 
 **Local/dev override (pick one):**
 
@@ -93,11 +93,11 @@ curl -X POST http://localhost:3000/api/license/activate \
 
 ## Production / Vercel
 
-1. Deploy `web/` to Vercel project **cannabissage** (alias `https://cannabissage.vercel.app`); Marketplace already attaches Neon (`cannabissage-db`) + Stripe sandbox (`cannabissage-stripe`).
-2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.vercel.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
-3. Point Stripe webhook (test mode until Cipher CLEAR) to `https://cannabissage.vercel.app/api/webhook`.
-4. Extension already defaults to the prod origin in `data/config.json` (v1.3.2+); localhost remains in `host_permissions` for unpacked local/dev only.
-5. Rebuild extension zip (`./scripts/pack-extension.sh`) → `dist/cannabis-sage-1.3.2.zip`.
+1. Deploy `web/` to Vercel project **cannabissage** (custom domain `https://cannabissage.app`, alias `https://cannabissage.vercel.app`); Marketplace already attaches Neon (`cannabissage-db`) + Stripe sandbox (`cannabissage-stripe`).
+2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
+3. Point Stripe webhook (test mode until Cipher CLEAR) to `https://cannabissage.app/api/webhook` (Vercel alias URL also works).
+4. Extension defaults to `cannabissage.app` in `data/config.json` (v1.3.3+); manifest keeps Vercel + localhost in `host_permissions` for fallback/unpacked dev.
+5. Rebuild extension zip (`./scripts/pack-extension.sh`) → `dist/cannabis-sage-1.3.3.zip`.
 
 License rows live in Neon (`licenses`); Stripe subscription metadata remains the entitlement source of truth (`web/lib/licenses.ts`, `web/lib/fulfillment.ts`).
 

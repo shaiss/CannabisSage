@@ -122,11 +122,15 @@ export default function PrivacyPage() {
                   <td>Zen Leaf / Malvern (TerraVida alias) menus and PDPs.</td>
                 </tr>
                 <tr>
-                  <td><code>https://cannabissage.vercel.app/*</code></td>
+                  <td><code>https://cannabissage.app/*</code></td>
                   <td>
-                    Entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep
-                    links.
+                    Primary production origin: entitlement activate/validate against the CannabisSage
+                    API; Upgrade/Manage deep links.
                   </td>
+                </tr>
+                <tr>
+                  <td><code>https://cannabissage.vercel.app/*</code></td>
+                  <td>Vercel deployment fallback for the same APIs and deep links.</td>
                 </tr>
                 <tr>
                   <td><code>http://localhost:3000/*</code> (unpacked local/dev only)</td>

@@ -1,6 +1,6 @@
 {
-  "apiBaseUrl": "https://cannabissage.vercel.app",
-  "upgradeUrl": "https://cannabissage.vercel.app/#pricing",
-  "accountUrl": "https://cannabissage.vercel.app/account",
+  "apiBaseUrl": "https://cannabissage.app",
+  "upgradeUrl": "https://cannabissage.app/#pricing",
+  "accountUrl": "https://cannabissage.app/account",
   "productName": "CannabisSage Pro"
 }

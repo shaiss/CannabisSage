@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "CannabisSage",
-  "version": "1.3.2",
+  "version": "1.3.3",
   "description": "Chem insights for Sunnyside & Zen Leaf. Free hover/compare; Pro via Stripe on our site. Not medical advice.",
   "icons": {
     "16": "icons/icon16.png",
@@ -70,6 +70,7 @@
     "https://sunnyside.shop/*",
     "https://zenleafdispensaries.com/*",
     "https://www.zenleafdispensaries.com/*",
+    "https://cannabissage.app/*",
     "https://cannabissage.vercel.app/*",
     "http://localhost:3000/*",
     "https://localhost:3000/*"

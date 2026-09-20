@@ -59,7 +59,8 @@ assert(envExample.includes('STRIPE_SECRET_KEY='), 'env STRIPE_SECRET_KEY');
 assert(envExample.includes('STRIPE_WEBHOOK_SECRET='), 'env STRIPE_WEBHOOK_SECRET');
 assert(envExample.includes('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY='), 'env publishable key');
 assert(envExample.includes('STRIPE_PRICE_ID_PROMO='), 'env promo price');
-assert(envExample.includes('cannabissage.vercel.app'), 'prod API alias documented');
+assert(envExample.includes('cannabissage.app'), 'prod site URL documented');
+assert(envExample.includes('cannabissage.vercel.app'), 'vercel fallback documented');
 assert(!/sk_live_|whsec_[A-Za-z0-9]{20,}/.test(envExample), 'no live secrets in .env.example');
 
 const pkg = JSON.parse(fs.readFileSync(path.join(webRoot, 'package.json'), 'utf8'));
@@ -93,15 +94,16 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.2', 'extension 1.3.2');
-assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host');
+assert(manifest.version === '1.3.3', 'extension 1.3.3');
+assert(manifest.host_permissions.includes('https://cannabissage.app/*'), 'prod API host (custom domain)');
+assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host (vercel fallback)');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');
 assert(manifest.web_accessible_resources[0].resources.includes('data/config.json'), 'config WAR');
 
 const config = JSON.parse(fs.readFileSync(path.join(extRoot, 'data/config.json'), 'utf8'));
-assert(config.apiBaseUrl === 'https://cannabissage.vercel.app', 'prod apiBaseUrl');
-assert(config.upgradeUrl.includes('cannabissage.vercel.app'), 'prod upgradeUrl');
-assert(config.accountUrl.includes('cannabissage.vercel.app'), 'prod accountUrl');
+assert(config.apiBaseUrl === 'https://cannabissage.app', 'prod apiBaseUrl');
+assert(config.upgradeUrl.includes('cannabissage.app'), 'prod upgradeUrl');
+assert(config.accountUrl.includes('cannabissage.app'), 'prod accountUrl');
 
 function generateLicenseKey() {
   const raw = randomBytes(9).toString('hex').toUpperCase();

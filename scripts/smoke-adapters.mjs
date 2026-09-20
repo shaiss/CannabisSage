@@ -135,14 +135,18 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.2', 'version bump');
+assert(manifest.version === '1.3.3', 'version bump');
 assert(
   manifest.host_permissions.includes('https://zenleafdispensaries.com/*'),
   'zenleaf host perm'
 );
 assert(
+  manifest.host_permissions.includes('https://cannabissage.app/*'),
+  'prod API host perm (custom domain)'
+);
+assert(
   manifest.host_permissions.includes('https://cannabissage.vercel.app/*'),
-  'prod API host perm'
+  'prod API host perm (vercel fallback)'
 );
 assert(
   !manifest.host_permissions.some((h) => /terravidahc|terravida\.com/.test(h)),

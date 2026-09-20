@@ -208,8 +208,12 @@
         <div class="csi-sidebar-header">
           <h2>Product Comparison</h2>
           <div class="csi-sidebar-actions">
-            <button type="button" class="csi-export-json" title="Copy JSON">JSON</button>
-            <button type="button" class="csi-export-csv" title="Copy CSV">CSV</button>
+            ${
+              CSI.features?.can?.('exportCompare')
+                ? `<button type="button" class="csi-export-json" title="Copy JSON">JSON</button>
+            <button type="button" class="csi-export-csv" title="Copy CSV">CSV</button>`
+                : `<button type="button" class="csi-export-locked" title="Pro feature">Export (Pro)</button>`
+            }
             <button type="button" class="csi-sidebar-close" aria-label="Close">✕</button>
           </div>
         </div>
@@ -230,6 +234,7 @@
         renderTable(sidebar, productData, state.tasteMap);
         const exportJson = sidebar.querySelector('.csi-export-json');
         const exportCsv = sidebar.querySelector('.csi-export-csv');
+        const exportLocked = sidebar.querySelector('.csi-export-locked');
         exportJson?.addEventListener('click', async () => {
           const ok = await copyText(exportCompareJson(productData));
           exportJson.textContent = ok ? 'Copied' : 'Failed';
@@ -240,6 +245,7 @@
           exportCsv.textContent = ok ? 'Copied' : 'Failed';
           setTimeout(() => (exportCsv.textContent = 'CSV'), 1200);
         });
+        exportLocked?.addEventListener('click', () => CSI.entitlement?.openUpgrade?.());
       };
 
       selected.forEach(async (product, index) => {

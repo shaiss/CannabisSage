@@ -135,7 +135,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.2.0', 'version bump');
+assert(manifest.version === '1.3.0', 'version bump');
 assert(
   manifest.host_permissions.includes('https://zenleafdispensaries.com/*'),
   'zenleaf host perm'

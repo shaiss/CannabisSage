@@ -39,9 +39,18 @@
       CSI.routes?.teardownPdp?.();
     }
 
-    if (next === 'listing') CSI.routes?.startListing?.();
+    if (next === 'listing') {
+      CSI.entitlement?.refreshIsPro?.().finally(() => CSI.routes?.startListing?.());
+    }
     if (next === 'pdp') {
-      setTimeout(() => CSI.routes?.startPdp?.(), 200);
+      // Free: PDP allowed on Sunnyside; multi-store PDPs require Pro
+      CSI.entitlement?.refreshIsPro?.().finally(() => {
+        if (!CSI.features?.canUseActiveStore?.()) {
+          CSI.routes?.startListing?.(); // shows store gate banner path via listing
+          return;
+        }
+        setTimeout(() => CSI.routes?.startPdp?.(), 200);
+      });
     }
   }
 

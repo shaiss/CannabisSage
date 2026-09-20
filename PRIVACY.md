@@ -1,51 +1,54 @@
 # Privacy Policy — CannabisSage
 
 **Last updated:** September 20, 2026  
-**Extension version covered:** 1.2.x
+**Extension version covered:** 1.3.x
 
-CannabisSage is a Chrome extension that helps shoppers view cannabinoid and terpene information on supported retailer product listing and detail pages (Sunnyside; Zen Leaf Dispensaries; TerraVida shopping via Zen Leaf Malvern), compare a small number of products, filter/sort visible cards, and score products against a local taste preference map.
+CannabisSage is a Chrome extension that helps shoppers view cannabinoid and terpene information on supported retailer product listing and detail pages (Sunnyside; Zen Leaf Dispensaries; TerraVida shopping via Zen Leaf Malvern), compare a small number of products, filter/sort visible cards, and score products against a local taste preference map. Optional **Pro** features unlock after a subscription purchased on the CannabisSage website via **Stripe Checkout** (not inside the extension).
 
 ## Summary
 
-CannabisSage does **not** collect, sell, or share personal data with the extension developer. It does not require an account. It does not use analytics SDKs, advertising trackers, or remote configuration that executes code.
+CannabisSage does **not** sell personal data. The free extension does not require an account. Paid Pro uses Stripe-hosted Checkout on the CannabisSage website; the extension only stores a license key and entitlement status you activate locally.
 
 ## Data the extension accesses
 
 When you use CannabisSage on a supported store page:
 
-1. **Page content (local):** The content script reads product card and detail-page information already present in the page (identifiers, names, prices, sale cues, and any potency/terpene fields exposed in the DOM or client state).
-2. **Product detail pages (network):** The background service worker may request same-site product detail HTML over HTTPS when listing cards lack chemistry details or when you open a detail page / comparison. Requests stay on the active retailer’s hosts listed below.
-3. **Local extension storage (`chrome.storage.local`):**
-   - Compare-tray selections (up to three products and related profile fields)
-   - Taste-map preferences you set in the toolbar popup
-   - Listing filter/sort preferences
-   - A short-lived **TTL cache** of fetched product profiles (default 6 hours) to reduce repeat network requests
-4. **Bundled JSON:** Default taste-map seeds and a terpene aroma glossary ship inside the extension package.
+1. **Page content (local):** Product card and detail-page information already present in the page.
+2. **Product detail pages (network):** Same-site HTTPS fetches to retailer hosts when chemistry details are missing.
+3. **Local extension storage (`chrome.storage.local`):** Compare selections, taste-map preferences, filters, TTL product cache, and (if you activate Pro) license key + entitlement expiry.
+4. **Bundled JSON:** Default taste-map seeds, terpene glossary, and API base URL config.
+
+## Payments & Pro entitlement
+
+- **Cards are never collected in the extension UI.** Upgrade opens the CannabisSage website, which redirects to **Stripe Checkout** (hosted by Stripe).
+- After payment, Stripe may process your **email** and payment details under Stripe’s privacy policy. CannabisSage’s server may store license key, Stripe customer/subscription ids, subscription status, period end, and checkout email to fulfill entitlement.
+- The extension calls the CannabisSage HTTPS API (`/api/license/activate`, `/api/license/validate`) to activate or refresh Pro status. No remote extension code is downloaded.
 
 ## Data we do not collect
 
 CannabisSage does **not**:
 
-- Create user accounts or store retailer login credentials
-- Transmit browsing history, selections, or taste preferences to the developer or any third party other than the retailer hosts you already use
-- Upload data to an analytics or advertising service
-- Sell or rent user data
+- Create retailer login credentials or scrape account passwords
+- Embed analytics SDKs or advertising trackers in the extension
 - Execute remote code or load store adapters from the network
+- Collect payment card numbers inside the extension
 
 ## Permissions explained
 
 | Permission / host | Why it is needed |
 | --- | --- |
-| `https://www.sunnyside.shop/*`, `https://sunnyside.shop/*` | Inject UI on Sunnyside `/products/*` listings and `/product/*` detail pages; fetch same-site product HTML for chemistry details. |
-| `https://zenleafdispensaries.com/*`, `https://www.zenleafdispensaries.com/*` | Inject UI on Zen Leaf location menus and product pages (including Malvern / TerraVida alias); fetch same-site product HTML when needed. |
-| `storage` | Persist compare selections, taste-map preferences, filter/sort settings, and TTL product-profile cache on your device. |
-| No `tabs`, `history`, `cookies`, identity, or `<all_urls>` | Intentionally omitted. |
+| `https://www.sunnyside.shop/*`, `https://sunnyside.shop/*` | Sunnyside listings/PDPs and same-site product HTML. |
+| `https://zenleafdispensaries.com/*`, `https://www.zenleafdispensaries.com/*` | Zen Leaf / Malvern (TerraVida alias) menus and PDPs. |
+| `http://localhost:3000/*` (dev) / your deployed site origin | Entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep links. |
+| Optional `https://*.vercel.app/*` | Optional production previews when you grant them. |
+| `storage` | Persist compare, prefs, filters, cache, and license entitlement on device. |
 
-**Not declared:** `terravidahc.com` and other TerraVida marketing domains — they do not host a usable ecommerce product catalog for this extension (see `docs/ADAPTERS.md`).
+**Not declared:** `terravidahc.com` (not an ecommerce catalog).
 
 ## Third parties
 
-Network requests go only to the retailer hosts above (`sunnyside.shop`, `zenleafdispensaries.com`). CannabisSage does not introduce additional third-party data processors.
+- Retailer hosts you already browse (`sunnyside.shop`, `zenleafdispensaries.com`)
+- **Stripe** (Checkout, Billing, Customer Portal) when you purchase or manage Pro — see [Stripe Privacy Policy](https://stripe.com/privacy)
 
 ## Children
 

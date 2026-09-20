@@ -33,13 +33,21 @@ desktop.ini
 
 # Node modules (if using npm/node for any tooling)
 node_modules/
-package-lock.json
 yarn.lock
+
+# Keep web lockfile for reproducible deploys
+!web/package-lock.json
 
 # Environment files
 .env
 .env.local
 .env.*.local
+
+# Next.js / web
+web/.next/
+web/.data/
+web/node_modules/
+web/.env*.local
 
 # Build outputs
 dist/

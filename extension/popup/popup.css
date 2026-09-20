@@ -96,3 +96,24 @@ button.primary {
   color: #1f883d;
   font-weight: 600;
 }
+
+.license-actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px 0;
+}
+
+.license-label {
+  display: block;
+  margin-top: 8px;
+}
+
+#taste-section.is-locked {
+  opacity: 0.72;
+}
+
+#license-status {
+  font-weight: 600;
+  color: var(--dark);
+}
+

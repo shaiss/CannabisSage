@@ -17,11 +17,16 @@
     preferHighTotalTerps: true
   };
 
+  const CSI = globalThis.CSI;
   const prefList = document.getElementById('pref-list');
   const avoidInput = document.getElementById('avoid-input');
   const minMatch = document.getElementById('min-match');
   const preferTerps = document.getElementById('prefer-terps');
   const status = document.getElementById('status');
+  const licenseStatus = document.getElementById('license-status');
+  const licenseKeyInput = document.getElementById('license-key');
+  const tasteProNote = document.getElementById('taste-pro-note');
+  const deactivateBtn = document.getElementById('deactivate');
 
   function showStatus(msg) {
     status.hidden = false;
@@ -73,7 +78,33 @@
     preferTerps.checked = !!map.preferHighTotalTerps;
   }
 
-  async function load() {
+  function setTasteEnabled(pro) {
+    tasteProNote.textContent = pro
+      ? 'Applied on listings.'
+      : 'Saved locally; Map match on listings requires Pro.';
+  }
+
+  async function refreshLicenseUi() {
+    await CSI.entitlement.validateRemote().catch(() => null);
+    const rec = await CSI.entitlement.readStored();
+    const pro = CSI.entitlement.isPro();
+    if (pro && rec) {
+      const exp = rec.expiresAt ? new Date(rec.expiresAt).toLocaleDateString() : 'current period';
+      licenseStatus.textContent = `Pro active${rec.email ? ` · ${rec.email}` : ''} · through ${exp}`;
+      licenseKeyInput.value = rec.licenseKey || '';
+      deactivateBtn.hidden = false;
+    } else if (rec?.licenseKey) {
+      licenseStatus.textContent = `License saved but inactive (${rec.status || 'expired'}).`;
+      licenseKeyInput.value = rec.licenseKey;
+      deactivateBtn.hidden = false;
+    } else {
+      licenseStatus.textContent = 'Free plan — hover, badges, compare, Sunnyside PDP.';
+      deactivateBtn.hidden = true;
+    }
+    setTasteEnabled(pro);
+  }
+
+  async function loadTaste() {
     const data = await chrome.storage.local.get(['csi_taste_map']);
     if (data.csi_taste_map) fillForm(data.csi_taste_map);
     else {
@@ -97,5 +128,24 @@
     showStatus('Defaults restored');
   });
 
-  load();
+  document.getElementById('upgrade').addEventListener('click', () => CSI.entitlement.openUpgrade());
+  document.getElementById('manage').addEventListener('click', () => CSI.entitlement.openManage());
+  document.getElementById('activate').addEventListener('click', async () => {
+    try {
+      await CSI.entitlement.activate(licenseKeyInput.value);
+      showStatus('Activated');
+      await refreshLicenseUi();
+    } catch (e) {
+      showStatus(e.message || 'Activation failed');
+    }
+  });
+  deactivateBtn.addEventListener('click', async () => {
+    await CSI.entitlement.clearStored();
+    licenseKeyInput.value = '';
+    showStatus('License removed');
+    await refreshLicenseUi();
+  });
+
+  await loadTaste();
+  await refreshLicenseUi();
 })();

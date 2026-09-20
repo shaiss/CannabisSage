@@ -87,11 +87,13 @@
       }
     }
 
-    if (match != null && match >= minMatch) {
+    if (CSI.features?.can?.('tasteMap') && match != null && match >= minMatch) {
       chips.push(`<span class="csi-badge csi-badge-match" title="Taste-map match ${Math.round(match * 100)}%">Map match</span>`);
     }
-    if (product?.onSale) chips.push(`<span class="csi-badge csi-badge-deal">Sale</span>`);
-    if (product?.dollarsPerMg != null) {
+    if (CSI.features?.can?.('dealBadges') && product?.onSale) {
+      chips.push(`<span class="csi-badge csi-badge-deal">Sale</span>`);
+    }
+    if (CSI.features?.can?.('dealBadges') && product?.dollarsPerMg != null) {
       chips.push(`<span class="csi-badge csi-badge-deal">$${product.dollarsPerMg.toFixed(2)}/mg</span>`);
     }
 
@@ -153,10 +155,16 @@
       return product;
     }
 
-    if (state.tasteMap) product.matchScore = CSI.scoreTasteMatch(product, state.tasteMap);
-    product.dollarsPerMg = weightGrams
-      ? CSI.dollarsPerMgThc(product.price, product.cannabinoids, weightGrams)
-      : null;
+    if (CSI.features?.can?.('tasteMap') && state.tasteMap) {
+      product.matchScore = CSI.scoreTasteMatch(product, state.tasteMap);
+    }
+    if (CSI.features?.can?.('dealBadges')) {
+      product.dollarsPerMg = weightGrams
+        ? CSI.dollarsPerMgThc(product.price, product.cannabinoids, weightGrams)
+        : null;
+    } else {
+      product.dollarsPerMg = null;
+    }
     const empty =
       !CSI.hasCannabinoidInfo(product.cannabinoids) && !CSI.hasTerpeneInfo(product.terpenes);
     product.status = empty ? 'empty' : product.status || 'ok';
@@ -245,7 +253,9 @@
     CSI.ui.showTooltip(
       event.pageX,
       event.pageY,
-      CSI.ui.buildTooltipContent(product, { matchScore: product?.matchScore })
+      CSI.ui.buildTooltipContent(product, {
+        matchScore: CSI.features?.can?.('tasteMap') ? product?.matchScore : null
+      })
     );
   }
 
@@ -278,14 +288,17 @@
     const cards = findProductCards();
     const hosts = cards.map((c) => ({ card: c, host: cardHost(c) }));
 
+    const filtersOn = CSI.features?.can?.('filters');
+    const sortOn = CSI.features?.can?.('sort');
+
     // Filter visibility
     hosts.forEach(({ card, host }) => {
-      const pass = cardPassesFilters(card);
+      const pass = filtersOn ? cardPassesFilters(card) : true;
       host.classList.toggle('csi-filtered-out', !pass);
       host.style.display = pass ? '' : 'none';
     });
 
-    const sortBy = state.filters.sortBy || 'default';
+    const sortBy = sortOn ? state.filters.sortBy || 'default' : 'default';
     if (sortBy === 'default') return;
 
     // Sort visible hosts within shared parent
@@ -314,14 +327,17 @@
 
   function ensureFilterBar() {
     if (filterBar || !document.body) return;
+    const pro = CSI.features?.hasPro?.();
+    const storeName = CSI.registry?.getActiveAdapter?.()?.displayName || '';
     filterBar = document.createElement('div');
     filterBar.id = 'csi-filter-bar';
     filterBar.innerHTML = `
       <div class="csi-filter-title">CannabisSage${
-        CSI.registry?.getActiveAdapter?.()?.displayName
-          ? ` · ${CSI.escapeHtml(CSI.registry.getActiveAdapter().displayName)}`
-          : ''
-      }</div>
+        storeName ? ` · ${CSI.escapeHtml(storeName)}` : ''
+      }${pro ? ' · Pro' : ' · Free'}</div>
+      ${
+        pro
+          ? `
       <label>Min THC% <input type="number" step="0.1" min="0" id="csi-min-thc" placeholder="—"></label>
       <label>Must terpene <input type="text" id="csi-must-terp" placeholder="e.g. Limonene" list="csi-terp-list"></label>
       <label>Exclude <input type="text" id="csi-excl-terp" placeholder="terpene" list="csi-terp-list"></label>
@@ -338,9 +354,17 @@
       <button type="button" id="csi-reset-filters">Reset</button>
       <datalist id="csi-terp-list">
         ${CSI.TERPENE_CANON.map((t) => `<option value="${t.name}"></option>`).join('')}
-      </datalist>
+      </datalist>`
+          : `<span class="csi-filter-locked">Filters, sort & taste-map are Pro. <button type="button" id="csi-upgrade-btn" class="csi-upgrade-inline">Upgrade</button></span>`
+      }
     `;
     document.body.appendChild(filterBar);
+
+    filterBar.querySelector('#csi-upgrade-btn')?.addEventListener('click', () => {
+      CSI.entitlement?.openUpgrade?.();
+    });
+
+    if (!pro) return;
 
     const syncInputs = () => {
       filterBar.querySelector('#csi-min-thc').value = state.filters.minThc ?? '';
@@ -462,6 +486,7 @@
     }
     clearTimeout(enhanceTimer);
     document.getElementById('csi-filter-bar')?.remove();
+    document.getElementById('csi-store-gate')?.remove();
     filterBar = null;
     document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
     document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
@@ -470,20 +495,44 @@
     // Keep compare tray across PDP
   }
 
+  function showStoreGateBanner() {
+    document.getElementById('csi-store-gate')?.remove();
+    const el = document.createElement('div');
+    el.id = 'csi-store-gate';
+    el.innerHTML = `
+      <strong>CannabisSage Pro</strong>
+      <span>Multi-store (Zen Leaf / TerraVida) requires Pro.</span>
+      <button type="button" id="csi-store-upgrade">Upgrade</button>
+    `;
+    document.body.appendChild(el);
+    el.querySelector('#csi-store-upgrade')?.addEventListener('click', () => {
+      CSI.entitlement?.openUpgrade?.();
+    });
+  }
+
   async function startListing() {
     if (active) {
       onListingPathChange();
       return;
     }
     active = true;
+    await CSI.entitlement?.refreshIsPro?.();
     CSI.log(
       `listing start v${CSI.VERSION}`,
       CSI.registry?.getActiveAdapter?.()?.id || 'no-adapter',
       location.href
     );
+
+    if (!CSI.features?.canUseActiveStore?.()) {
+      showStoreGateBanner();
+      active = false;
+      return;
+    }
+    document.getElementById('csi-store-gate')?.remove();
+
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();
-    state.tasteMap = await CSI.storage.loadTasteMap();
+    state.tasteMap = CSI.features?.can?.('tasteMap') ? await CSI.storage.loadTasteMap() : null;
     state.filters = await CSI.storage.loadFilters();
     await CSI.glossary.ensureGlossary();
 

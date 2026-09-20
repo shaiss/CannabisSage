@@ -1,21 +1,21 @@
 # Chrome Web Store Listing — CannabisSage
 
-Use this copy when submitting **v1.2+** to the Chrome Web Store. Keep claims factual; do not imply medical advice or clinical outcomes.
+Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims factual; do not imply medical advice or clinical outcomes.
 
 ## Store metadata
 
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.2.0 |
+| **Version** | 1.3.0 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
-| **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare, filter, sort, and match against a local taste preference map. |
+| **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
 
 ## Short description (≤ 132 characters)
 
 ```
-Chem insights for Sunnyside & Zen Leaf: badges, compare, filters, taste-map. Local prefs. Not medical advice.
+Chem insights for Sunnyside & Zen Leaf. Free hover/compare; Pro via Stripe on our site. Not medical advice.
 ```
 
 ## Detailed description
@@ -25,36 +25,30 @@ CannabisSage is a Chrome extension for supported cannabis retailers:
 
 • Sunnyside (sunnyside.shop)
 • Zen Leaf Dispensaries (zenleafdispensaries.com)
-• TerraVida shopping via Zen Leaf Malvern menus (same Zen Leaf host — no separate TerraVida storefront)
+• TerraVida shopping via Zen Leaf Malvern menus (same Zen Leaf host)
 
-On category / location menus:
-• Hover a product card for cannabinoid and terpene details when the retailer publishes them
-• See small badges (THC%, top terpene, sale, optional $/mg when price and weight are visible)
-• Select up to three products in a persistent compare tray (survives refresh)
-• Filter by min THC, must-include/exclude terpene, and max $/mg when calculable
-• Sort visible cards by THCA/THC, total terpenes, or taste-map match
-• Flag products that match your local taste preference map
+Free features:
+• Hover tooltips and basic chem badges
+• Compare tray (up to 3 products)
+• Product detail panel on Sunnyside
 
-On product detail pages:
-• Side panel with the same chemistry readout
-• Add to the compare tray
-• Tap a terpene for a one-line aroma note plus a disclaimer (not medical advice)
+Pro features (unlock after purchase on the CannabisSage website):
+• Taste-map match, listing filters & sort
+• CSV/JSON export and deal badges
+• Zen Leaf / TerraVida multi-store
 
-Taste map:
-• Edit preferred/avoided terpenes in the extension popup
-• Preferences stay on your device
+Payments:
+• Subscription checkout uses Stripe Checkout on our website — never inside the extension
+• Launch promo: $10/year for the first 30 days after launch (see site for end date)
+• Activate a license key in the extension popup; manage/cancel via Stripe Customer Portal
 
 What it does not do
-• It does not provide medical advice or make claims about effects, dosing, or treatment
-• It does not replace official labels, certificates of analysis, or in-store guidance
-• It does not load store plugins from the internet (adapters ship inside the extension)
+• Medical advice or claims about effects/dosing/treatment
+• Card collection inside the extension
+• Remote code / sideloaded plugins
 
 Privacy
-• No account required
-• No analytics SDK and no remote code execution
-• Network requests stay on sunnyside.shop and zenleafdispensaries.com
-• Uses on-device storage for compare selections, preferences, and a short TTL cache
-• See PRIVACY.md in the project repository
+• See PRIVACY.md — retailer page reads, optional Stripe email for Pro, on-device storage
 
 Packaging
 • Upload the zip from ./scripts/pack-extension.sh
@@ -62,48 +56,41 @@ Packaging
 
 ## Permission justifications
 
-### Host permission: `https://www.sunnyside.shop/*` and `https://sunnyside.shop/*`
+### Host permission: Sunnyside
 
-Needed to run on Sunnyside listing and product detail pages and to fetch same-origin product HTML when chemistry fields are missing from listing cards.
+Inject UI and fetch same-origin product HTML on Sunnyside listings and PDPs.
 
-### Host permission: `https://zenleafdispensaries.com/*` and `https://www.zenleafdispensaries.com/*`
+### Host permission: Zen Leaf
 
-Needed to run on Zen Leaf location menus and product pages (including Malvern, labeled TerraVida in-product when that alias adapter matches) and to fetch same-origin product HTML when needed. TerraVida marketing domains are intentionally omitted — they are not ecommerce catalogs.
+Inject UI and fetch same-origin product HTML on Zen Leaf location menus/PDPs (including Malvern / TerraVida alias).
+
+### Host permission: CannabisSage site / localhost (dev)
+
+Call entitlement activate/validate APIs and open Upgrade / Manage links. Production builds should list your deployed HTTPS origin. Cards are never entered in the extension.
 
 ### Permission: `storage`
 
-Needed to persist the compare tray, taste-map preferences, listing filter/sort settings, and a time-limited product-profile cache on the user’s device. Data is not uploaded to the developer.
+Persist compare tray, taste-map prefs, filters, TTL cache, and Pro license entitlement on device.
 
 ## Single purpose statement
 
 ```
-Enhance supported cannabis retailer listing and detail pages by displaying retailer-published cannabinoid and terpene information, enabling comparison of up to three products, and providing local filter/sort/taste-map tools. Not medical advice.
+Enhance supported cannabis retailer listing and detail pages by displaying retailer-published cannabinoid and terpene information, enabling comparison of up to three products, and optionally unlocking local Pro tools after a website Stripe subscription. Not medical advice. Payments are not collected inside the extension.
 ```
 
 ## Remote code attestation notes
 
-- All logic ships inside the package (content scripts, service worker, popup, bundled JSON, in-repo store adapters).
-- No eval of remote scripts; no dynamically loaded extension code from the network.
-- Network use is limited to HTTPS fetches of product HTML on allowed retailer hosts for products the user views or compares.
-
-## Screenshots
-
-Prepare **1280×800** and **640×400** shots showing: listing badges + filter bar; hover tooltip; compare sidebar; PDP panel; taste-map popup. Prefer at least one Sunnyside and one Zen Leaf/Malvern frame.
-
-## Packaging
-
-```bash
-./scripts/pack-extension.sh
-```
-
-Writes `dist/cannabis-sage-<version>.zip`.
+- All extension logic ships inside the package.
+- No eval of remote scripts; adapters are in-repo only.
+- Network: retailer HTML fetches + CannabisSage entitlement HTTPS API + user-initiated navigation to Stripe Checkout on the website.
 
 ## Human steps remaining
 
-1. Chrome Web Store developer account (one-time registration fee; confirm current amount on Google’s site).
-2. Upload the packed zip.
-3. Paste descriptions and permission justifications from this file.
-4. Host/link `PRIVACY.md` over HTTPS.
-5. Upload compliant screenshots.
-6. Complete privacy practices questionnaire (on-device storage only; no selling data).
-7. Submit for review (age-restricted retail vertical; accurate single-purpose; no medical claims).
+1. Chrome Web Store developer account.
+2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
+3. Set `LAUNCH_DATE` / Price IDs; update extension `data/config.json` + manifest hosts for production API origin.
+4. Upload `dist/cannabis-sage-1.3.0.zip`.
+5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
+6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
+
+See `docs/MONETIZATION.md` and `docs/ADAPTERS.md`.

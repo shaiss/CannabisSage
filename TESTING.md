@@ -1,8 +1,13 @@
-# CannabisSage — Manual Test Matrix (v1.2)
+# CannabisSage — Manual Test Matrix (v1.3)
 
 Load unpacked from `extension/` after each change. Debug logs stay off unless `localStorage.cannabisSageDebug='1'`.
 
-Automated adapter checks (no browser): `node scripts/smoke-adapters.mjs`
+Automated checks:
+
+```bash
+node scripts/smoke-adapters.mjs
+node web/scripts/smoke-monetization.mjs
+```
 
 ## Setup
 
@@ -110,13 +115,31 @@ Checks per listing:
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.2.0.zip` | |
-| Zip contains `adapters/*`, manifest, lib/*, popup/*, data/*, icons | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.0.zip` | |
+| Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
+| `node web/scripts/smoke-monetization.mjs` exits 0 | |
 
-## Explicitly out of scope (do not fail v1.2)
+## P3 — Monetization (Stripe test mode)
+
+Prereq: `cd web && npm i && npm run dev` with `.env.local` Stripe test keys; `stripe listen --forward-to localhost:3000/api/webhook`.
+
+| Step | Pass? |
+| --- | --- |
+| Landing `/` shows promo price + Free vs Pro | |
+| Checkout button redirects to Stripe Checkout (hosted) | |
+| Success page shows `CSG-…` license key | |
+| Popup → Activate license → status Pro | |
+| Sunnyside: filters unlock; Free shows Upgrade on filter bar | |
+| Zen Leaf without Pro: multi-store gate banner | |
+| Zen Leaf with Pro: TerraVida/Zen Leaf enhancements work | |
+| Manage → Customer Portal (test) | |
+| Cancel sub → webhook → validate inactive → Pro features lock | |
+
+## Explicitly out of scope (do not fail v1.3)
 
 - Wishlist / tried tags beyond taste prefs
 - Strain lineage deep features
 - Remote / sideloaded community adapters (in-repo PRs only)
+- Live-mode Stripe until human goes live

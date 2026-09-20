@@ -1,15 +1,15 @@
 {
   "manifest_version": 3,
   "name": "CannabisSage",
-  "version": "1.2.0",
-  "description": "Cannabinoid and terpene insights on Sunnyside, Zen Leaf, and TerraVida (Zen Leaf Malvern) listings and product pages — compare, filter, sort, taste-map. Not medical advice.",
+  "version": "1.3.0",
+  "description": "Cannabinoid and terpene insights on Sunnyside, Zen Leaf, and TerraVida (Zen Leaf Malvern). Free core; Pro unlocks filters, taste-map, multi-store. Not medical advice.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "CannabisSage — taste map & settings",
+    "default_title": "CannabisSage — taste map & license",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
@@ -53,6 +53,8 @@
         "lib/csi-storage.js",
         "lib/csi-fetch.js",
         "lib/csi-glossary.js",
+        "lib/csi-entitlement.js",
+        "lib/csi-features.js",
         "lib/csi-ui.js",
         "content-listing.js",
         "content-pdp.js",
@@ -67,14 +69,20 @@
     "https://www.sunnyside.shop/*",
     "https://sunnyside.shop/*",
     "https://zenleafdispensaries.com/*",
-    "https://www.zenleafdispensaries.com/*"
+    "https://www.zenleafdispensaries.com/*",
+    "http://localhost:3000/*",
+    "https://localhost:3000/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.vercel.app/*"
   ],
   "permissions": ["storage"],
   "web_accessible_resources": [
     {
       "resources": [
         "data/default-taste-map.json",
-        "data/terpene-glossary.json"
+        "data/terpene-glossary.json",
+        "data/config.json"
       ],
       "matches": [
         "https://www.sunnyside.shop/*",

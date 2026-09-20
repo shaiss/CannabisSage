@@ -173,9 +173,42 @@
     return product;
   }
 
+  function normalizeCompareUrl(raw) {
+    if (!raw) return '';
+    try {
+      const u = new URL(raw, location.origin);
+      return `${u.origin}${u.pathname.replace(/\/$/, '')}`;
+    } catch {
+      return String(raw).split(/[?#]/)[0].replace(/\/$/, '');
+    }
+  }
+
+  function isUrlSelected(url) {
+    const norm = normalizeCompareUrl(url);
+    if (!norm) return false;
+    return state.selection.some((p) => normalizeCompareUrl(p.url) === norm);
+  }
+
+  function syncSelectButtonForCard(cardEl) {
+    const host = cardHost(cardEl);
+    const btn = host?.querySelector?.('.cannabis-sage-select-btn');
+    if (!btn) return;
+    const url = cardEl.dataset.csiUrl;
+    if (url && isUrlSelected(url)) {
+      btn.textContent = 'Selected ✓';
+      btn.classList.add('is-selected');
+    } else {
+      btn.textContent = 'Compare Select';
+      btn.classList.remove('is-selected');
+    }
+  }
+
   function addSelectionButton(cardEl) {
     const host = cardHost(cardEl);
-    if (host.querySelector('.cannabis-sage-select-btn')) return;
+    if (host.querySelector('.cannabis-sage-select-btn')) {
+      syncSelectButtonForCard(cardEl);
+      return;
+    }
 
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -183,19 +216,12 @@
     btn.textContent = 'Compare Select';
     btn.title = 'CannabisSage: select for comparison';
 
-    // Restore selected state from persistence
-    const syncLabel = () => {
-      const url = cardEl.dataset.csiUrl;
-      const selected = url && state.selection.some((p) => p.url === url);
-      if (selected) {
-        btn.textContent = 'Selected ✓';
-        btn.classList.add('is-selected');
-      } else {
-        btn.textContent = 'Compare Select';
-        btn.classList.remove('is-selected');
-      }
-    };
+    const syncLabel = () => syncSelectButtonForCard(cardEl);
     syncLabel();
+    // Restore after URL is known (reload: dataset.csiUrl may be empty at mount)
+    CSI.resolveProductUrl(cardEl)
+      .then(() => syncLabel())
+      .catch(() => {});
 
     btn.addEventListener('click', async (e) => {
       e.stopPropagation();
@@ -213,7 +239,8 @@
         return;
       }
 
-      const index = state.selection.findIndex((p) => p.url === url);
+      const norm = normalizeCompareUrl(url);
+      const index = state.selection.findIndex((p) => normalizeCompareUrl(p.url) === norm);
       if (index > -1) {
         state.selection.splice(index, 1);
       } else {
@@ -223,7 +250,7 @@
           return;
         }
         state.selection.push({
-          url,
+          url: normalizeCompareUrl(url) || url,
           name: product.name || (cardEl.textContent || '').trim().split('\n').filter(Boolean)[0] || 'Product',
           cannabinoids: product.cannabinoids,
           terpenes: product.terpenes,
@@ -423,10 +450,15 @@
       });
 
       addSelectionButton(card);
-      // Fire-and-forget enrichment for badges
-      enrichCard(card).then(() => applyFiltersAndSort());
+      // Fire-and-forget enrichment for badges; re-sync compare label once URL is known
+      enrichCard(card).then(() => {
+        syncSelectButtonForCard(card);
+        applyFiltersAndSort();
+      });
     }
     CSI.log(`newly enhanced: ${n}`);
+    // Re-sync all buttons against persisted selection (covers cards skipped as already enhanced)
+    findProductCards().forEach((card) => syncSelectButtonForCard(card));
     tray.updateTrayButton();
     applyFiltersAndSort();
   }

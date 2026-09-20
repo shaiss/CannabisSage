@@ -72,11 +72,31 @@
   async function loadCompare() {
     const data = await storageGet([KEYS.COMPARE]);
     const list = data[KEYS.COMPARE];
-    return Array.isArray(list) ? list.slice(0, CSI.MAX_COMPARE) : [];
+    if (!Array.isArray(list)) return [];
+    return list
+      .slice(0, CSI.MAX_COMPARE)
+      .map((p) => {
+        if (!p || typeof p !== 'object') return null;
+        const url = String(p.url || '')
+          .split(/[?#]/)[0]
+          .replace(/\/$/, '');
+        if (!url) return null;
+        return { ...p, url };
+      })
+      .filter(Boolean);
   }
 
   async function saveCompare(list) {
-    await storageSet({ [KEYS.COMPARE]: (list || []).slice(0, CSI.MAX_COMPARE) });
+    const cleaned = (list || [])
+      .slice(0, CSI.MAX_COMPARE)
+      .map((p) => ({
+        ...p,
+        url: String(p.url || '')
+          .split(/[?#]/)[0]
+          .replace(/\/$/, '')
+      }))
+      .filter((p) => p.url);
+    await storageSet({ [KEYS.COMPARE]: cleaned });
   }
 
   async function clearCompare() {

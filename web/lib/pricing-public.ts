@@ -45,12 +45,12 @@ export const FEATURE_GATES = {
     'Basic THC / terpene badges',
     'Compare tray (up to 3)',
     'Product detail panel',
-    'Sunnyside store'
+    'Core supported dispensary menus'
   ],
-  /** Pro bullets lead with money-savers: match, Zen Leaf coverage, $/mg. */
+  /** Pro bullets lead with money-savers: match, multi-store coverage, $/mg. */
   proLabels: [
     'Taste-map match on listings',
-    'Zen Leaf + TerraVida coverage',
+    'More stores you shop (multi-store)',
     '$/mg and deal badges',
     'Listing filters & sort',
     'CSV / JSON export'

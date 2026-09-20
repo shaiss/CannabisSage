@@ -44,10 +44,10 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | Free | Pro |
 | --- | --- |
 | Hover tooltips | Taste-map match on listings |
-| Basic THC / terpene badges | Zen Leaf + TerraVida coverage |
+| Basic THC / terpene badges | More stores you shop (multi-store) |
 | Compare tray (≤3) | $/mg and deal badges |
 | PDP panel | Filters & sort |
-| Sunnyside store | CSV / JSON export |
+| Core supported menus | CSV / JSON export |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings only when Pro is active.
 

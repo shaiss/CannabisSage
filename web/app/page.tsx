@@ -24,7 +24,7 @@ export default function HomePage() {
 
       <section className="hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">Chrome extension · Sunnyside &amp; Zen Leaf</p>
+          <p className="hero-eyebrow">Chrome extension · supported dispensary menus</p>
           <h1 className="brand-hero">Shop menus with chemistry on the page—not buried in every PDP.</h1>
           <p>
             CannabisSage surfaces retailer-published cannabinoid and terpene data while you browse.
@@ -111,21 +111,22 @@ export default function HomePage() {
       <section className="section section-alt" id="why-pro">
         <h2>Why shoppers upgrade to Pro</h2>
         <p>
-          Pro money-savers first: match what you like, cover Zen Leaf, and spot $/mg value—not fluff.
+          Pro money-savers first: match what you like, cover more of the stores you shop, and spot
+          $/mg value—not fluff.
         </p>
         <div className="why-grid">
           <article className="why-card">
             <h3>Match what you will pick</h3>
             <p>
               Taste-map match scores listings against terpene weights you set on your device. Free
-              still gives hover tooltips, badges, compare, and PDP panels on Sunnyside.
+              still gives hover tooltips, badges, compare, and PDP panels on supported menus.
             </p>
           </article>
           <article className="why-card">
-            <h3>Zen Leaf coverage</h3>
+            <h3>Across stores you shop</h3>
             <p>
-              Pro adds Zen Leaf and TerraVida so chem badges travel with you across more menus—not
-              just one retailer.
+              Pro extends chem badges across more supported dispensary menus—so insights travel with
+              you, not just one site.
             </p>
           </article>
           <article className="why-card">

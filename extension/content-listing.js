@@ -66,37 +66,16 @@
 
   function renderBadges(cardEl, product, status) {
     const row = ensureBadgeRow(cardEl);
-    const thc = CSI.readThcPercent(product?.cannabinoids);
-    const top = CSI.topTerpene(product?.terpenes);
-    const match = product?.matchScore;
+    const adapter = CSI.registry?.getActiveAdapter?.();
     const minMatch = state.tasteMap?.minMatchScore ?? 0.35;
-    const chips = [];
-
-    if (status === 'loading') {
-      chips.push(`<span class="csi-badge csi-badge-loading">Loading…</span>`);
-    } else if (status === 'error') {
-      chips.push(`<span class="csi-badge csi-badge-error" title="${CSI.escapeHtml(product?.error || 'Fetch failed')}">Chem unavailable</span>`);
-    } else if (status === 'empty' || (!thc && !top)) {
-      chips.push(`<span class="csi-badge csi-badge-empty">No chem data</span>`);
-    } else {
-      if (thc != null) chips.push(`<span class="csi-badge csi-badge-thc">THC ${thc.toFixed(1)}%</span>`);
-      if (top) {
-        chips.push(
-          `<span class="csi-badge csi-badge-terp" data-csi-terp="${CSI.escapeHtml(top.name)}">${CSI.escapeHtml(top.name)}</span>`
-        );
-      }
-    }
-
-    if (CSI.features?.can?.('tasteMap') && match != null && match >= minMatch) {
-      chips.push(`<span class="csi-badge csi-badge-match" title="Taste-map match ${Math.round(match * 100)}%">Map match</span>`);
-    }
-    if (CSI.features?.can?.('dealBadges') && product?.onSale) {
-      chips.push(`<span class="csi-badge csi-badge-deal">Sale</span>`);
-    }
-    if (CSI.features?.can?.('dealBadges') && product?.dollarsPerMg != null) {
-      chips.push(`<span class="csi-badge csi-badge-deal">$${product.dollarsPerMg.toFixed(2)}/mg</span>`);
-    }
-
+    const chips = CSI.ui.buildListingBadgeChips({
+      product,
+      status,
+      cardEl,
+      adapter,
+      tasteMap: state.tasteMap,
+      minMatch
+    });
     row.innerHTML = chips.join('');
     CSI.glossary?.wireTerpeneClicks(row);
   }

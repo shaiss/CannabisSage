@@ -39,8 +39,9 @@ CannabisSage does **not**:
 | --- | --- |
 | `https://www.sunnyside.shop/*`, `https://sunnyside.shop/*` | Sunnyside listings/PDPs and same-site product HTML. |
 | `https://zenleafdispensaries.com/*`, `https://www.zenleafdispensaries.com/*` | Zen Leaf / Malvern (TerraVida alias) menus and PDPs. |
-| `http://localhost:3000/*` (dev) / your deployed site origin | Entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep links. |
-| Optional `https://*.vercel.app/*` | Optional production previews when you grant them. |
+| `https://cannabissage.vercel.app/*` | Entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep links. |
+| `http://localhost:3000/*` (unpacked local/dev only) | Same entitlement APIs when running `web/` locally; keep for unpacked testing. Override via `chrome.storage.local.csi_api_base` or edit `data/config.json`. |
+| Optional `https://*.vercel.app/*` | Optional preview deployments when you grant them. |
 | `storage` | Persist compare, prefs, filters, cache, and license entitlement on device. |
 
 **Not declared:** `terravidahc.com` (not an ecommerce catalog).

@@ -83,10 +83,13 @@ export async function syncSubscription(subscription: Stripe.Subscription): Promi
   });
 }
 
+const CSG_KEY_RE = /^CSG-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/;
+
 /** Stripe is source of truth; Neon (or local .data under ALLOW_DEV_MOCK) is the durable cache. */
 export async function lookupLicenseViaStripe(licenseKey: string): Promise<LicenseRecord | null> {
   const key = licenseKey.trim().toUpperCase();
-  if (!key) return null;
+  // Reject anything that is not a CSG key before interpolating into Stripe Search syntax.
+  if (!CSG_KEY_RE.test(key)) return null;
   try {
     const stripe = getStripe();
     const result = await stripe.subscriptions.search({

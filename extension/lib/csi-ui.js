@@ -288,6 +288,95 @@
     }
   }
 
+  /**
+   * Preference match on the floating product panel.
+   * Uses the same taste-map object as the popup (saved prefs, or the
+   * bundled seed when nothing is saved). No retailer names, no effects claims.
+   * Quiet when there are no preferred terpenes or none of them are listed
+   * on this product. The existing tasteMap entitlement decides visibility;
+   * this copy does not add an upgrade control.
+   */
+  const PREFERENCE_MATCH_COPY = {
+    chip: 'Preference match',
+    lead: 'Preferred terpenes on this product',
+    avoid: 'Also on your avoid list'
+  };
+
+  function preferredTerpeneEntries(tasteMap) {
+    const preferred = tasteMap && tasteMap.preferredTerpenes;
+    if (!preferred || typeof preferred !== 'object' || Array.isArray(preferred)) return [];
+    return Object.entries(preferred).filter(([, weight]) => Number(weight) > 0);
+  }
+
+  /**
+   * Null when prefs are missing or no preferred terpene is actually listed.
+   * A total-terpene figure alone is not overlap. Score under the saved
+   * minimum is not a match.
+   */
+  function summarizePreferenceMatch(product, tasteMap) {
+    if (!product || !tasteMap) return null;
+    const prefs = preferredTerpeneEntries(tasteMap);
+    if (!prefs.length) return null;
+    const terpMap = CSI.normalizeTerpeneMap(product.terpenes);
+    const overlaps = [];
+    prefs.forEach(([rawName, weight]) => {
+      const name = CSI.canonicalizeTerpeneName(rawName) || String(rawName).trim();
+      if (!name || /total\s*terpenes?/i.test(name)) return;
+      const pct = terpMap[name];
+      if (!(pct > 0)) return;
+      overlaps.push({ name, percentage: pct, weight: Number(weight) });
+    });
+    if (!overlaps.length) return null;
+    const score = CSI.scoreTasteMatch(product, tasteMap);
+    if (score == null || !(score > 0)) return null;
+    const rawMin = Number(tasteMap.minMatchScore);
+    const minMatch = Number.isFinite(rawMin) ? rawMin : 0.35;
+    if (score < minMatch) return null;
+    const avoid = [];
+    const seenAvoid = new Set();
+    (Array.isArray(tasteMap.avoidTerpenes) ? tasteMap.avoidTerpenes : []).forEach((raw) => {
+      const name = CSI.canonicalizeTerpeneName(raw) || String(raw || '').trim();
+      if (!name || seenAvoid.has(name)) return;
+      const pct = terpMap[name];
+      if (!(pct > 0)) return;
+      seenAvoid.add(name);
+      avoid.push({ name, percentage: pct });
+    });
+    overlaps.sort((a, b) => b.percentage - a.percentage || a.name.localeCompare(b.name));
+    return { score, minMatch, overlaps, avoid };
+  }
+
+  function formatListedPercent(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  function buildPreferenceMatchPanel(product, tasteMap) {
+    if (!CSI.features?.can?.('tasteMap')) return '';
+    const summary = summarizePreferenceMatch(product, tasteMap);
+    if (!summary) return '';
+    const COPY = PREFERENCE_MATCH_COPY;
+    const pct = Math.round(summary.score * 100);
+    const chips = summary.overlaps
+      .map((row) => {
+        const shown = formatListedPercent(row.percentage);
+        const label = shown ? `${row.name} ${shown}%` : row.name;
+        return `<span class="csi-pref-match-chip" data-csi-terp="${CSI.escapeHtml(row.name)}">${CSI.escapeHtml(label)}</span>`;
+      })
+      .join('');
+    const avoid = summary.avoid.length
+      ? `<p class="csi-pref-match-avoid">${CSI.escapeHtml(COPY.avoid)}: ${summary.avoid
+          .map((row) => CSI.escapeHtml(row.name))
+          .join(', ')}</p>`
+      : '';
+    return `<section class="csi-pref-match" data-csi-pref-match="1"><span class="csi-badge csi-badge-match">${CSI.escapeHtml(
+      COPY.chip
+    )} ${pct}%</span><p class="csi-pref-match-lead">${CSI.escapeHtml(
+      COPY.lead
+    )}</p><div class="csi-pref-match-chips">${chips}</div>${avoid}</section>`;
+  }
+
   function exportCompareJson(products) {
     return JSON.stringify(products, null, 2);
   }
@@ -722,6 +811,8 @@
     TERP_OVERLAP_COPY,
     DEAL_VS_MEDIAN_COPY,
     PROVENANCE_COPY,
+    PREFERENCE_MATCH_COPY,
+    summarizePreferenceMatch,
     summarizeTerpeneOverlap,
     formatCannabinoids,
     formatTerpenes,
@@ -731,6 +822,7 @@
     buildDealVsMedianStrip,
     buildProvenanceStrip,
     buildProvenanceListingNote,
+    buildPreferenceMatchPanel,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

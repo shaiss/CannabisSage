@@ -619,6 +619,36 @@
   font-weight: 500;
 }
 
+.csi-pref-match {
+  margin: 0 0 8px;
+}
+
+.csi-pref-match-lead,
+.csi-pref-match-avoid {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667;
+  font-weight: 500;
+}
+
+.csi-pref-match-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.csi-pref-match-chip {
+  font-size: 11px;
+  line-height: 1.3;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid #c7e6d0;
+  background: #f4fbf6;
+  color: #1f883d;
+}
+
 /* Push page content slightly when filter bar present */
 body:has(#csi-filter-bar) {
   scroll-padding-top: 56px;

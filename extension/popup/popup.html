@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CannabisSage</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>CannabisSage</h1>
+      <p class="sub">Taste-map preferences · factual shopping aid only</p>
+    </header>
+
+    <section id="license-section">
+      <h2>Subscription</h2>
+      <p id="license-status" class="hint">Checking…</p>
+      <div class="license-actions">
+        <button type="button" id="upgrade" class="primary">Upgrade — $10/yr promo</button>
+        <button type="button" id="manage">Manage</button>
+      </div>
+      <label class="license-label">
+        Activate license key
+        <input type="text" id="license-key" placeholder="CSG-XXXX-XXXX-XXXX" autocomplete="off" />
+      </label>
+      <button type="button" id="activate">Activate</button>
+      <button type="button" id="deactivate" hidden>Remove license</button>
+      <p class="hint">
+        Cards are never collected in the extension. Checkout opens on the CannabisSage site (Stripe
+        hosted).
+      </p>
+    </section>
+
+    <section id="taste-section">
+      <h2>Preferred terpenes</h2>
+      <p class="hint">Weights 0–1. Higher = more important for “Map match”. <span id="taste-pro-note"></span></p>
+      <div id="pref-list"></div>
+      <button type="button" id="add-pref">Add terpene</button>
+    </section>
+
+    <section>
+      <h2>Avoid terpenes</h2>
+      <input type="text" id="avoid-input" placeholder="Comma-separated names" />
+    </section>
+
+    <section>
+      <label>Min match score for badge
+        <input type="number" id="min-match" min="0" max="1" step="0.05" />
+      </label>
+      <label class="check">
+        <input type="checkbox" id="prefer-terps" />
+        Slightly boost high total terpenes
+      </label>
+    </section>
+
+    <section class="actions">
+      <button type="button" id="save" class="primary">Save</button>
+      <button type="button" id="reset">Reset defaults</button>
+    </section>
+    <p id="status" class="status" hidden></p>
+    <p class="disclaimer">
+      CannabisSage displays retailer-published chemistry and aroma notes. It does not provide medical advice.
+    </p>
+    <script src="../lib/csi-core.js"></script>
+    <script src="../lib/csi-entitlement.js"></script>
+    <script src="../lib/csi-features.js"></script>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,95 @@
+{
+  "manifest_version": 3,
+  "name": "CannabisSage",
+  "version": "1.3.0",
+  "description": "Cannabinoid and terpene insights on Sunnyside, Zen Leaf, and TerraVida (Zen Leaf Malvern). Free core; Pro unlocks filters, taste-map, multi-store. Not medical advice.",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "CannabisSage — taste map & license",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.sunnyside.shop/products/*",
+        "https://sunnyside.shop/products/*",
+        "https://www.sunnyside.shop/product/*",
+        "https://sunnyside.shop/product/*",
+        "https://zenleafdispensaries.com/locations/*",
+        "https://www.zenleafdispensaries.com/locations/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://www.sunnyside.shop/products/*",
+        "https://sunnyside.shop/products/*",
+        "https://www.sunnyside.shop/product/*",
+        "https://sunnyside.shop/product/*",
+        "https://zenleafdispensaries.com/locations/*",
+        "https://www.zenleafdispensaries.com/locations/*"
+      ],
+      "js": [
+        "lib/csi-core.js",
+        "adapters/interface.js",
+        "adapters/sunnyside.js",
+        "adapters/zenleaf.js",
+        "adapters/terravida.js",
+        "adapters/registry.js",
+        "lib/csi-storage.js",
+        "lib/csi-fetch.js",
+        "lib/csi-glossary.js",
+        "lib/csi-entitlement.js",
+        "lib/csi-features.js",
+        "lib/csi-ui.js",
+        "content-listing.js",
+        "content-pdp.js",
+        "content-router.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    }
+  ],
+  "host_permissions": [
+    "https://www.sunnyside.shop/*",
+    "https://sunnyside.shop/*",
+    "https://zenleafdispensaries.com/*",
+    "https://www.zenleafdispensaries.com/*",
+    "http://localhost:3000/*",
+    "https://localhost:3000/*"
+  ],
+  "optional_host_permissions": [
+    "https://*.vercel.app/*"
+  ],
+  "permissions": ["storage"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data/default-taste-map.json",
+        "data/terpene-glossary.json",
+        "data/config.json"
+      ],
+      "matches": [
+        "https://www.sunnyside.shop/*",
+        "https://sunnyside.shop/*",
+        "https://zenleafdispensaries.com/*",
+        "https://www.zenleafdispensaries.com/*"
+      ]
+    }
+  ]
+}

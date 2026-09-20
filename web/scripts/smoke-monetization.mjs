@@ -22,7 +22,7 @@ assert(pricingSrc.includes("LAUNCH_DATE = process.env.LAUNCH_DATE || '2026-09-20
 assert(pricingSrc.includes('PROMO_DAYS = Number(process.env.PROMO_DAYS || 30)'), 'promo days');
 assert(pricingSrc.includes('PRICE_PROMO_YEAR_CENTS = 900'), 'promo $9/yr');
 assert(pricingSrc.includes('PRICE_PROMO_MONTH_CENTS = 400'), 'promo $4/mo');
-assert(pricingSrc.includes('PRICE_REGULAR_YEAR_CENTS = 9900'), 'regular $99/yr');
+assert(pricingSrc.includes('PRICE_REGULAR_YEAR_CENTS = 5900'), 'regular $59/yr');
 assert(pricingSrc.includes('STRIPE_PRICE_ID_PROMO'), 'promo annual env');
 assert(pricingSrc.includes('STRIPE_PRICE_ID_PROMO_MONTHLY'), 'promo monthly env');
 assert(pricingSrc.includes('STRIPE_PRICE_ID_REGULAR_ANNUAL'), 'regular annual env');
@@ -104,7 +104,7 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.4', 'extension 1.3.4');
+assert(manifest.version === '1.3.5', 'extension 1.3.5');
 assert(manifest.host_permissions.includes('https://cannabissage.app/*'), 'prod API host (custom domain)');
 assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host (vercel fallback)');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');

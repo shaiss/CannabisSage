@@ -135,7 +135,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.4', 'version bump');
+assert(manifest.version === '1.3.5', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',

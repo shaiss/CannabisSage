@@ -24,7 +24,7 @@ export default function HomePage() {
 
       <section className="hero">
         <div className="hero-inner">
-          <p className="hero-eyebrow">Chrome extension · Sunnyside &amp; Zen Leaf</p>
+          <p className="hero-eyebrow">Chrome extension · supported dispensary menus</p>
           <h1 className="brand-hero">Shop menus with chemistry on the page—not buried in every PDP.</h1>
           <p>
             CannabisSage surfaces retailer-published cannabinoid and terpene data while you browse.
@@ -110,30 +110,61 @@ export default function HomePage() {
 
       <section className="section section-alt" id="why-pro">
         <h2>Why shoppers upgrade to Pro</h2>
-        <p>Pro is for faster decisions across stores—not a spreadsheet of feature flags.</p>
+        <p>
+          Pro money-savers first: match what you like, cover more of the stores you shop, and spot
+          $/mg value—not fluff.
+        </p>
         <div className="why-grid">
           <article className="why-card">
-            <h3>Save time on big menus</h3>
+            <h3>Match what you will pick</h3>
             <p>
-              Filter and sort listings so you are not scrolling every hybrid on the page. Free still
-              gives hover tooltips, badges, compare, and PDP panels on Sunnyside.
+              Taste-map match scores listings against terpene weights you set on your device. Free
+              still gives hover tooltips, badges, compare, and PDP panels on supported menus.
             </p>
           </article>
           <article className="why-card">
-            <h3>Find what you will actually pick</h3>
+            <h3>Across stores you shop</h3>
             <p>
-              Taste-map match scores listings against terpene weights you set—saved on your device.
-              Map match on grids is Pro; editing preferences is available in the popup anytime.
+              Pro extends chem badges across more supported dispensary menus—so insights travel with
+              you, not just one site.
             </p>
           </article>
           <article className="why-card">
-            <h3>Shop more than one retailer</h3>
+            <h3>$/mg and deal badges</h3>
             <p>
-              Pro adds Zen Leaf and TerraVida adapters, deal and $/mg badges, and CSV/JSON export when
-              you want a record of what the menu showed—not medical guidance.
+              See $/mg and deal flags on the page so value is obvious before you open another tab.
+              Filters, sort, and export are included when you want a record of the menu.
             </p>
           </article>
         </div>
+      </section>
+
+      <section className="section" id="whats-next" aria-labelledby="whats-next-heading">
+        <h2 id="whats-next-heading">Coming soon</h2>
+        <p>
+          Next up on product pages—chem-first shopping tools. No ship-date guarantees; we ship when
+          each piece is solid.
+        </p>
+        <ul className="fomo-list">
+          <li>
+            <strong>Match across stores</strong> — Soft-match the same chem profile when you jump
+            retailers.
+          </li>
+          <li>
+            <strong>$/mg multi-store compare</strong> — Side-by-side value across supported menus.
+          </li>
+          <li>
+            <strong>Similar-by-chem when something is OOS</strong> — Same-menu neighbors by chemistry
+            when a pick is gone.
+          </li>
+          <li>
+            <strong>Deal math</strong> — Flags vs menu median and clearer value cues when the data
+            is there.
+          </li>
+        </ul>
+        <p className="fomo-always muted">
+          Always: chem-first browsing. Retailer-published data only—never medical or effects claims.
+        </p>
       </section>
 
       <section className="section" id="pricing">

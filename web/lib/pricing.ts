@@ -2,9 +2,10 @@
  * Pricing + promo window (shared by landing copy and Checkout).
  *
  * Launch promo (PROMO_DAYS after LAUNCH_DATE): $9/year or $4/month.
- * Regular (after promo): $99/year or $9/month.
+ * Regular (after promo): $59/year or $9/month.
  *
  * Checkout charges via Stripe Price IDs from env — display cents below are for copy only.
+ * Assay sets STRIPE_PRICE_ID_* on Vercel; do not invent Price IDs in this repo.
  */
 
 export const PRODUCT_NAME = 'CannabisSage Pro';
@@ -23,8 +24,8 @@ export const PRICE_PROMO_YEAR_CENTS = 900;
 /** Launch promo — monthly ($4.00). */
 export const PRICE_PROMO_MONTH_CENTS = 400;
 
-/** Regular list — annual ($99.00). */
-export const PRICE_REGULAR_YEAR_CENTS = 9900;
+/** Regular list — annual ($59.00). */
+export const PRICE_REGULAR_YEAR_CENTS = 5900;
 
 /** Regular list — monthly ($9.00). */
 export const PRICE_REGULAR_MONTH_CENTS = 900;
@@ -142,7 +143,7 @@ function readEnvPrice(...keys: string[]): string {
  *   month → STRIPE_PRICE_ID_PROMO_MONTHLY ($4/mo)
  *
  * After promo:
- *   year  → STRIPE_PRICE_ID_REGULAR_ANNUAL | STRIPE_PRICE_ID_AFTER_PROMO ($99/yr)
+ *   year  → STRIPE_PRICE_ID_REGULAR_ANNUAL | STRIPE_PRICE_ID_AFTER_PROMO ($59/yr)
  *   month → STRIPE_PRICE_ID_REGULAR_MONTHLY ($9/mo)
  */
 export function resolveStripePriceId(
@@ -170,7 +171,7 @@ export function resolveStripePriceId(
     const id = readEnvPrice('STRIPE_PRICE_ID_REGULAR_ANNUAL', 'STRIPE_PRICE_ID_AFTER_PROMO');
     if (!id) {
       throw new Error(
-        'STRIPE_PRICE_ID_REGULAR_ANNUAL (or STRIPE_PRICE_ID_AFTER_PROMO) is not configured ($99/yr)'
+        'STRIPE_PRICE_ID_REGULAR_ANNUAL (or STRIPE_PRICE_ID_AFTER_PROMO) is not configured ($59/yr)'
       );
     }
     return id;

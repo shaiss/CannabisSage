@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "CannabisSage",
-  "version": "1.3.4",
-  "description": "Chem insights for Sunnyside & Zen Leaf. Free hover/compare; Pro via Stripe on our site. Not medical advice.",
+  "version": "1.3.5",
+  "description": "Chem insights on supported dispensary menus. Free hover/compare; Pro via Stripe on our site. Not medical advice.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

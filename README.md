@@ -26,9 +26,9 @@ Creates `dist/cannabis-sage-<version>.zip`.
 
 ## Features
 
-**Free:** hover tooltips, basic badges, compare tray, PDP panel, Sunnyside.
+**Free:** hover tooltips, basic badges, compare tray, PDP panel on supported dispensary menus.
 
-**Pro (launch promo $9/yr or $4/mo for 30 days after `LAUNCH_DATE`, then $99/yr or $9/mo):** taste-map match, filters/sort, export, deal badges, Zen Leaf + TerraVida multi-store.
+**Pro (launch promo $9/yr or $4/mo for 30 days after `LAUNCH_DATE`, then $59/yr or $9/mo):** taste-map match, filters/sort, export, deal badges, chem insights across more stores you shop.
 
 **P0–P2:** compare, PDP, badges, TTL cache, taste-map/filters/sort/glossary/export/deals, in-repo store adapters.
 

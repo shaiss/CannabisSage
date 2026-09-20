@@ -81,6 +81,16 @@
   }
 
   async function enrichCard(cardEl, opts = {}) {
+    cardEl.dataset.csiEnriching = '1';
+    try {
+      return await enrichCardBody(cardEl, opts);
+    } finally {
+      delete cardEl.dataset.csiEnriching;
+      await refreshCategoryDealFlags();
+    }
+  }
+
+  async function enrichCardBody(cardEl, opts = {}) {
     const { forceFetch = false } = opts;
     let product = CSI.getElementProduct(cardEl) || {};
     renderBadges(cardEl, product, 'loading');
@@ -130,6 +140,7 @@
       };
     } else if (!url) {
       product = { ...product, status: 'error', error: 'Unable to find product URL' };
+      CSI.storeElementProduct(cardEl, product);
       renderBadges(cardEl, product, 'error');
       return product;
     }
@@ -150,6 +161,69 @@
     CSI.storeElementProduct(cardEl, product);
     renderBadges(cardEl, product, product.status);
     return product;
+  }
+
+  function cardCategoryKey(cardEl, product) {
+    const pageKey = CSI.categoryKeyFromPath(location.pathname);
+    if (pageKey) return pageKey;
+    const raw = product?.url || cardEl?.dataset?.csiUrl || '';
+    if (!raw) return null;
+    try {
+      return CSI.categoryKeyFromPath(new URL(raw, location.origin).pathname);
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Recompute below-median flags from prices on this menu.
+   * Pro gate matches existing deal badges. Missing price or median clears the flag
+   * and does not ask anyone to upgrade. Chem badges are left to renderBadges.
+   */
+  async function refreshCategoryDealFlags() {
+    const pro = !!CSI.features?.can?.('dealBadges');
+    const cards = findProductCards();
+    const stillEnriching = cards.some((card) => card.dataset.csiEnriching === '1');
+    const entries = [];
+    const keyed = [];
+    const seen = new Set();
+    cards.forEach((card) => {
+      if (card.dataset.csiEnriching === '1') return;
+      const product = CSI.getElementProduct(card);
+      if (!product) return;
+      const categoryKey = cardCategoryKey(card, product);
+      if (categoryKey) seen.add(categoryKey);
+      const url = product.url ? CSI.normalizeMenuUrl(product.url, location.origin) : '';
+      keyed.push({ card, product, categoryKey, url });
+      if (categoryKey && product.price != null) {
+        entries.push({ categoryKey, price: product.price, url: url || undefined });
+      }
+    });
+    const medians = CSI.summarizeCategoryPriceMedians(entries);
+    keyed.forEach(({ card, product, categoryKey }) => {
+      const stats = categoryKey ? medians[categoryKey] : null;
+      const next = pro
+        ? CSI.dealVsCategoryMedian(product.price, stats && stats.median, stats && stats.sampleCount)
+        : null;
+      const prev = product.belowCategoryMedian || null;
+      const prevKey = prev ? `${prev.price}|${prev.categoryMedian}|${prev.sampleCount}` : '';
+      const nextKey = next ? `${next.price}|${next.categoryMedian}|${next.sampleCount}` : '';
+      product.belowCategoryMedian = next;
+      product.categoryKey = categoryKey || null;
+      CSI.storeElementProduct(card, product);
+      if (prevKey !== nextKey) renderBadges(card, product, product.status || 'ok');
+    });
+    if (stillEnriching || !seen.size || !CSI.storage?.saveCategoryMedians || !location.hostname) return;
+    const adapter = CSI.registry?.getActiveAdapter?.();
+    await CSI.storage.saveCategoryMedians({
+      host: location.hostname,
+      adapterId: adapter?.id || '',
+      categories: medians,
+      replaceKeys: Array.from(seen),
+      products: keyed
+        .filter((row) => row.categoryKey && row.url)
+        .map((row) => ({ url: row.url, categoryKey: row.categoryKey }))
+    });
   }
 
   function normalizeCompareUrl(raw) {
@@ -439,6 +513,7 @@
     CSI.log(`newly enhanced: ${n}`);
     // Re-sync all buttons against persisted selection (covers cards skipped as already enhanced)
     findProductCards().forEach((card) => syncSelectButtonForCard(card));
+    await refreshCategoryDealFlags();
     tray.updateTrayButton();
     applyFiltersAndSort();
   }

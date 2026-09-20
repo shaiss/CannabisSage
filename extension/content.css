@@ -587,6 +587,14 @@
   font-weight: 600;
 }
 
+.csi-deal-median {
+  margin: 0 0 8px;
+  font-size: 12px;
+  line-height: 1.35;
+  color: #ef6c00;
+  font-weight: 600;
+}
+
 /* Push page content slightly when filter bar present */
 body:has(#csi-filter-bar) {
   scroll-padding-top: 56px;

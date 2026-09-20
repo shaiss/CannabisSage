@@ -121,6 +121,27 @@ Compare stays free. Overlap copy must not name a retailer or make medical/effect
 | Product with strikethrough/sale UI shows **Sale** badge when detectable | |
 | Zen Leaf “% Off” / Currently $ shows Sale | |
 | `$/mg` appears only with scrapeable price + weight + THC | |
+| **Below median** only when this card’s price and a category median from at least 3 listed prices are both real (see v1.3.9) | |
+
+## Deal vs category median (v1.3.9+)
+
+Deal flags stay Pro (`dealBadges`), same as Sale and `$/mg` on listings. Chemistry badges, hover, compare, and the PDP panel stay on Free — this does not add an upgrade wall when the median is missing.
+
+The flag is **Below median**. It uses the listed price on the card and the median of listed prices in that category on this menu. A category page (for example `/products/flower`) is one category. A mixed menu only groups cards whose product URL names a category. Fewer than 3 scraped prices, a missing price, or a price that is not under the median: show nothing. No guessed price, no percent-off, no error banner.
+
+The product page reuses a median saved from a listing on the same host within 2 hours, and only when this product’s category is known (from its URL, or because the listing saved that URL). Otherwise the PDP stays quiet.
+
+Copy must not name a retailer or make medical or effects claims.
+
+| Step | Pass? |
+| --- | --- |
+| Pro, category listing with 3+ scraped prices: a card under the median shows **Below median** | |
+| Card with no price, or a category with fewer than 3 prices: no median badge and no error | |
+| Price equal to or above the median: no median badge | |
+| Free plan: no **Below median** badge. THC/terp badges and compare still show. No new Upgrade control for the missing flag | |
+| Pro, open that product after the listing: deals row shows the same badge plus “Below the median listed price in this category.” | |
+| PDP opened with no saved median for that category: no badge and no strip | |
+| Badge and strip do not name a retailer or make medical/effects claims | |
 
 ## SPA / scroll
 
@@ -134,7 +155,7 @@ Compare stays free. Overlap copy must not name a retailer or make medical/effect
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.8.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.9.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

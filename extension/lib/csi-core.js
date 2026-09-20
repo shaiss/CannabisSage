@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.8';
+  const VERSION = '1.3.9';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -383,6 +383,121 @@
     return false;
   }
 
+  /**
+   * How long a menu median may be reused on a product page.
+   * Freshness window only — never a stand-in price.
+   */
+  const DEAL_MEDIAN_TTL_MS = 2 * 60 * 60 * 1000;
+
+  /** Fewer than this many scraped prices is not a category median. */
+  const MIN_CATEGORY_PRICE_SAMPLE = 3;
+
+  const NON_CATEGORY_SLUGS = new Set(['menu', 'product', 'products', 'search', 'all', 'shop']);
+
+  /** A listed price we actually scraped. Zero, blank, and non-numeric are missing. */
+  function positivePrice(value) {
+    if (value == null || value === '') return null;
+    const n = typeof value === 'number' ? value : parseFloat(value);
+    if (!Number.isFinite(n) || n <= 0) return null;
+    return n;
+  }
+
+  function normalizeMenuUrl(raw, base) {
+    if (!raw) return '';
+    try {
+      const u = new URL(raw, base || 'https://local.invalid');
+      return `${u.origin}${u.pathname.replace(/\/$/, '')}`;
+    } catch {
+      return String(raw).split(/[?#]/)[0].replace(/\/$/, '');
+    }
+  }
+
+  function normalizeCategorySlug(raw) {
+    if (raw == null) return null;
+    let slug = String(raw).trim().toLowerCase();
+    if (!slug) return null;
+    try {
+      slug = decodeURIComponent(slug);
+    } catch {
+      /* keep the raw slug */
+    }
+    slug = slug
+      .replace(/[^a-z0-9-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .replace(/-\d+$/, '');
+    if (!slug || !/[a-z]/.test(slug) || NON_CATEGORY_SLUGS.has(slug)) return null;
+    return slug;
+  }
+
+  /**
+   * Category from a menu path when the path itself names one.
+   * /products/flower → flower
+   * .../menu/flower-709/slug → flower
+   * /product/:id and a mixed /menu listing → null (do not invent a bucket)
+   */
+  function categoryKeyFromPath(pathname) {
+    const path = String(pathname || '').split(/[?#]/)[0];
+    const listing = path.match(/^\/products\/([^/]+)\/?$/i);
+    if (listing) return normalizeCategorySlug(listing[1]);
+    const menuProduct = path.match(/\/menu\/([^/]+)\/[^/]+\/?$/i);
+    if (menuProduct) return normalizeCategorySlug(menuProduct[1]);
+    return null;
+  }
+
+  /** Median of positive prices. Even counts use the mean of the two middle values. */
+  function medianOfPrices(prices) {
+    const nums = [];
+    (Array.isArray(prices) ? prices : []).forEach((price) => {
+      const n = positivePrice(price);
+      if (n != null) nums.push(n);
+    });
+    if (!nums.length) return null;
+    nums.sort((a, b) => a - b);
+    const mid = Math.floor(nums.length / 2);
+    if (nums.length % 2 === 1) return nums[mid];
+    return (nums[mid - 1] + nums[mid]) / 2;
+  }
+
+  /**
+   * Group scraped { categoryKey, price, url? } into medians.
+   * A category with fewer than MIN_CATEGORY_PRICE_SAMPLE prices is omitted.
+   * Same url counts once. No category key → that row is ignored.
+   */
+  function summarizeCategoryPriceMedians(entries) {
+    const groups = new Map();
+    (Array.isArray(entries) ? entries : []).forEach((entry, index) => {
+      const key = entry && entry.categoryKey ? String(entry.categoryKey) : '';
+      const price = positivePrice(entry && entry.price);
+      if (!key || price == null) return;
+      const dedupe = entry.url ? String(entry.url) : `row:${index}`;
+      if (!groups.has(key)) groups.set(key, new Map());
+      groups.get(key).set(dedupe, price);
+    });
+    const medians = {};
+    groups.forEach((priceMap, key) => {
+      const prices = Array.from(priceMap.values());
+      if (prices.length < MIN_CATEGORY_PRICE_SAMPLE) return;
+      const median = medianOfPrices(prices);
+      if (median == null) return;
+      medians[key] = { median, sampleCount: prices.length };
+    });
+    return medians;
+  }
+
+  /**
+   * Below-median flag. Null unless price, median, and sample size are all real
+   * and the listed price is strictly under that median. Never invents a number.
+   */
+  function dealVsCategoryMedian(price, categoryMedian, sampleCount) {
+    const p = positivePrice(price);
+    const m = positivePrice(categoryMedian);
+    const n = Number(sampleCount);
+    if (p == null || m == null) return null;
+    if (!Number.isFinite(n) || n < MIN_CATEGORY_PRICE_SAMPLE) return null;
+    if (!(p < m)) return null;
+    return { price: p, categoryMedian: m, sampleCount: n };
+  }
+
   global.CSI = {
     VERSION,
     MAX_COMPARE,
@@ -413,6 +528,15 @@
     scoreTasteMatch,
     dollarsPerMgThc,
     parseWeightGrams,
-    detectSale
+    detectSale,
+    DEAL_MEDIAN_TTL_MS,
+    MIN_CATEGORY_PRICE_SAMPLE,
+    positivePrice,
+    normalizeMenuUrl,
+    normalizeCategorySlug,
+    categoryKeyFromPath,
+    medianOfPrices,
+    summarizeCategoryPriceMedians,
+    dealVsCategoryMedian
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

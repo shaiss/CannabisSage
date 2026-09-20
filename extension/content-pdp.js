@@ -65,7 +65,10 @@
     if (needsFetch) {
       const data = await CSI.fetchProductDetails(url);
       if (data.error) {
-        return { ...product, url, status: 'error', error: data.error };
+        const failed = { ...product, url, status: 'error', error: data.error };
+        failed.price = failed.price ?? CSI.parsePrice(document.body?.innerText || '');
+        await attachDealVsMedian(failed);
+        return failed;
       }
       product = {
         ...product,
@@ -92,7 +95,34 @@
 
     const taste = await CSI.storage.loadTasteMap();
     product.matchScore = CSI.scoreTasteMatch(product, taste);
+    await attachDealVsMedian(product);
     return product;
+  }
+
+  /**
+   * PDP flag uses a median saved from a listing on this host.
+   * Category comes from the product URL or from the listing snapshot for this URL.
+   * No snapshot, no price, or not below median → leave the field null (no placeholder).
+   */
+  async function attachDealVsMedian(product) {
+    product.belowCategoryMedian = null;
+    if (!CSI.features?.can?.('dealBadges')) return;
+    if (!CSI.storage?.loadCategoryMedians || !CSI.dealVsCategoryMedian) return;
+    const snap = await CSI.storage.loadCategoryMedians(location.hostname);
+    if (!snap || !snap.categories) return;
+    let categoryKey = CSI.categoryKeyFromPath(location.pathname);
+    const norm = CSI.normalizeMenuUrl(product.url || location.href, location.origin);
+    if (!categoryKey && norm && Array.isArray(snap.products)) {
+      const hit = snap.products.find((row) => row && row.url === norm);
+      if (hit && hit.categoryKey) categoryKey = hit.categoryKey;
+    }
+    const stats = categoryKey ? snap.categories[categoryKey] : null;
+    product.categoryKey = categoryKey || null;
+    product.belowCategoryMedian = CSI.dealVsCategoryMedian(
+      product.price,
+      stats && stats.median,
+      stats && stats.sampleCount
+    );
   }
 
   function clearPdpBuyboxChemInject() {
@@ -153,10 +183,17 @@
     if (product.matchScore != null && product.matchScore >= 0.35) {
       dealBits.push(`<span class="csi-badge csi-badge-match">Map match ${Math.round(product.matchScore * 100)}%</span>`);
     }
+    let medianStrip = '';
+    if (CSI.features?.can?.('dealBadges')) {
+      const medianBadge = CSI.ui.buildDealVsMedianBadge(product.belowCategoryMedian);
+      if (medianBadge) dealBits.push(medianBadge);
+      medianStrip = CSI.ui.buildDealVsMedianStrip(product.belowCategoryMedian);
+    }
 
     panel.innerHTML = `
       ${CSI.ui.buildPdpHeader({ showClose: true })}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
+      ${medianStrip}
       <div class="csi-pdp-body">${body}</div>
       <div class="csi-pdp-actions">
         <button type="button" class="csi-pdp-compare">Add to compare</button>
@@ -204,6 +241,7 @@
     }
     active = true;
     CSI.log(`pdp start v${CSI.VERSION}`, location.href);
+    await CSI.entitlement?.refreshIsPro?.();
     await CSI.glossary.ensureGlossary();
 
     const mount = () => {

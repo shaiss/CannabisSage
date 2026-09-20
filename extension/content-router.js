@@ -64,6 +64,12 @@
   // Boot after listing/pdp files register handlers
   function boot() {
     patchHistory();
+    window.addEventListener('message', (event) => {
+      if (event.source !== window) return;
+      const data = event.data;
+      if (!data || data.source !== 'cannabis-sage-bridge' || data.direction !== 'route') return;
+      syncRoute();
+    });
     // Defer so content-listing.js / content-pdp.js can register
     setTimeout(syncRoute, 0);
   }

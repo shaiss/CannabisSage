@@ -152,4 +152,34 @@
       '*'
     );
   });
+
+  // Notify isolated content scripts of SPA navigations (React Router uses MAIN-world history).
+  (function patchHistory() {
+    let lastHref = location.href;
+    const notify = () => {
+      if (location.href === lastHref) return;
+      lastHref = location.href;
+      window.postMessage(
+        {
+          source: SOURCE,
+          direction: 'route',
+          href: location.href,
+          path: location.pathname
+        },
+        '*'
+      );
+    };
+    const wrap = (methodName) => {
+      const original = history[methodName];
+      history[methodName] = function (...args) {
+        const result = original.apply(this, args);
+        notify();
+        return result;
+      };
+    };
+    wrap('pushState');
+    wrap('replaceState');
+    window.addEventListener('popstate', notify);
+    setInterval(notify, 800);
+  })();
 })();

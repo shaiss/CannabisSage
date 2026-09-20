@@ -1,6 +1,7 @@
 /**
- * Route router — one content-script injection covers SPA nav between
- * /products/* and /product/* without requiring a full document reload.
+ * Route router — SPA-aware listing ↔ PDP switching.
+ * Polls location in the isolated world because MAIN-world history
+ * notifications can race; also listens for bridge route messages.
  */
 (function () {
   'use strict';
@@ -8,71 +9,61 @@
   if (!CSI) return;
 
   let mode = null; // 'listing' | 'pdp' | null
+  let lastPathSeen = '';
 
   function currentMode() {
     const path = location.pathname;
-    if (path.startsWith('/product/')) return 'pdp';
-    if (path.startsWith('/products/')) return 'listing';
+    if (/^\/product\//.test(path)) return 'pdp';
+    if (/^\/products\//.test(path)) return 'listing';
     return null;
   }
 
-  function cleanupUi() {
-    document.getElementById('csi-pdp-panel')?.remove();
+  function cleanupSharedChrome() {
+    // Do not remove compare tray
     document.getElementById('csi-filter-bar')?.remove();
-    // Keep compare tray — shared across routes
   }
 
-  function ensureModules() {
-    // listing + pdp scripts register init hooks on CSI.routes
-  }
-
-  function syncRoute() {
+  function syncRoute(force) {
+    const path = location.pathname;
     const next = currentMode();
-    if (next === mode) {
+    if (!force && path === lastPathSeen && next === mode) {
       CSI.routes?.onSameRoute?.(next);
       return;
     }
-    CSI.log('route', mode, '->', next);
+    lastPathSeen = path;
+    CSI.log('route sync', mode, '->', next, path);
     const prev = mode;
     mode = next;
-    cleanupUi();
-    if (prev === 'listing') CSI.routes?.teardownListing?.();
-    if (prev === 'pdp') CSI.routes?.teardownPdp?.();
+
+    if (prev === 'listing' && next !== 'listing') {
+      CSI.routes?.teardownListing?.();
+      cleanupSharedChrome();
+    }
+    if (prev === 'pdp' && next !== 'pdp') {
+      CSI.routes?.teardownPdp?.();
+    }
+
     if (next === 'listing') CSI.routes?.startListing?.();
-    if (next === 'pdp') CSI.routes?.startPdp?.();
+    if (next === 'pdp') {
+      // Slight delay so React can mount PDP content before bridge extract
+      setTimeout(() => CSI.routes?.startPdp?.(), 200);
+    }
   }
 
-  function patchHistory() {
-    if (window.__csiRouterPatched) return;
-    window.__csiRouterPatched = true;
-    const wrap = (name) => {
-      const orig = history[name];
-      history[name] = function (...args) {
-        const r = orig.apply(this, args);
-        setTimeout(syncRoute, 0);
-        return r;
-      };
-    };
-    wrap('pushState');
-    wrap('replaceState');
-    window.addEventListener('popstate', () => setTimeout(syncRoute, 0));
-  }
-
-  CSI.routes = CSI.routes || {};
-  CSI.router = { syncRoute, currentMode };
-
-  // Boot after listing/pdp files register handlers
   function boot() {
-    patchHistory();
     window.addEventListener('message', (event) => {
       if (event.source !== window) return;
       const data = event.data;
       if (!data || data.source !== 'cannabis-sage-bridge' || data.direction !== 'route') return;
-      syncRoute();
+      syncRoute(true);
     });
-    // Defer so content-listing.js / content-pdp.js can register
-    setTimeout(syncRoute, 0);
+    window.addEventListener('popstate', () => syncRoute(true));
+    setInterval(() => syncRoute(false), 400);
+    setTimeout(() => syncRoute(true), 0);
   }
+
+  CSI.routes = CSI.routes || {};
+  CSI.router = { syncRoute, currentMode };
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', boot);

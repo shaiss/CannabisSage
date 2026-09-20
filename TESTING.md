@@ -4,6 +4,8 @@ Load unpacked from `extension/` after each change. Debug logs stay off unless `l
 
 ## Setup
 
+> After reloading the unpacked extension, hard-refresh (Ctrl+Shift+R) or open a new tab. Otherwise Chrome shows “Extension context invalidated” and UI may collapse.
+
 1. `chrome://extensions` → Developer mode → **Load unpacked** → `extension/`
 2. Open popup via toolbar icon; confirm taste-map editor loads
 3. Confirm service worker link has no errors

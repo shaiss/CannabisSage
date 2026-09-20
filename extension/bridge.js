@@ -1,6 +1,5 @@
 /**
- * MAIN-world bridge: read React product props for the isolated content script.
- * Communicates via window.postMessage (reliable across extension worlds).
+ * MAIN-world bridge: React product props + listing price/sale/weight hints.
  */
 (function () {
   'use strict';
@@ -34,7 +33,13 @@
     return null;
   }
 
-  function summarizeProduct(product) {
+  function parsePrice(text) {
+    if (!text) return null;
+    const m = String(text).replace(/,/g, '').match(/\$\s*([0-9]+(?:\.[0-9]+)?)/);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  function summarizeProduct(product, hostEl) {
     if (!product || typeof product !== 'object') return null;
     const id = product.id || product.productId || product.sku?.product?.id || product.sku?.id;
     const slug = product.slug || product.productSlug || product.handle;
@@ -59,13 +64,35 @@
       if (v !== undefined && v !== null && v !== '' && !Number.isNaN(v)) cannabinoids[k] = v;
     });
 
+    const host = hostEl || null;
+    const hostText = host ? host.textContent || '' : '';
+    const price =
+      parsePrice(hostText) ||
+      parsePrice(product.price) ||
+      parsePrice(product.display_price) ||
+      parsePrice(product.sku?.price);
+
+    const weightText =
+      (hostText.match(/(\d+(?:\.\d+)?\s*(?:g|mg|oz)\b)/i) || [])[1] ||
+      product.weight ||
+      product.displaySize ||
+      null;
+
+    const onSale =
+      !!(host && /sale|special|%\s*off/i.test(hostText)) ||
+      !!(host && host.querySelector && host.querySelector('s, del, [class*="special" i]')) ||
+      !!(product.special || product.on_sale || product.is_special);
+
     return {
       id: id != null ? String(id) : undefined,
       slug: slug != null ? String(slug) : undefined,
       name: name != null ? String(name) : undefined,
       cannabinoids: Object.keys(cannabinoids).length ? cannabinoids : undefined,
       potency,
-      terpenes: product.terpenes
+      terpenes: product.terpenes,
+      price: price || undefined,
+      weightText: weightText ? String(weightText) : undefined,
+      onSale: !!onSale
     };
   }
 
@@ -78,8 +105,38 @@
     let result = null;
     try {
       if (action === 'extractProduct') {
-        const target = marker ? document.querySelector(`[data-csi-bridge-id="${marker}"]`) : null;
-        result = summarizeProduct(readReactProduct(target));
+        const safeMarker = marker
+          ? typeof CSS !== 'undefined' && CSS.escape
+            ? CSS.escape(marker)
+            : String(marker).replace(/["\\]/g, '')
+          : '';
+        const el = safeMarker ? document.querySelector(`[data-csi-bridge-id="${safeMarker}"]`) : null;
+        const host = el?.closest('[data-cy="ProductListItem"]')?.parentElement || el?.parentElement || el;
+        result = summarizeProduct(readReactProduct(el), host);
+      } else if (action === 'extractPdp') {
+        // Walk from main product root
+        const roots = [
+          document.querySelector('[data-cy*="Product"]'),
+          document.querySelector('main'),
+          document.body
+        ].filter(Boolean);
+        for (const root of roots) {
+          const product = readReactProduct(root);
+          if (product && (product.id || product.name)) {
+            result = summarizeProduct(product, root);
+            break;
+          }
+          // Deep scan children with react fibers (limited)
+          const kids = root.querySelectorAll('div, section, article');
+          for (let i = 0; i < Math.min(kids.length, 80); i++) {
+            const p = readReactProduct(kids[i]);
+            if (p && (p.id || p.sku)) {
+              result = summarizeProduct(p, kids[i]);
+              break;
+            }
+          }
+          if (result) break;
+        }
       }
     } catch (err) {
       result = { error: String(err && err.message ? err.message : err) };

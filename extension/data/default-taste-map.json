@@ -1,0 +1,14 @@
+{
+  "preferredTerpenes": {
+    "Limonene": 0.9,
+    "Beta-Myrcene": 0.7,
+    "Beta-Caryophyllene": 0.8,
+    "Linalool": 0.6,
+    "Humulene": 0.4,
+    "Alpha-Pinene": 0.5,
+    "Terpinolene": 0.5
+  },
+  "avoidTerpenes": [],
+  "minMatchScore": 0.35,
+  "preferHighTotalTerps": true
+}

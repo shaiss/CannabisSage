@@ -1,15 +1,16 @@
 {
   "manifest_version": 3,
   "name": "CannabisSage",
-  "version": "1.0.0",
-  "description": "Show cannabinoid and terpene profiles on Sunnyside product listings and compare up to three products side by side.",
+  "version": "1.1.0",
+  "description": "Cannabinoid and terpene insights on Sunnyside listings and product pages: compare, filter, sort, and taste-map match — no medical claims.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",
     "128": "icons/icon128.png"
   },
   "action": {
-    "default_title": "CannabisSage",
+    "default_title": "CannabisSage — taste map & settings",
+    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",
@@ -23,7 +24,9 @@
     {
       "matches": [
         "https://www.sunnyside.shop/products/*",
-        "https://sunnyside.shop/products/*"
+        "https://sunnyside.shop/products/*",
+        "https://www.sunnyside.shop/product/*",
+        "https://sunnyside.shop/product/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_idle",
@@ -34,7 +37,31 @@
         "https://www.sunnyside.shop/products/*",
         "https://sunnyside.shop/products/*"
       ],
-      "js": ["content.js"],
+      "js": [
+        "lib/csi-core.js",
+        "lib/csi-storage.js",
+        "lib/csi-fetch.js",
+        "lib/csi-glossary.js",
+        "lib/csi-ui.js",
+        "content-listing.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://www.sunnyside.shop/product/*",
+        "https://sunnyside.shop/product/*"
+      ],
+      "js": [
+        "lib/csi-core.js",
+        "lib/csi-storage.js",
+        "lib/csi-fetch.js",
+        "lib/csi-glossary.js",
+        "lib/csi-ui.js",
+        "content-pdp.js"
+      ],
       "css": ["content.css"],
       "run_at": "document_idle",
       "world": "ISOLATED"
@@ -44,5 +71,17 @@
     "https://www.sunnyside.shop/*",
     "https://sunnyside.shop/*"
   ],
-  "permissions": []
+  "permissions": ["storage"],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "data/default-taste-map.json",
+        "data/terpene-glossary.json"
+      ],
+      "matches": [
+        "https://www.sunnyside.shop/*",
+        "https://sunnyside.shop/*"
+      ]
+    }
+  ]
 }

@@ -19,12 +19,23 @@ OUT_ZIP="${DIST_DIR}/${NAME}.zip"
 mkdir -p "${DIST_DIR}"
 rm -f "${OUT_ZIP}"
 
-# Validate required files exist before zipping.
 required=(
   "${EXT_DIR}/manifest.json"
   "${EXT_DIR}/background.js"
-  "${EXT_DIR}/content.js"
+  "${EXT_DIR}/bridge.js"
+  "${EXT_DIR}/content-listing.js"
+  "${EXT_DIR}/content-pdp.js"
   "${EXT_DIR}/content.css"
+  "${EXT_DIR}/lib/csi-core.js"
+  "${EXT_DIR}/lib/csi-storage.js"
+  "${EXT_DIR}/lib/csi-fetch.js"
+  "${EXT_DIR}/lib/csi-glossary.js"
+  "${EXT_DIR}/lib/csi-ui.js"
+  "${EXT_DIR}/popup/popup.html"
+  "${EXT_DIR}/popup/popup.js"
+  "${EXT_DIR}/popup/popup.css"
+  "${EXT_DIR}/data/default-taste-map.json"
+  "${EXT_DIR}/data/terpene-glossary.json"
   "${EXT_DIR}/icons/icon16.png"
   "${EXT_DIR}/icons/icon48.png"
   "${EXT_DIR}/icons/icon128.png"
@@ -36,7 +47,6 @@ for f in "${required[@]}"; do
   fi
 done
 
-# Zip contents at the archive root (not nested under extension/).
 (
   cd "${EXT_DIR}"
   zip -r "${OUT_ZIP}" . \

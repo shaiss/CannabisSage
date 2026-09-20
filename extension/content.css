@@ -1,59 +1,103 @@
-/* CannabisSage content styles — keep selectors scoped to extension UI */
+/* CannabisSage v1.1 — scoped UI */
 
 #cannabis-sage-tooltip {
   position: absolute;
   background: #fff;
   border: 2px solid #ff6b35;
   border-radius: 8px;
-  padding: 15px;
+  padding: 12px 14px;
   z-index: 2147483000;
-  max-width: 350px;
+  max-width: 360px;
   display: none;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-size: 14px;
-  line-height: 1.5;
+  font-size: 13px;
+  line-height: 1.45;
   color: #2c3e50;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
-#cannabis-sage-compare-btn {
+#csi-compare-tray {
   position: fixed;
   bottom: 20px;
   right: 20px;
-  padding: 12px 24px;
-  background: #ff6b35;
-  color: #fff;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
   z-index: 2147483000;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
   display: none;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  gap: 8px;
+  align-items: center;
 }
 
-#cannabis-sage-compare-btn:hover {
-  background: #e55a2b;
+#csi-compare-tray button {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+#csi-compare-tray .csi-tray-compare {
+  background: #ff6b35;
+  color: #fff;
+}
+
+#csi-compare-tray .csi-tray-clear {
+  background: #2c3e50;
+  color: #fff;
 }
 
 #cannabis-sage-comparison-sidebar {
   position: fixed;
   top: 0;
   right: 0;
-  width: min(500px, 100vw);
+  width: min(520px, 100vw);
   height: 100vh;
   background: #fff;
   border-left: 2px solid #ff6b35;
-  padding: 20px;
+  padding: 16px 18px;
   z-index: 2147483001;
   overflow-y: auto;
   box-shadow: -4px 0 12px rgba(0, 0, 0, 0.15);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: #2c3e50;
   box-sizing: border-box;
+}
+
+.csi-sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.csi-sidebar-header h2 {
+  margin: 0;
+  font-size: 1.15rem;
+  color: #2c3e50;
+}
+
+.csi-sidebar-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.csi-sidebar-actions button {
+  border: 1px solid #ddd;
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.csi-sidebar-close {
+  border: none !important;
+  background: none !important;
+  font-size: 20px !important;
 }
 
 #cannabis-sage-comparison-sidebar .csi-subheader td {
@@ -64,31 +108,18 @@
   border-top: 1px solid #eee;
 }
 
-#cannabis-sage-comparison-sidebar .csi-max {
-  color: #1f883d;
-  font-weight: 700;
-}
-
-#cannabis-sage-comparison-sidebar .csi-second {
-  color: #6e7781;
-  font-weight: 600;
-}
-
-#cannabis-sage-comparison-sidebar .csi-muted {
-  color: #9aa0a6;
-}
-
 #cannabis-sage-comparison-sidebar table {
   width: 100%;
   border-collapse: collapse;
-  margin-top: 10px;
+  margin-top: 8px;
 }
 
 #cannabis-sage-comparison-sidebar th,
 #cannabis-sage-comparison-sidebar td {
-  padding: 10px;
+  padding: 8px 10px;
   text-align: left;
   vertical-align: top;
+  border-bottom: 1px solid #eee;
 }
 
 .cannabis-sage-select-btn {
@@ -105,7 +136,6 @@
   width: auto;
   position: relative;
   z-index: 20;
-  transition: background 0.2s;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.2);
 }
@@ -116,18 +146,252 @@
 
 .cannabis-sage-select-btn.is-selected {
   background: #28a745;
+  border-color: #1f883d;
 }
 
-#cannabis-sage-loaded {
+.csi-badge-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  justify-content: center;
+  margin: 6px 4px 0;
+  position: relative;
+  z-index: 15;
+}
+
+.csi-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #fff;
+  border: 1px solid #ddd;
+  color: #2c3e50;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.csi-badge-thc {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
+.csi-badge-terp {
+  border-color: #6e7781;
+  cursor: pointer;
+}
+
+.csi-badge-match {
+  background: #e8f5e9;
+  border-color: #1f883d;
+  color: #1f883d;
+}
+
+.csi-badge-deal {
+  background: #fff3e0;
+  border-color: #ef6c00;
+  color: #ef6c00;
+}
+
+.csi-badge-loading {
+  color: #666;
+}
+
+.csi-badge-empty,
+.csi-badge-error {
+  color: #b45309;
+  border-color: #f0c36d;
+}
+
+.csi-status {
+  padding: 10px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.csi-status-loading {
+  background: #f5f5f5;
+  color: #555;
+}
+
+.csi-status-empty {
+  background: #fff8e6;
+  color: #8a6d1d;
+}
+
+.csi-status-error {
+  background: #fdecea;
+  color: #b91c1c;
+}
+
+.csi-muted {
+  color: #9aa0a6;
+}
+
+.csi-terp-chip,
+[data-csi-terp] {
+  cursor: pointer;
+  text-decoration: underline dotted;
+}
+
+.csi-glossary-pop {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  z-index: 2147483003;
+  width: 280px;
+  background: #fff;
+  border: 2px solid #ff6b35;
+  border-radius: 8px;
+  padding: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: #2c3e50;
+  font-size: 13px;
+}
+
+.csi-glossary-title {
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: #ff6b35;
+}
+
+.csi-glossary-disclaimer {
+  margin-top: 8px;
+  font-size: 11px;
+  color: #667;
+}
+
+.csi-glossary-close {
+  margin-top: 8px;
+  border: 1px solid #ddd;
+  background: #fafafa;
+  border-radius: 4px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+
+#csi-filter-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2147482990;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 2px solid #ff6b35;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 12px;
+  color: #2c3e50;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+#csi-filter-bar .csi-filter-title {
+  font-weight: 800;
+  color: #ff6b35;
+  margin-right: 4px;
+}
+
+#csi-filter-bar label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+#csi-filter-bar input,
+#csi-filter-bar select {
+  max-width: 110px;
+  padding: 3px 6px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+}
+
+#csi-filter-bar button {
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid #ff6b35;
   background: #ff6b35;
   color: #fff;
-  padding: 8px 12px;
-  border-radius: 4px;
-  font-size: 12px;
-  z-index: 2147483002;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+#csi-filter-bar #csi-reset-filters {
+  background: #fff;
+  color: #2c3e50;
+  border-color: #ccc;
+}
+
+#csi-pdp-panel {
+  position: fixed;
+  top: 80px;
+  right: 16px;
+  width: min(340px, calc(100vw - 24px));
+  z-index: 2147483000;
+  background: #fff;
+  border: 2px solid #ff6b35;
+  border-radius: 10px;
+  padding: 12px 14px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  color: #2c3e50;
+  font-size: 13px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+}
+
+.csi-pdp-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  color: #ff6b35;
+}
+
+.csi-pdp-close {
+  border: none;
+  background: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.csi-pdp-deals {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+
+.csi-pdp-actions {
+  margin-top: 10px;
+}
+
+.csi-pdp-compare {
+  width: 100%;
+  padding: 8px 10px;
+  background: #ff6b35;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.csi-pdp-footnote {
+  margin: 8px 0 0;
+  font-size: 10px;
+  color: #667;
+}
+
+.csi-deal {
+  color: #ef6c00;
+  font-weight: 600;
+}
+
+/* Push page content slightly when filter bar present */
+body:has(#csi-filter-bar) {
+  scroll-padding-top: 56px;
 }

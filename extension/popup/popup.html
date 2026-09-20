@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>CannabisSage</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <header>
+      <h1>CannabisSage</h1>
+      <p class="sub">Taste-map preferences · factual shopping aid only</p>
+    </header>
+
+    <section>
+      <h2>Preferred terpenes</h2>
+      <p class="hint">Weights 0–1. Higher = more important for “Map match”.</p>
+      <div id="pref-list"></div>
+      <button type="button" id="add-pref">Add terpene</button>
+    </section>
+
+    <section>
+      <h2>Avoid terpenes</h2>
+      <input type="text" id="avoid-input" placeholder="Comma-separated names" />
+    </section>
+
+    <section>
+      <label>Min match score for badge
+        <input type="number" id="min-match" min="0" max="1" step="0.05" />
+      </label>
+      <label class="check">
+        <input type="checkbox" id="prefer-terps" />
+        Slightly boost high total terpenes
+      </label>
+    </section>
+
+    <section class="actions">
+      <button type="button" id="save" class="primary">Save</button>
+      <button type="button" id="reset">Reset defaults</button>
+    </section>
+    <p id="status" class="status" hidden></p>
+    <p class="disclaimer">
+      CannabisSage displays retailer-published chemistry and aroma notes. It does not provide medical advice.
+    </p>
+    <script src="popup.js"></script>
+  </body>
+</html>

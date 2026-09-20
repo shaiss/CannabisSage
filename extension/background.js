@@ -1,22 +1,43 @@
 /**
- * CannabisSage service worker — fetches Sunnyside product detail HTML
- * on behalf of the content script (replaces GM_xmlhttpRequest).
+ * CannabisSage service worker — product HTML fetch + cache pruning.
  */
 
 const ALLOWED_HOSTS = new Set(['www.sunnyside.shop', 'sunnyside.shop']);
+const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 function isAllowedProductUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:') return false;
     if (!ALLOWED_HOSTS.has(url.hostname)) return false;
-    // Product detail pages: /product/:id (optionally with query)
     if (!/^\/product\/[^/]+\/?$/.test(url.pathname)) return false;
     return true;
   } catch {
     return false;
   }
 }
+
+async function pruneExpiredCache() {
+  try {
+    const all = await chrome.storage.local.get(null);
+    const toRemove = [];
+    Object.entries(all || {}).forEach(([k, v]) => {
+      if (!k.startsWith('csi_pdp:')) return;
+      if (!v || !v.fetchedAt || Date.now() - v.fetchedAt > CACHE_TTL_MS) toRemove.push(k);
+    });
+    if (toRemove.length) await chrome.storage.local.remove(toRemove);
+  } catch {
+    /* ignore */
+  }
+}
+
+chrome.runtime.onInstalled.addListener(() => {
+  pruneExpiredCache();
+});
+
+chrome.runtime.onStartup?.addListener?.(() => {
+  pruneExpiredCache();
+});
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (!message || message.type !== 'FETCH_PRODUCT_HTML') {
@@ -58,6 +79,5 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     }
   })();
 
-  // Keep the message channel open for the async response.
   return true;
 });

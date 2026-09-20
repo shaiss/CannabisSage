@@ -414,12 +414,73 @@
   transform: none !important;
 }
 
+.csi-adds-chip {
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #445;
+  background: #fafafa;
+  border: 1px solid #e4e7eb;
+  border-radius: 999px;
+  padding: 2px 8px;
+  max-width: min(420px, 100%);
+}
+
+.csi-adds-chip[open] {
+  border-radius: 8px;
+  padding: 6px 8px;
+  background: #fff;
+}
+
+.csi-adds-chip summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #2c3e50;
+  list-style: none;
+}
+
+.csi-adds-chip summary::-webkit-details-marker {
+  display: none;
+}
+
+.csi-adds-chip summary::before {
+  content: '+ ';
+  color: #ff6b35;
+  font-weight: 700;
+}
+
+.csi-adds-chip[open] summary::before {
+  content: '– ';
+}
+
+.csi-adds-detail {
+  margin: 6px 0 0;
+  font-weight: 400;
+  color: #445;
+}
+
+#csi-filter-bar .csi-adds-chip {
+  flex: 0 1 auto;
+}
+
 .csi-pdp-header {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  margin-bottom: 8px;
+  color: #ff6b35;
+}
+
+.csi-pdp-header-row {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
-  color: #ff6b35;
+}
+
+.csi-pdp-header .csi-adds-chip {
+  align-self: flex-start;
+  color: #445;
 }
 
 .csi-pdp-close {

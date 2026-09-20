@@ -341,6 +341,7 @@
       <div class="csi-filter-title">CannabisSage${
         storeName ? ` · ${CSI.escapeHtml(storeName)}` : ''
       }${pro ? ' · Pro' : ' · Free'}</div>
+      ${CSI.ui.buildWhatSageAddsChip()}
       ${
         pro
           ? `

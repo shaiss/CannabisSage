@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "CannabisSage",
   "version": "1.3.2",
-  "description": "Cannabinoid and terpene insights on Sunnyside, Zen Leaf, and TerraVida (Zen Leaf Malvern). Free core; Pro unlocks filters, taste-map, multi-store. Not medical advice.",
+  "description": "Chem insights for Sunnyside & Zen Leaf. Free hover/compare; Pro via Stripe on our site. Not medical advice.",
   "icons": {
     "16": "icons/icon16.png",
     "48": "icons/icon48.png",

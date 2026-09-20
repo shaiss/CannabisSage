@@ -1,12 +1,12 @@
 import Image from 'next/image';
 import { CheckoutButton } from '@/components/CheckoutButton';
-import { activePriceLabel, FEATURE_GATES } from '@/lib/pricing-public';
+import { getPricingCatalog, FEATURE_GATES } from '@/lib/pricing-public';
 
 const CHROME_STORE_SEARCH =
   'https://chrome.google.com/webstore/search/CannabisSage';
 
 export default function HomePage() {
-  const pricing = activePriceLabel();
+  const pricing = getPricingCatalog();
 
   return (
     <>
@@ -40,7 +40,11 @@ export default function HomePage() {
             >
               Get the extension
             </a>
-            <CheckoutButton label={`Try Pro — ${pricing.label}`} className="btn btn-ghost" />
+            <CheckoutButton
+              label="Try Pro — launch promo"
+              className="btn btn-ghost"
+              defaultInterval="year"
+            />
           </div>
           <p className="hero-footnote muted-on-dark">
             Chrome Web Store listing coming soon — search link above until publish. Already subscribed?{' '}
@@ -135,16 +139,41 @@ export default function HomePage() {
       <section className="section" id="pricing">
         <h2>Launch pricing</h2>
         <div className="price-card price-card-wide">
-          <div className="amount">{pricing.label}</div>
           {pricing.promo ? (
-            <span className="promo">
-              Launch promo through {pricing.promoEndsAt} (30 days from public launch)
-            </span>
+            <>
+              <div className="price-duo">
+                <div>
+                  <span className="price-duo-label">Annual promo</span>
+                  <div className="amount">{pricing.promoPlans.year.label}</div>
+                </div>
+                <div>
+                  <span className="price-duo-label">Monthly promo</span>
+                  <div className="amount amount-sm">{pricing.promoPlans.month.label}</div>
+                </div>
+              </div>
+              <span className="promo">
+                Launch promo through {pricing.promoEndsAt} ({pricing.promoHeadline}).{' '}
+                <strong>{pricing.fomoLine}</strong> after the window.
+              </span>
+            </>
           ) : (
-            <span className="muted">Promo window ended {pricing.promoEndsAt}.</span>
+            <>
+              <div className="price-duo">
+                <div>
+                  <span className="price-duo-label">Annual</span>
+                  <div className="amount">{pricing.regularPlans.year.label}</div>
+                </div>
+                <div>
+                  <span className="price-duo-label">Monthly</span>
+                  <div className="amount amount-sm">{pricing.regularPlans.month.label}</div>
+                </div>
+              </div>
+              <span className="muted">Launch promo ended {pricing.promoEndsAt}. Standard pricing applies.</span>
+            </>
           )}
           <p className="muted" style={{ marginTop: '0.75rem' }}>
-            One-year subscription on cannabissage.app. Cancel anytime in the Stripe Customer Portal.
+            Subscriptions on cannabissage.app (Stripe-hosted checkout). Cancel anytime in the Stripe
+            Customer Portal.
           </p>
           <div className="pricing-unlock">
             <p>
@@ -154,7 +183,12 @@ export default function HomePage() {
             </p>
           </div>
           <div className="cta-row cta-row-light" style={{ marginTop: '1.25rem' }}>
-            <CheckoutButton label={`Subscribe — ${pricing.label}`} />
+            <CheckoutButton
+              label="Subscribe with Stripe Checkout"
+              showPlanPicker
+              promoYearLabel={pricing.promo ? pricing.promoPlans.year.label : pricing.regularPlans.year.label}
+              promoMonthLabel={pricing.promo ? pricing.promoPlans.month.label : pricing.regularPlans.month.label}
+            />
             <a className="btn btn-outline" href="/account">
               I have a key — activate
             </a>

@@ -2,18 +2,40 @@
 
 Stripe Checkout (hosted) + license keys + extension entitlement. **No card collection inside the Chrome extension** (CWS policy).
 
-## Offer
+## Offer (Shai pricing lock)
 
-| Window | Price | Config |
-| --- | --- | --- |
-| Launch promo (first **30 days** after `LAUNCH_DATE`) | **$10 / year** | `PRICE_PROMO_CENTS=1000`, `STRIPE_PRICE_ID_PROMO` |
-| After promo | Same $10/yr by default, or set your own | `PRICE_AFTER_PROMO_CENTS` (display) + optional `STRIPE_PRICE_ID_AFTER_PROMO` |
+| Window | Annual | Monthly | Stripe env |
+| --- | --- | --- | --- |
+| **Launch promo** (first **30 days** after `LAUNCH_DATE`) | **$9 / year** | **$4 / month** | `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY` |
+| **Regular** (after promo) | **$99 / year** | **$9 / month** | `STRIPE_PRICE_ID_REGULAR_ANNUAL` (alias: `STRIPE_PRICE_ID_AFTER_PROMO`), `STRIPE_PRICE_ID_REGULAR_MONTHLY` |
 
-Defaults in `web/lib/pricing.ts`:
+Display amounts live in `web/lib/pricing.ts` (`PRICE_*_CENTS`). Checkout always charges the configured Stripe Price IDs — not the cent constants alone.
 
-- `LAUNCH_DATE=2026-09-20` (set this to your real CWS/public launch day)
+Defaults:
+
+- `LAUNCH_DATE=2026-09-20` (set to real CWS/public launch day)
 - `PROMO_DAYS=30` → promo ends **2026-10-20** with the default launch date
-- Do **not** invent a higher post-promo price in code; leave `PRICE_AFTER_PROMO_CENTS` / after-promo Price ID configurable
+
+### Marketplace sandbox (partial — Assay / Shai)
+
+Test-mode Price IDs already created (promo annual $9 and regular monthly $9 may be pending card approval):
+
+| Price | Amount | Price ID (test) |
+| --- | --- | --- |
+| Promo monthly | $4/mo | `price_1UHikzATpHsAXg8mLqGkTbdi` |
+| Regular annual | $99/yr | `price_1UHikzATpHsAXg8mECO1ZvjR` |
+
+Set on Vercel when approved:
+
+```bash
+STRIPE_PRICE_ID_PROMO_MONTHLY=price_1UHikzATpHsAXg8mLqGkTbdi
+STRIPE_PRICE_ID_REGULAR_ANNUAL=price_1UHikzATpHsAXg8mECO1ZvjR
+# Pending Shai approval:
+# STRIPE_PRICE_ID_PROMO=price_...
+# STRIPE_PRICE_ID_REGULAR_MONTHLY=price_...
+```
+
+Landing Checkout sends `POST /api/checkout` with JSON `{ "interval": "year" | "month" }` to pick the Price ID for the active window.
 
 ## Feature gates
 
@@ -50,15 +72,14 @@ Extension popup ──Upgrade──► web/ landing ──► Stripe Checkout (h
 
 ## Stripe Dashboard setup
 
-1. Create Product **CannabisSage Pro** with a **yearly** recurring Price at **$10** → copy Price ID → `STRIPE_PRICE_ID_PROMO`.
-2. (Optional) Create a second yearly Price for post-promo → `STRIPE_PRICE_ID_AFTER_PROMO`.
-3. Add webhook endpoint `https://<your-domain>/api/webhook` for:
+1. Create Product **CannabisSage Pro** with four recurring Prices ($9/yr promo, $4/mo promo, $99/yr regular, $9/mo regular) → map to env vars above.
+2. Add webhook endpoint `https://<your-domain>/api/webhook` for:
    - `checkout.session.completed`
    - `customer.subscription.created`
    - `customer.subscription.updated`
    - `customer.subscription.deleted`
-4. Enable **Customer Portal** (cancel / update payment method).
-5. Copy secrets into `web/.env.local` from `web/.env.example` (never commit secrets).
+3. Enable **Customer Portal** (cancel / update payment method).
+4. Copy secrets into `web/.env.local` from `web/.env.example` (never commit secrets).
 
 **Tax:** If you charge US/EU customers, review [Stripe Tax for subscriptions](https://docs.stripe.com/billing/taxes/collect-taxes) and register before enabling `automatic_tax` (not enabled by default here).
 
@@ -66,7 +87,7 @@ Extension popup ──Upgrade──► web/ landing ──► Stripe Checkout (h
 
 ```bash
 cd web
-cp .env.example .env.local   # fill Stripe test keys + price id
+cp .env.example .env.local   # fill Stripe test keys + price ids
 npm install
 npm run dev                  # http://localhost:3000
 
@@ -94,7 +115,7 @@ curl -X POST http://localhost:3000/api/license/activate \
 ## Production / Vercel
 
 1. Deploy `web/` to Vercel project **cannabissage** (custom domain `https://cannabissage.app`, alias `https://cannabissage.vercel.app`); Marketplace already attaches Neon (`cannabissage-db`) + Stripe sandbox (`cannabissage-stripe`).
-2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
+2. Confirm env: `DATABASE_URL` / `POSTGRES_URL`, `STRIPE_SECRET_KEY`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY`, `STRIPE_PRICE_ID_REGULAR_ANNUAL`, `STRIPE_PRICE_ID_REGULAR_MONTHLY`, `NEXT_PUBLIC_SITE_URL=https://cannabissage.app`, `LAUNCH_DATE`. Do **not** set `ALLOW_DEV_MOCK` in prod.
 3. Point Stripe webhook (test mode until Cipher CLEAR) to `https://cannabissage.app/api/webhook` (Vercel alias URL also works).
 4. Extension defaults to `cannabissage.app` in `data/config.json` (v1.3.3+); manifest keeps Vercel + localhost in `host_permissions` for fallback/unpacked dev.
 5. Rebuild extension zip (`./scripts/pack-extension.sh`) → `dist/cannabis-sage-1.3.3.zip`.
@@ -111,7 +132,7 @@ License rows live in Neon (`licenses`); Stripe subscription metadata remains the
 ## Testing checklist
 
 - [ ] `npm run smoke` in `web/` (pricing window + license key format)
-- [ ] Test-mode Checkout completes → success page shows `CSG-…` key
+- [ ] Test-mode Checkout completes (annual **and** monthly) → success page shows `CSG-…` key
 - [ ] Webhook writes license; `/api/license/validate` returns `active: true`
 - [ ] Extension popup Activate → status Pro; filters unlock on Sunnyside
 - [ ] Free plan on Zen Leaf shows multi-store upgrade gate

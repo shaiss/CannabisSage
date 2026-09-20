@@ -28,10 +28,10 @@ Tweak: `extension/lib/csi-features.js` (+ landing copy in `web/lib/pricing-publi
 ## Assay take-over checklist (human / SA)
 
 1. **Cipher CLEAR** — security review before merge or first public deploy (test-mode Stripe only until CLEAR).
-2. **Stack flip-in (Neon + Checkout)** — durable licenses on Neon via `DATABASE_URL`; hosted Checkout `$10/yr` promo via `STRIPE_PRICE_ID_PROMO` + `LAUNCH_DATE`. Schema: `web/db/migrations/001_licenses.sql`. CRUD stays in `web/lib/licenses.ts`.
-3. **Stripe (test → live after Cipher)** — Product “CannabisSage Pro”, yearly $10 Price → `STRIPE_PRICE_ID_PROMO`; webhook → `/api/webhook`; Customer Portal on. See `docs/MONETIZATION.md`.
+2. **Stack flip-in (Neon + Checkout)** — durable licenses on Neon via `DATABASE_URL`; promo **$9/yr or $4/mo** via `STRIPE_PRICE_ID_PROMO` + `STRIPE_PRICE_ID_PROMO_MONTHLY` + `LAUNCH_DATE`; regular **$99/yr or $9/mo** via `STRIPE_PRICE_ID_REGULAR_ANNUAL` + `STRIPE_PRICE_ID_REGULAR_MONTHLY`. Schema: `web/db/migrations/001_licenses.sql`. CRUD stays in `web/lib/licenses.ts`.
+3. **Stripe (test → live after Cipher)** — Product “CannabisSage Pro”, four Prices (promo + regular, annual + monthly) → env vars in `docs/MONETIZATION.md`; webhook → `/api/webhook`; Customer Portal on.
 4. **Deploy `web/`** to Vercel project `cannabissage` (`https://cannabissage.app`, alias `https://cannabissage.vercel.app`); set env from `web/.env.example` (never commit secrets; no `ALLOW_DEV_MOCK` in prod).
-5. **Set `LAUNCH_DATE`** to real public/CWS day (promo = +30 days). `PRICE_AFTER_PROMO_*` only when Sage decides post-promo price — do not invent a higher amount.
+5. **Set `LAUNCH_DATE`** to real public/CWS day (promo = +30 days). Regular tier **$99/yr or $9/mo** (`STRIPE_PRICE_ID_REGULAR_ANNUAL`, `STRIPE_PRICE_ID_REGULAR_MONTHLY`).
 6. **Point extension at prod API** — ✅ **1.3.3**: `extension/data/config.json` → `https://cannabissage.app`; manifest includes `cannabissage.app` + `cannabissage.vercel.app` (+ localhost for unpacked local/dev). CWS **1.3.2** pending with vercel-only hosts. Override local API via `csi_api_base` storage or temporary config edit.
 7. **CWS upload** — zip from pack script; copy from `STORE_LISTING.md`; host `PRIVACY.md` on HTTPS; screenshots; age-restricted vertical; no medical claims.
 8. **Sage product sign-off** — Free/Pro split, promo copy, store listing tone.
@@ -39,7 +39,7 @@ Tweak: `extension/lib/csi-features.js` (+ landing copy in `web/lib/pricing-publi
 ### SA-CLEAR path (this flip-in)
 
 1. `cd web && npm ci && npm run smoke && npm run typecheck && npm run build`
-2. Confirm Vercel env has Neon `DATABASE_URL` + Stripe **test** keys + `STRIPE_PRICE_ID_PROMO` (no live keys until Cipher).
+2. Confirm Vercel env has Neon `DATABASE_URL` + Stripe **test** keys + `STRIPE_PRICE_ID_PROMO`, `STRIPE_PRICE_ID_PROMO_MONTHLY`, `STRIPE_PRICE_ID_REGULAR_ANNUAL`, `STRIPE_PRICE_ID_REGULAR_MONTHLY` (no live keys until Cipher).
 3. Optional: `SMOKE_LIVE=1` only with `sk_test_` + `DATABASE_URL`.
 4. Cipher reviews webhook signature verify, no secrets in repo, fail-closed without DB, no extension card collection.
 

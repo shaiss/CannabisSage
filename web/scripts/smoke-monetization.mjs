@@ -20,9 +20,14 @@ const extRoot = path.resolve(webRoot, '..', 'extension');
 const pricingSrc = fs.readFileSync(path.join(webRoot, 'lib/pricing.ts'), 'utf8');
 assert(pricingSrc.includes("LAUNCH_DATE = process.env.LAUNCH_DATE || '2026-09-20'"), 'launch date default');
 assert(pricingSrc.includes('PROMO_DAYS = Number(process.env.PROMO_DAYS || 30)'), 'promo days');
-assert(pricingSrc.includes('PRICE_PROMO_CENTS = 1000'), 'promo $10');
-assert(pricingSrc.includes('PRICE_AFTER_PROMO_CENTS'), 'after-promo placeholder');
-assert(pricingSrc.includes('STRIPE_PRICE_ID_PROMO'), 'promo price env');
+assert(pricingSrc.includes('PRICE_PROMO_YEAR_CENTS = 900'), 'promo $9/yr');
+assert(pricingSrc.includes('PRICE_PROMO_MONTH_CENTS = 400'), 'promo $4/mo');
+assert(pricingSrc.includes('PRICE_REGULAR_YEAR_CENTS = 9900'), 'regular $99/yr');
+assert(pricingSrc.includes('STRIPE_PRICE_ID_PROMO'), 'promo annual env');
+assert(pricingSrc.includes('STRIPE_PRICE_ID_PROMO_MONTHLY'), 'promo monthly env');
+assert(pricingSrc.includes('STRIPE_PRICE_ID_REGULAR_ANNUAL'), 'regular annual env');
+assert(pricingSrc.includes('STRIPE_PRICE_ID_REGULAR_MONTHLY'), 'regular monthly env');
+assert(pricingSrc.includes('STRIPE_PRICE_ID_AFTER_PROMO'), 'after-promo alias');
 assert(pricingSrc.includes('STRIPE_PRICE_ID'), 'price id alias');
 
 const gatesSrc = fs.readFileSync(path.join(webRoot, 'lib/feature-gates.ts'), 'utf8');
@@ -58,7 +63,10 @@ assert(envExample.includes('DATABASE_URL='), 'env DATABASE_URL');
 assert(envExample.includes('STRIPE_SECRET_KEY='), 'env STRIPE_SECRET_KEY');
 assert(envExample.includes('STRIPE_WEBHOOK_SECRET='), 'env STRIPE_WEBHOOK_SECRET');
 assert(envExample.includes('NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY='), 'env publishable key');
-assert(envExample.includes('STRIPE_PRICE_ID_PROMO='), 'env promo price');
+assert(envExample.includes('STRIPE_PRICE_ID_PROMO='), 'env promo annual');
+assert(envExample.includes('STRIPE_PRICE_ID_PROMO_MONTHLY='), 'env promo monthly');
+assert(envExample.includes('STRIPE_PRICE_ID_REGULAR_ANNUAL='), 'env regular annual');
+assert(envExample.includes('STRIPE_PRICE_ID_REGULAR_MONTHLY='), 'env regular monthly');
 assert(envExample.includes('cannabissage.app'), 'prod site URL documented');
 assert(envExample.includes('cannabissage.vercel.app'), 'vercel fallback documented');
 assert(!/sk_live_|whsec_[A-Za-z0-9]{20,}/.test(envExample), 'no live secrets in .env.example');
@@ -75,6 +83,8 @@ assert(webhookSrc.includes("console.log('stripe webhook', event.type)"), 'log ty
 const checkoutSrc = fs.readFileSync(path.join(webRoot, 'app/api/checkout/route.ts'), 'utf8');
 assert(checkoutSrc.includes("mode: 'subscription'"), 'hosted subscription checkout');
 assert(checkoutSrc.includes('resolveStripePriceId'), 'env price id');
+assert(checkoutSrc.includes('billing_interval'), 'interval metadata');
+assert(checkoutSrc.includes('interval'), 'checkout interval body');
 assert(checkoutSrc.includes('/success?session_id='), 'success url');
 assert(checkoutSrc.includes('/cancel'), 'cancel url');
 

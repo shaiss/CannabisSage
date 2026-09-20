@@ -4,7 +4,7 @@ Next.js (App Router) landing page + Stripe Checkout + Neon license entitlement A
 
 See [`../docs/MONETIZATION.md`](../docs/MONETIZATION.md).
 
-**Prod alias:** `https://cannabissage.vercel.app`
+**Prod:** `https://cannabissage.app` (Vercel fallback: `https://cannabissage.vercel.app`)
 
 ```bash
 cp .env.example .env.local   # DATABASE_URL + Stripe test keys; never commit secrets

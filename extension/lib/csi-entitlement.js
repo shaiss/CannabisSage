@@ -23,7 +23,7 @@
       cachedConfig = {};
     }
     // Local/dev override: chrome.storage.local.csi_api_base = 'http://localhost:3000'
-    // (or edit data/config.json when loading unpacked). Production default is cannabissage.vercel.app.
+    // (or edit data/config.json when loading unpacked). Production default is cannabissage.app (Vercel alias fallback in manifest).
     try {
       const local = await chrome.storage.local.get(['csi_api_base']);
       if (local.csi_api_base) cachedConfig.apiBaseUrl = local.csi_api_base;
@@ -31,7 +31,7 @@
       /* ignore */
     }
     cachedConfig.apiBaseUrl = (
-      cachedConfig.apiBaseUrl || 'https://cannabissage.vercel.app'
+      cachedConfig.apiBaseUrl || 'https://cannabissage.app'
     ).replace(/\/$/, '');
     cachedConfig.upgradeUrl = cachedConfig.upgradeUrl || `${cachedConfig.apiBaseUrl}/#pricing`;
     cachedConfig.accountUrl = cachedConfig.accountUrl || `${cachedConfig.apiBaseUrl}/account`;

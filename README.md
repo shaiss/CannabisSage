@@ -51,7 +51,7 @@ npm install && npm run dev
 stripe listen --forward-to localhost:3000/api/webhook
 ```
 
-Extension defaults to prod API `https://cannabissage.vercel.app`. For local entitlement against `npm run dev`, set `chrome.storage.local.csi_api_base` to `http://localhost:3000` (or temporarily edit `extension/data/config.json`).
+Extension defaults to prod API `https://cannabissage.app` (Vercel alias `https://cannabissage.vercel.app` remains in `host_permissions` as fallback). For local entitlement against `npm run dev`, set `chrome.storage.local.csi_api_base` to `http://localhost:3000` (or temporarily edit `extension/data/config.json`).
 
 ## Permissions
 

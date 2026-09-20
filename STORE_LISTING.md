@@ -7,7 +7,7 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.2 |
+| **Version** | 1.3.3 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
@@ -64,13 +64,13 @@ Inject UI and fetch same-origin product HTML on Sunnyside listings and PDPs.
 
 Inject UI and fetch same-origin product HTML on Zen Leaf location menus/PDPs (including Malvern / TerraVida alias).
 
-### Host permission: CannabisSage site (`https://cannabissage.vercel.app/*`)
+### Host permission: CannabisSage site (`https://cannabissage.app/*`, `https://cannabissage.vercel.app/*`)
 
-Call entitlement activate/validate APIs and open Upgrade / Manage links on the production landing origin. Cards are never entered in the extension.
+Call entitlement activate/validate APIs and open Upgrade / Manage links on the production landing origin (`cannabissage.app`; `cannabissage.vercel.app` kept as Vercel fallback). Cards are never entered in the extension.
 
 ### Host permission: localhost (unpacked local/dev)
 
-`http://localhost:3000/*` is kept so unpacked loads can talk to a local `web/` server. Production zip defaults (`data/config.json`) point at `https://cannabissage.vercel.app`. For local API override without editing the zip: set `chrome.storage.local.csi_api_base` to `http://localhost:3000`.
+`http://localhost:3000/*` is kept so unpacked loads can talk to a local `web/` server. Production zip defaults (`data/config.json`) point at `https://cannabissage.app`. For local API override without editing the zip: set `chrome.storage.local.csi_api_base` to `http://localhost:3000`.
 
 ### Permission: `storage`
 
@@ -92,8 +92,8 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
-3. Confirm `extension/data/config.json` + manifest host for `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.2.zip`.
+3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
+4. Upload `dist/cannabis-sage-1.3.3.zip` (CWS **1.3.2** may still be pending review with vercel-only hosts; ship **1.3.3** post-approval or unpacked).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

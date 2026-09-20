@@ -25,6 +25,7 @@ required=(
   "${EXT_DIR}/bridge.js"
   "${EXT_DIR}/content-listing.js"
   "${EXT_DIR}/content-pdp.js"
+  "${EXT_DIR}/content-router.js"
   "${EXT_DIR}/content.css"
   "${EXT_DIR}/lib/csi-core.js"
   "${EXT_DIR}/lib/csi-storage.js"

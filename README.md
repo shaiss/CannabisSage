@@ -48,8 +48,8 @@ Creates `dist/cannabis-sage-<version>.zip`.
 | --- | --- |
 | `bridge.js` (MAIN world) | Read React product props; price/sale/weight hints |
 | `lib/csi-*.js` | Shared parse, storage, fetch+cache, glossary, UI |
-| `content-listing.js` | Badges, filters, sort, hover, compare on `/products/*` |
-| `content-pdp.js` | Detail panel on `/product/*` |
+| `content-listing.js` / `content-pdp.js` | Listing + PDP controllers |
+| `content-router.js` | SPA-aware route switch between listing and PDP |
 | `background.js` | Allowed-host product HTML fetch; cache prune |
 | `popup/` | Taste-map preference editor |
 | `data/` | Default taste map + terpene glossary JSON |

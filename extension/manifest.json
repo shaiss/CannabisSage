@@ -35,22 +35,7 @@
     {
       "matches": [
         "https://www.sunnyside.shop/products/*",
-        "https://sunnyside.shop/products/*"
-      ],
-      "js": [
-        "lib/csi-core.js",
-        "lib/csi-storage.js",
-        "lib/csi-fetch.js",
-        "lib/csi-glossary.js",
-        "lib/csi-ui.js",
-        "content-listing.js"
-      ],
-      "css": ["content.css"],
-      "run_at": "document_idle",
-      "world": "ISOLATED"
-    },
-    {
-      "matches": [
+        "https://sunnyside.shop/products/*",
         "https://www.sunnyside.shop/product/*",
         "https://sunnyside.shop/product/*"
       ],
@@ -60,7 +45,9 @@
         "lib/csi-fetch.js",
         "lib/csi-glossary.js",
         "lib/csi-ui.js",
-        "content-pdp.js"
+        "content-listing.js",
+        "content-pdp.js",
+        "content-router.js"
       ],
       "css": ["content.css"],
       "run_at": "document_idle",

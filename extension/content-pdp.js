@@ -5,9 +5,9 @@
   'use strict';
   const CSI = globalThis.CSI;
   if (!CSI) return;
-  if (!/^\/product\//.test(location.pathname)) return;
 
   const BRIDGE_SOURCE = 'cannabis-sage-bridge';
+  let active = false;
 
   function requestPdpBridge(timeoutMs = 1000) {
     return new Promise((resolve) => {
@@ -37,7 +37,12 @@
     const url = location.href.split(/[?#]/)[0];
     let product = {};
 
-    const bridge = await requestPdpBridge();
+    let bridge = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      bridge = await requestPdpBridge();
+      if (bridge && !bridge.error && (bridge.id || bridge.cannabinoids || bridge.name)) break;
+      await new Promise((r) => setTimeout(r, 350));
+    }
     if (bridge && !bridge.error) {
       const extracted = CSI.extractProductData(
         {
@@ -152,28 +157,44 @@
     });
   }
 
-  async function init() {
-    CSI.log(`pdp init v${CSI.VERSION}`);
+  function teardownPdp() {
+    active = false;
+    document.getElementById('csi-pdp-panel')?.remove();
+  }
+
+  async function startPdp() {
+    if (active) {
+      // Re-entered same PDP mode (e.g. product→product SPA): refresh panel
+      document.getElementById('csi-pdp-panel')?.remove();
+    }
+    active = true;
+    CSI.log(`pdp start v${CSI.VERSION}`, location.href);
     await CSI.glossary.ensureGlossary();
-    const loading = document.createElement('div');
-    loading.id = 'csi-pdp-panel';
-    loading.innerHTML = `<div class="csi-pdp-header"><strong>CannabisSage</strong></div><div class="csi-status csi-status-loading">Loading profile…</div>`;
+
     const mount = () => {
       if (!document.body) {
         setTimeout(mount, 50);
         return;
       }
+      if (!active || !location.pathname.startsWith('/product/')) return;
+      const loading = document.createElement('div');
+      loading.id = 'csi-pdp-panel';
+      loading.innerHTML = `<div class="csi-pdp-header"><strong>CannabisSage</strong></div><div class="csi-status csi-status-loading">Loading profile…</div>`;
       document.body.appendChild(loading);
       loadProfile()
-        .then(renderPanel)
+        .then((product) => {
+          if (!active) return;
+          renderPanel(product);
+        })
         .catch((e) => {
           CSI.error(e);
-          renderPanel({ status: 'error', error: e.message || 'Unexpected error' });
+          if (active) renderPanel({ status: 'error', error: e.message || 'Unexpected error' });
         });
     };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount);
-    else mount();
+    mount();
   }
 
-  init();
+  CSI.routes = CSI.routes || {};
+  CSI.routes.startPdp = startPdp;
+  CSI.routes.teardownPdp = teardownPdp;
 })();

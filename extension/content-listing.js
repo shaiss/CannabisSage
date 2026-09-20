@@ -9,9 +9,6 @@
     return;
   }
 
-  // Only run on listing routes
-  if (!/^\/products\//.test(location.pathname)) return;
-
   const state = {
     selection: [],
     tasteMap: null,
@@ -25,6 +22,8 @@
   let lastPath = location.pathname;
   let tray = null;
   let filterBar = null;
+  let storageListener = null;
+  let active = false;
 
   function getSelection() {
     return state.selection;
@@ -452,55 +451,60 @@
     mutationObserver.observe(document.body, { childList: true, subtree: true });
   }
 
-  function onSpaNav() {
+  function onListingPathChange() {
     if (!location.pathname.startsWith('/products/')) return;
     if (location.pathname !== lastPath) {
-      CSI.log('SPA path', lastPath, '->', location.pathname);
+      CSI.log('listing SPA path', lastPath, '->', location.pathname);
       lastPath = location.pathname;
       document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
         delete el.dataset.csiEnhanced;
       });
-      // Keep compare selection (P0 persistent tray)
       document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
     }
     scheduleEnhance();
   }
 
-  function patchHistory() {
-    if (window.__csiHistoryPatched) return;
-    window.__csiHistoryPatched = true;
-    const wrap = (name) => {
-      const orig = history[name];
-      history[name] = function (...args) {
-        const r = orig.apply(this, args);
-        setTimeout(onSpaNav, 0);
-        return r;
-      };
-    };
-    wrap('pushState');
-    wrap('replaceState');
-    window.addEventListener('popstate', onSpaNav);
+  function teardownListing() {
+    active = false;
+    if (mutationObserver) {
+      mutationObserver.disconnect();
+      mutationObserver = null;
+    }
+    clearTimeout(enhanceTimer);
+    document.getElementById('csi-filter-bar')?.remove();
+    filterBar = null;
+    document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
+    document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
+      delete el.dataset.csiEnhanced;
+    });
+    // Keep compare tray across PDP
   }
 
-  async function init() {
-    CSI.log(`listing init v${CSI.VERSION}`, location.href);
+  async function startListing() {
+    if (active) {
+      onListingPathChange();
+      return;
+    }
+    active = true;
+    CSI.log(`listing start v${CSI.VERSION}`, location.href);
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();
     state.tasteMap = await CSI.storage.loadTasteMap();
     state.filters = await CSI.storage.loadFilters();
     await CSI.glossary.ensureGlossary();
 
-    tray = CSI.ui.createCompareTrayController({
-      getSelection,
-      setSelection,
-      persist,
-      get tasteMap() {
-        return state.tasteMap;
-      }
-    });
+    if (!tray) {
+      tray = CSI.ui.createCompareTrayController({
+        getSelection,
+        setSelection,
+        persist,
+        get tasteMap() {
+          return state.tasteMap;
+        }
+      });
+    }
 
-    patchHistory();
-
+    lastPath = location.pathname;
     const start = () => {
       if (!document.body) {
         setTimeout(start, 50);
@@ -510,32 +514,39 @@
       setupObserver();
       tray.updateTrayButton();
     };
-    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start);
-    else start();
+    start();
 
-    chrome.storage.onChanged.addListener((changes, area) => {
-      if (area !== 'local') return;
-      if (changes.csi_taste_map) {
-        CSI.storage.loadTasteMap().then((m) => {
-          state.tasteMap = m;
-          document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
-            const p = CSI.getElementProduct(card);
-            if (!p) return;
-            p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
-            CSI.storeElementProduct(card, p);
-            renderBadges(card, p, p.status || 'ok');
+    if (!storageListener) {
+      storageListener = (changes, area) => {
+        if (area !== 'local' || !active) return;
+        if (changes.csi_taste_map) {
+          CSI.storage.loadTasteMap().then((m) => {
+            state.tasteMap = m;
+            document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
+              const p = CSI.getElementProduct(card);
+              if (!p) return;
+              p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
+              CSI.storeElementProduct(card, p);
+              renderBadges(card, p, p.status || 'ok');
+            });
+            applyFiltersAndSort();
           });
-          applyFiltersAndSort();
-        });
-      }
-      if (changes.csi_compare) {
-        CSI.storage.loadCompare().then((list) => {
-          state.selection = list;
-          tray.updateTrayButton();
-        });
-      }
-    });
+        }
+        if (changes.csi_compare) {
+          CSI.storage.loadCompare().then((list) => {
+            state.selection = list;
+            tray?.updateTrayButton();
+          });
+        }
+      };
+      chrome.storage.onChanged.addListener(storageListener);
+    }
   }
 
-  init();
+  CSI.routes = CSI.routes || {};
+  CSI.routes.startListing = startListing;
+  CSI.routes.teardownListing = teardownListing;
+  CSI.routes.onSameRoute = (mode) => {
+    if (mode === 'listing') onListingPathChange();
+  };
 })();

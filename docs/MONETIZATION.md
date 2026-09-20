@@ -51,6 +51,8 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 
 Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match.
 
+On a Free listing that this plan can already use, one dismissible note can appear after the shopper scrolls or hovers and at least three cards have chemistry. **Upgrade** uses the same deep link as the other Upgrade controls (`https://cannabissage.app/#pricing` → Stripe Checkout on the site). **Not now** stores `csi_soft_unlock_dismissed` locally. The note is omitted for Pro, on the multi-store gate, and before that browse signal. It does not hide hover, badges, compare, or the product panel.
+
 ## Architecture
 
 ```
@@ -136,5 +138,6 @@ License rows live in Neon (`licenses`); Stripe subscription metadata remains the
 - [ ] Webhook writes license; `/api/license/validate` returns `active: true`
 - [ ] Extension popup Activate → status Pro; filters unlock on Sunnyside
 - [ ] Free plan on Zen Leaf shows multi-store upgrade gate
+- [ ] Free Sunnyside listing: soft unlock note only after scroll or hover and three chem-ready cards; Upgrade opens the site; Not now hides it; badges and compare stay
 - [ ] Customer Portal opens from site `/account` or extension Manage
 - [ ] Cancel subscription → validate becomes inactive after webhook

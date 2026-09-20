@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.11';
+  const VERSION = '1.3.12';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';

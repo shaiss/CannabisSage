@@ -177,10 +177,12 @@
         return;
       }
       if (!active || !location.pathname.startsWith('/product/')) return;
+      document.getElementById('csi-pdp-panel')?.remove();
       const loading = document.createElement('div');
       loading.id = 'csi-pdp-panel';
+      loading.setAttribute('data-csi-pdp', '1');
       loading.innerHTML = `<div class="csi-pdp-header"><strong>CannabisSage</strong></div><div class="csi-status csi-status-loading">Loading profile…</div>`;
-      document.body.appendChild(loading);
+      (document.documentElement || document.body).appendChild(loading);
       loadProfile()
         .then((product) => {
           if (!active) return;

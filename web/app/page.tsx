@@ -79,6 +79,8 @@ export default function HomePage() {
 
       <footer className="footer">
         CannabisSage displays retailer-published chemistry. Not medical advice. ·{' '}
+        <a href="/privacy">Privacy</a>
+        {' · '}
         <a href="https://github.com/shaiss/CannabisSage">GitHub</a>
       </footer>
     </>

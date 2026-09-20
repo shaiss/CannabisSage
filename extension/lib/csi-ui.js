@@ -146,6 +146,10 @@
     if (CSI.features?.can?.('dealBadges') && product?.dollarsPerMg != null) {
       chips.push(`<span class="csi-badge csi-badge-deal">$${product.dollarsPerMg.toFixed(2)}/mg</span>`);
     }
+    if (CSI.features?.can?.('dealBadges')) {
+      const medianBadge = buildDealVsMedianBadge(product?.belowCategoryMedian);
+      if (medianBadge) chips.push(medianBadge);
+    }
     return chips;
   }
 
@@ -171,6 +175,39 @@
       html += `<br><span class="csi-deal">≈ $${insights.dollarsPerMg.toFixed(3)}/mg THC*</span>`;
     }
     return html;
+  }
+
+  /**
+   * Deal vs category median. Words only in the badge; hover title repeats the
+   * scraped price and computed median when both were passed in. No percent-off,
+   * no retailer name, no effects language. Empty string when the flag is absent.
+   */
+  const DEAL_VS_MEDIAN_COPY = {
+    badge: 'Below median',
+    titleLead: 'Listed price is below the median listed price in this category on this menu.',
+    strip: 'Below the median listed price in this category.'
+  };
+
+  function formatListedPrice(value) {
+    const n = CSI.positivePrice ? CSI.positivePrice(value) : null;
+    if (n == null) return '';
+    return n.toFixed(2);
+  }
+
+  function buildDealVsMedianBadge(flag) {
+    if (!flag || !CSI.dealVsCategoryMedian) return '';
+    const checked = CSI.dealVsCategoryMedian(flag.price, flag.categoryMedian, flag.sampleCount);
+    if (!checked) return '';
+    const priceText = formatListedPrice(checked.price);
+    const medianText = formatListedPrice(checked.categoryMedian);
+    if (!priceText || !medianText) return '';
+    const title = `${DEAL_VS_MEDIAN_COPY.titleLead} Listed $${priceText}; median $${medianText} from ${checked.sampleCount} listed prices.`;
+    return `<span class="csi-badge csi-badge-deal" data-csi-deal-median="1" title="${CSI.escapeHtml(title)}">${CSI.escapeHtml(DEAL_VS_MEDIAN_COPY.badge)}</span>`;
+  }
+
+  function buildDealVsMedianStrip(flag) {
+    if (!buildDealVsMedianBadge(flag)) return '';
+    return `<p class="csi-deal-median" data-csi-deal-median="1">${CSI.escapeHtml(DEAL_VS_MEDIAN_COPY.strip)}</p>`;
   }
 
   let tooltipEl = null;
@@ -632,11 +669,14 @@
   CSI.ui = {
     WHAT_SAGE_ADDS,
     TERP_OVERLAP_COPY,
+    DEAL_VS_MEDIAN_COPY,
     summarizeTerpeneOverlap,
     formatCannabinoids,
     formatTerpenes,
     buildWhatSageAddsChip,
     buildPdpHeader,
+    buildDealVsMedianBadge,
+    buildDealVsMedianStrip,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

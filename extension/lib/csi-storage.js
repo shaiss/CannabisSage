@@ -10,7 +10,8 @@
     COMPARE: 'csi_compare',
     TASTE: 'csi_taste_map',
     FILTERS: 'csi_listing_filters',
-    CACHE_PREFIX: 'csi_pdp:'
+    CACHE_PREFIX: 'csi_pdp:',
+    CATEGORY_MEDIANS: 'csi_category_medians'
   };
 
   const DEFAULT_TASTE = {
@@ -180,6 +181,62 @@
     }
   }
 
+  /**
+   * Menu medians computed from scraped listing prices.
+   * Same host merges categories; a category seen again replaces its previous median.
+   * Expired or other-host snapshots are not returned (other-host is left in place).
+   */
+  async function loadCategoryMedians(host) {
+    const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
+    const snap = data[KEYS.CATEGORY_MEDIANS];
+    if (!snap || typeof snap !== 'object') return null;
+    if (host && snap.host !== host) return null;
+    const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
+    if (!snap.savedAt || Date.now() - snap.savedAt > ttl) {
+      await storageRemove([KEYS.CATEGORY_MEDIANS]);
+      return null;
+    }
+    return snap;
+  }
+
+  async function saveCategoryMedians(snapshot) {
+    if (!snapshot || !snapshot.host) return;
+    const existing = await loadCategoryMedians(snapshot.host);
+    const categories = { ...(existing && existing.categories ? existing.categories : {}) };
+    const replaceKeys = Array.isArray(snapshot.replaceKeys) ? snapshot.replaceKeys : [];
+    replaceKeys.forEach((key) => {
+      if (key) delete categories[key];
+    });
+    const incoming = snapshot.categories && typeof snapshot.categories === 'object' ? snapshot.categories : {};
+    Object.entries(incoming).forEach(([key, stats]) => {
+      const median = CSI.positivePrice(stats && stats.median);
+      const sampleCount = Number(stats && stats.sampleCount);
+      if (!key || median == null) return;
+      if (!Number.isFinite(sampleCount) || sampleCount < CSI.MIN_CATEGORY_PRICE_SAMPLE) return;
+      categories[key] = { median, sampleCount };
+    });
+
+    const byUrl = new Map();
+    (existing && Array.isArray(existing.products) ? existing.products : []).forEach((row) => {
+      if (row && row.url && row.categoryKey) byUrl.set(row.url, { url: row.url, categoryKey: row.categoryKey });
+    });
+    (Array.isArray(snapshot.products) ? snapshot.products : []).forEach((row) => {
+      if (!row || !row.url || !row.categoryKey) return;
+      byUrl.set(String(row.url), { url: String(row.url), categoryKey: String(row.categoryKey) });
+    });
+    const products = Array.from(byUrl.values()).slice(-400);
+
+    await storageSet({
+      [KEYS.CATEGORY_MEDIANS]: {
+        host: snapshot.host,
+        adapterId: snapshot.adapterId || '',
+        savedAt: Date.now(),
+        categories,
+        products
+      }
+    });
+  }
+
   CSI.storage = {
     KEYS,
     DEFAULT_TASTE,
@@ -194,6 +251,8 @@
     getPdpCache,
     setPdpCache,
     invalidatePdpCache,
-    pruneExpiredCache
+    pruneExpiredCache,
+    loadCategoryMedians,
+    saveCategoryMedians
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

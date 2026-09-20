@@ -133,7 +133,8 @@ export default function HomePage() {
             <h3>$/mg and deal badges</h3>
             <p>
               See $/mg and deal flags on the page so value is obvious before you open another tab.
-              Filters, sort, and export are included when you want a record of the menu.
+              A below-median mark shows only when the listed price and the category median are both
+              on the menu. Filters, sort, and export are included when you want a record of the menu.
             </p>
           </article>
         </div>
@@ -156,10 +157,6 @@ export default function HomePage() {
           <li>
             <strong>Similar-by-chem when something is OOS</strong> — Same-menu neighbors by chemistry
             when a pick is gone.
-          </li>
-          <li>
-            <strong>Deal math</strong> — Flags vs menu median and clearer value cues when the data
-            is there.
           </li>
         </ul>
         <p className="fomo-always muted">

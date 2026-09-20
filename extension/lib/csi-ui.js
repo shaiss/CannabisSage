@@ -210,6 +210,57 @@
     return `<p class="csi-deal-median" data-csi-deal-median="1">${CSI.escapeHtml(DEAL_VS_MEDIAN_COPY.strip)}</p>`;
   }
 
+  /**
+   * Provenance strip. Labels are generic. Each part is omitted when the
+   * adapter did not supply it. "Tested" is only used for a real test date;
+   * a packaged/mfg date is labeled Packaged. No retailer names.
+   */
+  const PROVENANCE_COPY = {
+    source: 'Menu source',
+    lab: 'Lab',
+    tested: 'Tested',
+    packaged: 'Packaged'
+  };
+
+  function provenanceParts(input) {
+    const provenance = CSI.readProvenance ? CSI.readProvenance(input) : null;
+    if (!provenance) return [];
+    const parts = [];
+    if (provenance.source) parts.push(`${PROVENANCE_COPY.source} ${provenance.source}`);
+    if (provenance.lab) parts.push(`${PROVENANCE_COPY.lab} ${provenance.lab}`);
+    if (provenance.timestamp) {
+      if (provenance.timestampKind === 'tested') {
+        parts.push(`${PROVENANCE_COPY.tested} ${provenance.timestamp}`);
+      } else if (provenance.timestampKind === 'packaged') {
+        parts.push(`${PROVENANCE_COPY.packaged} ${provenance.timestamp}`);
+      } else {
+        parts.push(provenance.timestamp);
+      }
+    }
+    return parts;
+  }
+
+  function buildProvenanceStrip(input) {
+    const parts = provenanceParts(input);
+    if (!parts.length) return '';
+    return `<p class="csi-provenance" data-csi-provenance="1">${parts
+      .map((part) => `<span>${CSI.escapeHtml(part)}</span>`)
+      .join('')}</p>`;
+  }
+
+  /**
+   * Listing note only when a lab label or a real date is present.
+   * A menu-source id alone stays on the PDP strip so cards stay quiet.
+   */
+  function buildProvenanceListingNote(input) {
+    const provenance = CSI.readProvenance ? CSI.readProvenance(input) : null;
+    if (!provenance || (!provenance.lab && !provenance.timestamp)) return '';
+    return buildProvenanceStrip(provenance).replace(
+      'class="csi-provenance"',
+      'class="csi-provenance csi-provenance-listing"'
+    );
+  }
+
   let tooltipEl = null;
   function ensureTooltip() {
     if (tooltipEl) return tooltipEl;
@@ -670,6 +721,7 @@
     WHAT_SAGE_ADDS,
     TERP_OVERLAP_COPY,
     DEAL_VS_MEDIAN_COPY,
+    PROVENANCE_COPY,
     summarizeTerpeneOverlap,
     formatCannabinoids,
     formatTerpenes,
@@ -677,6 +729,8 @@
     buildPdpHeader,
     buildDealVsMedianBadge,
     buildDealVsMedianStrip,
+    buildProvenanceStrip,
+    buildProvenanceListingNote,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

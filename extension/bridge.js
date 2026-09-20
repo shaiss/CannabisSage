@@ -64,6 +64,70 @@
     return Number.isNaN(n) ? null : n;
   }
 
+  function provenanceRaw(product) {
+    if (!product || typeof product !== 'object') return undefined;
+    const raw = {};
+    const copy = (from, key) => {
+      if (!from || from[key] == null || from[key] === '') return;
+      const value = from[key];
+      if (typeof value === 'string' || typeof value === 'number') raw[key] = value;
+    };
+    [
+      'source_sku',
+      'sourceSku',
+      'menuSource',
+      'mfg_date',
+      'mfgDate',
+      'packagedAt',
+      'packaged_at',
+      'packageDate',
+      'package_date',
+      'testedAt',
+      'tested_at',
+      'testDate',
+      'test_date',
+      'labTestedAt',
+      'lab_tested_at',
+      'labName',
+      'lab_name',
+      'laboratory',
+      'laboratoryName'
+    ].forEach((key) => copy(product, key));
+
+    const lab =
+      product.labTests && typeof product.labTests === 'object'
+        ? product.labTests
+        : product.lab_tests && typeof product.lab_tests === 'object'
+          ? product.lab_tests
+          : null;
+    if (lab) {
+      const nested = {};
+      [
+        'testedAt',
+        'tested_at',
+        'testDate',
+        'test_date',
+        'labName',
+        'lab_name',
+        'laboratory',
+        'laboratoryName',
+        'mfg_date',
+        'mfgDate',
+        'packagedAt',
+        'packaged_at',
+        'packageDate'
+      ].forEach((key) => {
+        const value = lab[key];
+        if (typeof value === 'string' || typeof value === 'number') nested[key] = value;
+      });
+      if (lab.lab && typeof lab.lab === 'object' && typeof lab.lab.name === 'string') {
+        nested.lab = { name: lab.lab.name };
+      }
+      if (Object.keys(nested).length) raw.labTests = nested;
+    }
+    return Object.keys(raw).length ? raw : undefined;
+  }
+
   function summarizeSunnyside(product, hostEl) {
     if (!product || typeof product !== 'object') return null;
     const id = product.id || product.productId || product.sku?.product?.id || product.sku?.id;
@@ -108,7 +172,7 @@
       !!(host && host.querySelector && host.querySelector('s, del, [class*="special" i]')) ||
       !!(product.special || product.on_sale || product.is_special);
 
-    return {
+    const summary = {
       id: id != null ? String(id) : undefined,
       slug: slug != null ? String(slug) : undefined,
       name: name != null ? String(name) : undefined,
@@ -120,6 +184,9 @@
       onSale: !!onSale,
       strategy: 'sunnyside'
     };
+    const raw = provenanceRaw(product);
+    if (raw) summary.provenanceRaw = raw;
+    return summary;
   }
 
   function summarizeZenleaf(product, hostEl) {
@@ -182,7 +249,7 @@
       if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
     }
 
-    return {
+    const summary = {
       id: id != null ? String(id) : undefined,
       slug: slug || undefined,
       name: name != null ? String(name) : undefined,
@@ -193,6 +260,9 @@
       onSale: !!onSale,
       strategy: 'zenleaf'
     };
+    const raw = provenanceRaw(product);
+    if (raw) summary.provenanceRaw = raw;
+    return summary;
   }
 
   function detectStrategy() {

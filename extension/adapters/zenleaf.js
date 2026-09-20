@@ -229,6 +229,7 @@
     const cannabinoids = {};
     const terpenes = [];
 
+    let provenance = null;
     // Prefer embedded labTests JSON (Next.js RSC / flight payload)
     const labMatch = html.match(/labTests\\?":\s*(\{[\s\S]*?\})(?=,\\?"saleType\\?"|,\\"saleType\\?"|,"saleType")/);
     if (labMatch) {
@@ -236,6 +237,7 @@
         const raw = unescapeJsonFragment(labMatch[1]);
         const lab = JSON.parse(raw);
         const parsed = parseLabTestsObject(lab);
+        provenance = CSI.mergeProvenance(provenance, CSI.readProvenance({ labTests: lab }));
         Object.assign(cannabinoids, parsed.cannabinoids);
         parsed.terpenes.forEach((t) => {
           if (t.name === 'Total Terpenes') {
@@ -324,8 +326,9 @@
       html.match(/unitSize\\?":\s*\{\s*\\?"value\\?":\s*([0-9.]+)\s*,\s*\\?"unitAbbr\\?":\s*\\?"([^\\"]+)\\?"/) ||
       html.match(/unitSize":\{"value":([0-9.]+),"unitAbbr":"([^"]+)"/);
     const weightText = weightMatch ? `${weightMatch[1]}${weightMatch[2]}` : null;
+    provenance = CSI.mergeProvenance(provenance, CSI.scrapeProvenanceFromHtml(html));
 
-    return {
+    const result = {
       cannabinoids,
       terpenes: terpeneResult,
       url,
@@ -335,6 +338,8 @@
       weightText: weightText || undefined,
       status: 'ok'
     };
+    if (provenance) result.provenance = provenance;
+    return result;
   }
 
   const zenleafAdapter = {

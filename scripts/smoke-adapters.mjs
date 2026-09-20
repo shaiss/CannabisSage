@@ -120,6 +120,7 @@ const parsed = CSI.adapters.zenleaf.parseProductHtml(
 assert(parsed.cannabinoids?.THC > 20 && parsed.cannabinoids.THC < 23, `thc ${parsed.cannabinoids?.THC}`);
 assert(parsed.price === 32.5 || parsed.price === 45, `price ${parsed.price}`);
 assert(parsed.onSale === true, 'sale from promoPrice');
+assert(!parsed.provenance, 'zenleaf potency sample has no provenance');
 
 // Sunnyside HTML scrape
 const syHtml = `<html><body><h1>Widget</h1><p>THC: 25.5%</p><h3>Terpenes</h3><div>Limonene 0.55% Beta-Myrcene 0.22%</div></body></html>`;
@@ -132,10 +133,11 @@ assert(
   Array.isArray(syParsed.terpenes) && syParsed.terpenes.some((t) => t.name === 'Limonene'),
   'sy limonene'
 );
+assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.9', 'version bump');
+assert(manifest.version === '1.3.10', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -188,7 +190,7 @@ assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.9', 'core version 1.3.9');
+assert(CSI.VERSION === '1.3.10', 'core version 1.3.10');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -410,5 +412,123 @@ assert(/basicBadges:\s*true/.test(featuresSrcDeal), 'basic chem badges remain fr
 const gatesSrc = fs.readFileSync(path.join(root, 'web', 'lib', 'feature-gates.ts'), 'utf8');
 assert(gatesSrc.includes("'dealBadges'"), 'landing gates still list dealBadges');
 assert(gatesSrc.includes('basicBadges'), 'landing gates still list basicBadges as free');
+
+// Provenance strip (v1.3.10) — only fields the adapter payload actually has
+assert(CSI.readProvenance(null) === null, 'missing payload is not provenance');
+assert(
+  CSI.readProvenance({
+    labTests: { displayThc: { label: 'THC', value: [20.1, 22.4] }, thc: { label: 'THCA' } },
+    sourceUrl: 'https://cdn.example/photo.png',
+    brand: { name: 'Savvy' },
+    startDate: '2024-01-01',
+    endDate: '2024-02-01',
+    updated_ago: '2 days ago',
+    created_ago: '1 hour ago',
+    exp_date: '2027-01-01'
+  }) === null,
+  'potency label, image url, brand, promo date, relative time, and expiration are not provenance'
+);
+assert(CSI.readProvenance({ source_sku: '   ' }) === null, 'blank menu source is omitted');
+assert(CSI.readProvenance({ source_sku: 'Sunnyside' }) === null, 'retailer name is not a menu source');
+assert(CSI.readProvenance({ labName: 'Zen Leaf' }) === null, 'retailer name is not a lab');
+assert(CSI.readProvenance({ mfg_date: 'not-a-date' }) === null, 'unparseable date is omitted');
+assert(CSI.readProvenance({ mfg_date: '2025-02-31' }) === null, 'impossible calendar date is omitted');
+assert(CSI.scrapeProvenanceFromHtml('displayThc\\":{\\"label\\":\\"THC\\"}') === null, 'scraped potency label is not a lab');
+assert(
+  CSI.scrapeProvenanceFromHtml('sourceUrl\\":\\"https://cdn.example/a.png\\"') === null,
+  'scraped image sourceUrl is not a menu source'
+);
+assert(CSI.scrapeProvenanceFromHtml('startDate\\":\\"2024-01-01\\"') === null, 'scraped promo start is not a timestamp');
+
+const packaged = CSI.readProvenance({
+  source_sku: 'SKU-9',
+  mfg_date: '2026-03-04',
+  labTests: { displayThc: { label: 'THC', value: [80] } }
+});
+assert(packaged && packaged.source === 'SKU-9', 'sunnyside source_sku is the menu source');
+assert(packaged.timestamp === '2026-03-04' && packaged.timestampKind === 'packaged', 'mfg_date is packaged, not tested');
+assert(!packaged.lab, 'potency label did not become a lab');
+
+const tested = CSI.readProvenance({
+  labTests: {
+    displayThc: { label: 'THCA', value: [22] },
+    testedAt: '2025-12-01T15:04:00Z',
+    labName: 'Keystone Lab'
+  },
+  startDate: '2020-01-01',
+  sourceUrl: 'https://cdn.example/a.png',
+  brand: { name: 'Savvy' }
+});
+assert(tested && tested.lab === 'Keystone Lab', 'lab name comes from labTests.labName');
+assert(tested.timestamp === '2025-12-01' && tested.timestampKind === 'tested', 'testedAt keeps the calendar date');
+assert(!tested.source, 'image sourceUrl and brand are not a menu source');
+
+const preferTested = CSI.mergeProvenance(
+  { source_sku: 'SKU-9', mfg_date: '2026-03-04' },
+  { testedAt: '2025-11-02', labName: 'Keystone Lab' }
+);
+assert(preferTested.source === 'SKU-9' && preferTested.lab === 'Keystone Lab', 'merge keeps source and lab');
+assert(preferTested.timestamp === '2025-11-02' && preferTested.timestampKind === 'tested', 'a real test date wins over packaged');
+assert(CSI.mergeProvenance(null, null) === null, 'merge of nothing is nothing');
+
+const embedded = CSI.scrapeProvenanceFromHtml(
+  'prefix labTests\\":{\\"labName\\":\\"Keystone Lab\\",\\"testedAt\\":\\"2025-11-02\\",\\"label\\":\\"THC\\"} tail'
+);
+assert(embedded && embedded.lab === 'Keystone Lab' && embedded.timestampKind === 'tested', 'escaped payload lab and test date');
+const syEmbedded = CSI.adapters.sunnyside.parseProductHtml(
+  '<html><body><h1>Widget</h1><script>{"source_sku":"SKU-9","mfg_date":"2026-03-04"}</script><p>THC: 1%</p></body></html>',
+  'https://www.sunnyside.shop/product/1'
+);
+assert(syEmbedded.provenance && syEmbedded.provenance.source === 'SKU-9', 'sunnyside html keeps source_sku when present');
+assert(syEmbedded.provenance.timestampKind === 'packaged', 'sunnyside html mfg_date is packaged');
+const zlEmbedded = CSI.adapters.zenleaf.parseProductHtml(
+  '<script>labTests\\":{\\"thc\\":{\\"value\\":[10],\\"unitAbbr\\":\\"%\\"},\\"labName\\":\\"Keystone Lab\\",\\"testedAt\\":\\"2025-11-02\\"},\\"saleType\\":\\"Both\\"</script>',
+  'https://zenleafdispensaries.com/locations/malvern/recreational-menu/menu/flower-709/x-1'
+);
+assert(zlEmbedded.provenance && zlEmbedded.provenance.lab === 'Keystone Lab', 'zenleaf html lab name when the key exists');
+assert(zlEmbedded.provenance.timestamp === '2025-11-02', 'zenleaf html testedAt when the key exists');
+
+const provCopy = Object.values(CSI.ui.PROVENANCE_COPY).join(' ');
+assert(CSI.ui.PROVENANCE_COPY.source === 'Menu source', 'generic menu source label');
+assert(CSI.ui.PROVENANCE_COPY.lab === 'Lab', 'generic lab label');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida|savvy/i.test(provCopy), 'no retailer or product brand in provenance copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(provCopy),
+  'no medical or effects claims in provenance copy'
+);
+assert(CSI.ui.buildProvenanceStrip(null) === '', 'no strip when provenance is missing');
+assert(CSI.ui.buildProvenanceStrip({ source_sku: '   ' }) === '', 'no strip for a blank source');
+const sourceOnly = CSI.ui.buildProvenanceStrip({ source_sku: 'SKU-9' });
+assert(sourceOnly.includes('data-csi-provenance="1"') && sourceOnly.includes('Menu source SKU-9'), 'pdp shows menu source');
+assert(!sourceOnly.includes('Lab') && !sourceOnly.includes('Tested') && !sourceOnly.includes('Packaged'), 'absent lab and date are omitted');
+assert(CSI.ui.buildProvenanceListingNote({ source_sku: 'SKU-9' }) === '', 'listing stays quiet for source id alone');
+const listingNote = CSI.ui.buildProvenanceListingNote(packaged);
+assert(listingNote.includes('csi-provenance-listing'), 'listing note when a date is present');
+assert(listingNote.includes('Menu source SKU-9') && listingNote.includes('Packaged 2026-03-04'), 'quiet line can include source with the date');
+assert(!listingNote.includes('Tested'), 'packaged date is not called a test');
+const labStrip = CSI.ui.buildProvenanceStrip(tested);
+assert(labStrip.includes('Lab Keystone Lab') && labStrip.includes('Tested 2025-12-01'), 'lab and test date on the strip');
+assert(!/sunnyside|zenleaf|savvy|https?:/i.test(labStrip), 'strip does not echo a brand or image url');
+assert(!/>Sale</.test(labStrip) && !/badge/.test(labStrip), 'provenance is not a deal badge');
+
+const provUi = uiSrc.slice(uiSrc.indexOf('const PROVENANCE_COPY'), uiSrc.indexOf('let tooltipEl'));
+assert(!/features\?\s*\.\s*can|hasPro\(|openUpgrade|dealBadges/.test(provUi), 'provenance is not a Pro gate');
+assert(pdpSrc.includes('buildProvenanceStrip(product.provenance)'), 'pdp panel renders the strip');
+assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'provenance does not move chem into the buy column');
+const renderBadgesNow = listingSrc.slice(
+  listingSrc.indexOf('function renderBadges'),
+  listingSrc.indexOf('async function enrichCard')
+);
+assert(renderBadgesNow.includes('buildProvenanceListingNote'), 'listing note is separate from chem chips');
+assert(!renderBadgesNow.includes('buildWhatSageAddsChip'), 'listing badges stay chem-only plus quiet provenance');
+const badgeFn = uiSrc.slice(uiSrc.indexOf('function buildListingBadgeChips'), uiSrc.indexOf('function buildTooltipContent'));
+assert(!badgeFn.includes('buildProvenance') && !badgeFn.includes('data-csi-provenance'), 'provenance is not a colored card badge');
+
+const bridgeSrc = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
+const bridgeProv = bridgeSrc.slice(bridgeSrc.indexOf('function provenanceRaw'), bridgeSrc.indexOf('function summarizeSunnyside'));
+assert(bridgeProv.includes('source_sku') && bridgeProv.includes('mfg_date'), 'bridge forwards sunnyside source and packaged date');
+assert(bridgeProv.includes('labName') && bridgeProv.includes('testedAt'), 'bridge forwards lab name and test date when present');
+assert(!bridgeProv.includes('displayThc') && !bridgeProv.includes('sourceUrl'), 'bridge does not treat potency or image urls as provenance');
+assert(!/startDate|updated_ago|exp_date|brand/.test(bridgeProv), 'bridge does not forward promo, relative, expiry, or brand fields');
 
 console.log('smoke-adapters: OK');

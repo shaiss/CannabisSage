@@ -595,6 +595,30 @@
   font-weight: 600;
 }
 
+.csi-provenance {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 0;
+  margin: 0 0 8px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667;
+  font-weight: 500;
+}
+
+.csi-provenance span + span::before {
+  content: '·';
+  margin: 0 6px;
+  color: #99a;
+}
+
+.csi-badge-row .csi-provenance-listing {
+  flex-basis: 100%;
+  margin: 2px 0 0;
+  font-size: 10px;
+  font-weight: 500;
+}
+
 /* Push page content slightly when filter bar present */
 body:has(#csi-filter-bar) {
   scroll-padding-top: 56px;

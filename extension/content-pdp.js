@@ -57,6 +57,8 @@
         url
       );
       product = { ...(extracted || {}), price: bridge.price, onSale: bridge.onSale, weightText: bridge.weightText };
+      const fromBridge = CSI.readProvenance?.(bridge.provenanceRaw);
+      if (fromBridge) product.provenance = fromBridge;
     }
 
     const needsFetch =
@@ -79,6 +81,8 @@
         price: data.price ?? product.price ?? CSI.parsePrice(document.body.innerText),
         status: data.status || 'ok'
       };
+      const mergedProvenance = CSI.mergeProvenance?.(product.provenance, data.provenance);
+      if (mergedProvenance) product.provenance = mergedProvenance;
     }
 
     const empty =
@@ -192,6 +196,7 @@
 
     panel.innerHTML = `
       ${CSI.ui.buildPdpHeader({ showClose: true })}
+      ${CSI.ui.buildProvenanceStrip(product.provenance)}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
       ${medianStrip}
       <div class="csi-pdp-body">${body}</div>

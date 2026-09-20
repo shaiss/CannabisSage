@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.9';
+  const VERSION = '1.3.10';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -485,6 +485,265 @@
   }
 
   /**
+   * Provenance the adapter payload actually carries. Missing parts stay absent.
+   *
+   * Sunnyside inventory (React fiber / API model) exposes source_sku and
+   * mfg_date. It does not expose a lab name. mfg_date is a packaged date, not
+   * a lab test. Relative created_ago / updated_ago and exp_date are not used.
+   *
+   * Zen Leaf labTests exposes potency only. displayThc.label is THC/THCA, not
+   * a laboratory. Image sourceUrl and promo startDate/endDate are not used.
+   * A lab name or testedAt is shown only when that key is on the payload.
+   *
+   * Retailer names are not a menu source or a lab. Never invent one.
+   */
+  const PROVENANCE_RETAILER = /^(sunnyside|zen\s*leaf|zenleaf|terravida(?:\s*\([^)]*\))?)$/i;
+  const PROVENANCE_NOT_LAB = new Set([
+    'thc',
+    'thca',
+    'cbd',
+    'cbda',
+    'cbn',
+    'cbg',
+    'cbc',
+    'tac',
+    'terp',
+    'terps',
+    'terpene',
+    'terpenes',
+    'total terpenes',
+    'total terps'
+  ]);
+  const PROVENANCE_EMBED_KEYS = [
+    'source_sku',
+    'sourceSku',
+    'menuSource',
+    'labName',
+    'lab_name',
+    'laboratory',
+    'laboratoryName',
+    'testedAt',
+    'tested_at',
+    'testDate',
+    'test_date',
+    'labTestedAt',
+    'lab_tested_at',
+    'mfg_date',
+    'mfgDate',
+    'packagedAt',
+    'packaged_at',
+    'packageDate',
+    'package_date'
+  ];
+
+  function cleanProvenanceToken(value, maxLen) {
+    if (value == null || typeof value === 'boolean' || typeof value === 'object') return null;
+    const s = String(value).replace(/\s+/g, ' ').trim();
+    if (!s || s.length > maxLen) return null;
+    if (/[<>]/.test(s) || /:\/\//.test(s)) return null;
+    if (PROVENANCE_RETAILER.test(s)) return null;
+    return s;
+  }
+
+  function parseProvenanceDate(value) {
+    if (value == null || typeof value === 'boolean' || typeof value === 'object') return null;
+    const s = String(value).trim();
+    if (!s || /\bago\b/i.test(s)) return null;
+    const m = s.match(/^(\d{4})-(\d{2})-(\d{2})(?:[T\s]\d.*)?$/);
+    if (!m) return null;
+    const y = Number(m[1]);
+    const mo = Number(m[2]);
+    const d = Number(m[3]);
+    if (y < 1990 || y > 2100) return null;
+    const dt = new Date(Date.UTC(y, mo - 1, d));
+    if (dt.getUTCFullYear() !== y || dt.getUTCMonth() !== mo - 1 || dt.getUTCDate() !== d) return null;
+    return `${m[1]}-${m[2]}-${m[3]}`;
+  }
+
+  function firstProvenanceDate(values) {
+    for (const value of values) {
+      const parsed = parseProvenanceDate(value);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+
+  function labTestsOf(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    if (obj.labTests && typeof obj.labTests === 'object') return obj.labTests;
+    if (obj.lab_tests && typeof obj.lab_tests === 'object') return obj.lab_tests;
+    return null;
+  }
+
+  function readLabLabelFrom(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const labTests = labTestsOf(obj);
+    const nestedLab = labTests && labTests.lab && typeof labTests.lab === 'object' ? labTests.lab : null;
+    const labObj = obj.lab && typeof obj.lab === 'object' ? obj.lab : null;
+    const candidates = [
+      obj.labName,
+      obj.lab_name,
+      obj.laboratory,
+      obj.laboratoryName,
+      labTests && labTests.labName,
+      labTests && labTests.lab_name,
+      labTests && labTests.laboratory,
+      labTests && labTests.laboratoryName,
+      nestedLab && nestedLab.name,
+      !labTests && labObj && labObj.name
+    ];
+    for (const value of candidates) {
+      const s = cleanProvenanceToken(value, 60);
+      if (!s) continue;
+      if (PROVENANCE_NOT_LAB.has(s.toLowerCase())) continue;
+      return s;
+    }
+    return null;
+  }
+
+  function readProvenanceFields(obj) {
+    if (!obj || typeof obj !== 'object') return null;
+    const source =
+      cleanProvenanceToken(obj.source_sku, 80) ||
+      cleanProvenanceToken(obj.sourceSku, 80) ||
+      cleanProvenanceToken(obj.menuSource, 80);
+    const lab = readLabLabelFrom(obj);
+    const labTests = labTestsOf(obj);
+    const tested = firstProvenanceDate([
+      obj.testedAt,
+      obj.tested_at,
+      obj.testDate,
+      obj.test_date,
+      obj.labTestedAt,
+      obj.lab_tested_at,
+      labTests && labTests.testedAt,
+      labTests && labTests.tested_at,
+      labTests && labTests.testDate,
+      labTests && labTests.test_date
+    ]);
+    const packaged = firstProvenanceDate([
+      obj.mfg_date,
+      obj.mfgDate,
+      obj.packagedAt,
+      obj.packaged_at,
+      obj.packageDate,
+      obj.package_date,
+      labTests && labTests.mfg_date,
+      labTests && labTests.mfgDate,
+      labTests && labTests.packagedAt,
+      labTests && labTests.packaged_at,
+      labTests && labTests.packageDate
+    ]);
+    let timestamp = null;
+    let timestampKind = null;
+    if (tested) {
+      timestamp = tested;
+      timestampKind = 'tested';
+    } else if (packaged) {
+      timestamp = packaged;
+      timestampKind = 'packaged';
+    }
+    if (!source && !lab && !timestamp) return null;
+    const out = {};
+    if (source) out.source = source;
+    if (lab) out.lab = lab;
+    if (timestamp) {
+      out.timestamp = timestamp;
+      out.timestampKind = timestampKind;
+    }
+    return out;
+  }
+
+  function isNormalizedProvenance(obj) {
+    const keys = Object.keys(obj);
+    if (!keys.length) return false;
+    const allowed = new Set(['source', 'lab', 'timestamp', 'timestampKind']);
+    return keys.every((key) => allowed.has(key));
+  }
+
+  function combineProvenance(left, right) {
+    if (!left && !right) return null;
+    const source = (left && left.source) || (right && right.source) || null;
+    const lab = (left && left.lab) || (right && right.lab) || null;
+    const leftTime = left && left.timestamp ? left : null;
+    const rightTime = right && right.timestamp ? right : null;
+    const chosen =
+      (leftTime && leftTime.timestampKind === 'tested' && leftTime) ||
+      (rightTime && rightTime.timestampKind === 'tested' && rightTime) ||
+      leftTime ||
+      rightTime ||
+      null;
+    if (!source && !lab && !(chosen && chosen.timestamp)) return null;
+    const out = {};
+    if (source) out.source = source;
+    if (lab) out.lab = lab;
+    if (chosen && chosen.timestamp) {
+      out.timestamp = chosen.timestamp;
+      if (chosen.timestampKind) out.timestampKind = chosen.timestampKind;
+    }
+    return out;
+  }
+
+  /**
+   * Normalize a raw menu object, an embedded-field bag, or an already
+   * normalized { source, lab, timestamp, timestampKind }. Null when nothing
+   * real is present.
+   */
+  function readProvenance(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+    if (isNormalizedProvenance(input)) {
+      const bag = {};
+      if (input.source) bag.source_sku = input.source;
+      if (input.lab) bag.labName = input.lab;
+      if (input.timestampKind === 'tested') bag.testedAt = input.timestamp;
+      else if (input.timestampKind === 'packaged') bag.mfg_date = input.timestamp;
+      else if (input.timestamp) bag.testedAt = input.timestamp;
+      const normalized = readProvenanceFields(bag);
+      if (normalized && input.timestamp && !input.timestampKind && normalized.timestampKind === 'tested') {
+        delete normalized.timestampKind;
+      }
+      return normalized;
+    }
+    const own = readProvenanceFields(input);
+    const nested =
+      input.provenance && input.provenance !== input ? readProvenance(input.provenance) : null;
+    return combineProvenance(own, nested);
+  }
+
+  function mergeProvenance(a, b) {
+    return combineProvenance(readProvenance(a), readProvenance(b));
+  }
+
+  function readEmbeddedJsonString(html, key) {
+    const src = String(html || '');
+    const esc = String(key).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const patterns = [
+      new RegExp('"' + esc + '"\\s*:\\s*"([^"\\\\]{1,160})"'),
+      new RegExp('\\\\"' + esc + '\\\\"\\s*:\\s*\\\\"([^"\\\\]{1,160})\\\\"')
+    ];
+    for (const re of patterns) {
+      const match = src.match(re);
+      if (match && match[1]) return match[1];
+    }
+    return null;
+  }
+
+  /** Pull only known provenance keys out of PDP HTML. No match → null. */
+  function scrapeProvenanceFromHtml(html) {
+    if (!html) return null;
+    const bag = {};
+    let found = false;
+    PROVENANCE_EMBED_KEYS.forEach((key) => {
+      const value = readEmbeddedJsonString(html, key);
+      if (!value) return;
+      bag[key] = value;
+      found = true;
+    });
+    if (!found) return null;
+    return readProvenanceFields(bag);
+  }
+
+  /**
    * Below-median flag. Null unless price, median, and sample size are all real
    * and the listed price is strictly under that median. Never invents a number.
    */
@@ -537,6 +796,9 @@
     categoryKeyFromPath,
     medianOfPrices,
     summarizeCategoryPriceMedians,
-    dealVsCategoryMedian
+    dealVsCategoryMedian,
+    readProvenance,
+    mergeProvenance,
+    scrapeProvenanceFromHtml
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

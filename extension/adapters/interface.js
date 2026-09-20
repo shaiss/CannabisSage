@@ -17,6 +17,12 @@
  *   pdpChemSurface: 'floating-panel' | 'inline-buybox' (default: floating-panel only in core)
  *   detectSale(el), categoryUrlPatterns, notes
  *
+ * Provenance (only fields the menu payload actually has — core omits the rest):
+ *   source_sku or menuSource → "Menu source" (not a retailer name, not an image URL)
+ *   labName / laboratory / labTests.labName → lab label (potency labels like THC are not a lab)
+ *   testedAt → test date; mfg_date / packagedAt → packaged date
+ * Do not invent a lab, a date, or a source. Do not pass brand, promo dates, or sourceUrl.
+ *
  * Do NOT load adapters from the network — Chrome Web Store forbids remote code.
  */
 (function (global) {

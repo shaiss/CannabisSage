@@ -145,6 +145,8 @@
     if (bridgeProduct.onSale != null) {
       storeElementProduct(cardEl, { onSale: bridgeProduct.onSale });
     }
+    const provenance = CSI.readProvenance?.(bridgeProduct.provenanceRaw);
+    if (provenance) storeElementProduct(cardEl, { provenance });
     return getElementProduct(cardEl);
   }
 

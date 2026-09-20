@@ -143,6 +143,28 @@ Copy must not name a retailer or make medical or effects claims.
 | PDP opened with no saved median for that category: no badge and no strip | |
 | Badge and strip do not name a retailer or make medical/effects claims | |
 
+## Provenance strip (v1.3.10+)
+
+The floating product panel shows source, lab, and date only when the menu payload has them. A missing part is left out. If none of the three is present, the strip is not rendered — no placeholder, no guessed lab, no guessed date.
+
+What the adapters actually expose:
+
+- Sunnyside inventory can include a menu-source id (`source_sku`) and a packaged date (`mfg_date`). It does not include a lab name. Relative “ago” text and an expiration date are not shown.
+- Zen Leaf `labTests` on the menu is potency only. A THC/THCA label is not a lab. An image URL is not a menu source. A promo start date is not a timestamp. A lab name or tested date appears only when that field is on the payload.
+
+Listing cards add a quiet line under the chem badges only when a lab label or a date is present. A menu-source id by itself stays on the product panel so the grid does not grow a line on every card. This is free, same as the chem panel. Copy says “Menu source”, “Lab”, “Tested”, or “Packaged” — it does not name a retailer or make a medical or effects claim.
+
+| Step | Pass? |
+| --- | --- |
+| PDP with a menu-source id: floating panel shows **Menu source** plus that id. No retailer name in the line | |
+| PDP with a lab name on the payload: line includes **Lab** and that name | |
+| PDP with a test date: line says **Tested** and the date. A packaged/mfg date says **Packaged**, not Tested | |
+| PDP whose payload has none of those fields: no provenance strip and no empty “unknown lab” text | |
+| THC/THCA potency label, image URL, promo dates, and “2 days ago” do not become provenance | |
+| Listing with a lab or a date: one quiet line under the badges, not a new colored badge | |
+| Listing with only a menu-source id: no extra line on the card. The id still shows on the product panel | |
+| Strip and listing line do not name a retailer or make medical/effects claims | |
+
 ## SPA / scroll
 
 | Step | Pass? |
@@ -155,7 +177,7 @@ Copy must not name a retailer or make medical or effects claims.
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.9.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.10.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |

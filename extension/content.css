@@ -108,6 +108,70 @@
   border-top: 1px solid #eee;
 }
 
+.csi-terp-overlap {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #e4e7eb;
+  border-radius: 8px;
+  background: #fafafa;
+}
+
+.csi-terp-overlap-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.csi-terp-overlap-note {
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: #667;
+}
+
+.csi-terp-overlap-label {
+  margin: 8px 0 4px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: #667;
+}
+
+.csi-terp-overlap-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.csi-terp-overlap-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0;
+  max-width: 100%;
+  font-size: 12px;
+  line-height: 1.3;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: #fff;
+  border: 1px solid #e4e7eb;
+  color: #2c3e50;
+}
+
+.csi-terp-overlap-name {
+  font-weight: 600;
+}
+
+.csi-terp-overlap-where {
+  color: #6b7280;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 180px;
+}
+
 #cannabis-sage-comparison-sidebar table {
   width: 100%;
   border-collapse: collapse;

@@ -135,7 +135,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.7', 'version bump');
+assert(manifest.version === '1.3.8', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -188,7 +188,7 @@ assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.7', 'core version 1.3.7');
+assert(CSI.VERSION === '1.3.8', 'core version 1.3.8');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -220,5 +220,95 @@ assert(!renderBadgesFn.includes('buildWhatSageAddsChip'), 'listing badges stay c
 assert(pdpSrc.includes('CSI.ui.buildPdpHeader({ showClose: true })'), 'loaded PDP uses header helper');
 assert(pdpSrc.includes('CSI.ui.buildPdpHeader({ showClose: false })'), 'loading PDP includes chip');
 assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'PDP still refuses buy-column chem');
+
+// Compare tray terpene overlap (v1.3.8) — free, quiet empty/error, no brand or effects copy
+const COPY = CSI.ui.TERP_OVERLAP_COPY;
+const overlapCopy = Object.values(COPY).join(' ');
+assert(COPY.title === 'Terpene overlap', 'overlap title');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida/i.test(overlapCopy), 'no retailer brand in overlap copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(overlapCopy),
+  'no medical or effects claims in overlap copy'
+);
+const uiSrc = fs.readFileSync(path.join(ext, 'lib/csi-ui.js'), 'utf8');
+const overlapSrc = uiSrc.slice(uiSrc.indexOf('const TERP_OVERLAP_COPY'), uiSrc.indexOf('async function copyText'));
+assert(overlapSrc.includes('function summarizeTerpeneOverlap'), 'overlap summary lives in ui');
+assert(!/openUpgrade|features\?\s*\.\s*can|hasPro\(/.test(overlapSrc), 'overlap is not a Pro gate');
+assert(!overlapSrc.includes('csi-status-error'), 'overlap does not use the error banner');
+assert(uiSrc.includes('renderTerpeneOverlap(container, productData)'), 'sidebar renders overlap above the table');
+const featuresSrc = fs.readFileSync(path.join(ext, 'lib/csi-features.js'), 'utf8');
+assert(/compareTray:\s*true/.test(featuresSrc), 'compare stays free');
+
+const sharedPair = CSI.ui.summarizeTerpeneOverlap([
+  {
+    name: 'Alpha',
+    status: 'ok',
+    terpenes: [
+      { name: 'Limonene', percentage: 0.4 },
+      { name: 'Myrcene', percentage: 0.2 }
+    ]
+  },
+  { name: 'Beta', status: 'ok', terpenes: { limonene: '0.5%', Pinene: 0.1 } }
+]);
+assert(sharedPair.shared.length === 1 && sharedPair.shared[0] === 'Limonene', `shared ${sharedPair.shared}`);
+assert(
+  sharedPair.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Alpha'),
+  'unique myrcene on first pick'
+);
+assert(
+  sharedPair.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Beta'),
+  'unique pinene on second pick'
+);
+assert(sharedPair.note === '', 'no empty note when a terpene is shared');
+
+const partial = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'A', status: 'ok', terpenes: { Limonene: 1, Myrcene: 0.2, Pinene: 0.1 } },
+  { name: 'B', status: 'ok', terpenes: { Limonene: 0.4, Myrcene: 0.3 } },
+  { name: 'C', status: 'ok', terpenes: { Limonene: 0.2 } }
+]);
+assert(partial.shared.join(',') === 'Limonene', 'three-pick shared is limonene only');
+assert(
+  partial.partial.some((p) => p.name === 'Beta-Myrcene' && p.count === 2 && p.total === 3),
+  'myrcene is on some, not shared'
+);
+assert(partial.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'A'), 'pinene only on one');
+
+const totalsOnly = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'A', status: 'ok', terpenes: { 'Total Terpenes': 1.2 } },
+  { name: 'B', status: 'empty', terpenes: { 'Total Terpenes': 0 } }
+]);
+assert(totalsOnly.shared.length === 0 && totalsOnly.unique.length === 0, 'total-only is not a named terpene');
+assert(totalsOnly.note === COPY.noneNamed, 'quiet note when nothing named is listed');
+
+assert(
+  CSI.ui.summarizeTerpeneOverlap([{ name: 'A', status: 'ok', terpenes: { Limonene: 1 } }]).note ===
+    COPY.needAnother,
+  'one pick asks for another, quietly'
+);
+assert(
+  CSI.ui.summarizeTerpeneOverlap([
+    { name: 'A', status: 'error', terpenes: { Limonene: 1 }, url: 'https://www.sunnyside.shop/product/1' },
+    { name: 'B', status: 'error', fetchError: 'Fetch failed https://zenleafdispensaries.com/x' }
+  ]).note === COPY.allFailed,
+  'all failed stays a calm note and does not echo urls'
+);
+
+const mixed = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'A', status: 'ok', terpenes: { Limonene: 1, Myrcene: 0.2 } },
+  { name: 'B', status: 'ok', terpenes: { Limonene: 0.4 } },
+  { name: 'C', status: 'error', url: 'https://www.sunnyside.shop/product/9', terpenes: { Pinene: 1 } }
+]);
+assert(mixed.shared.includes('Limonene'), 'shared ignores the failed pick');
+assert(!mixed.unique.some((u) => u.name === 'Alpha-Pinene'), 'failed pick terpenes are not unique');
+assert(mixed.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'A'), 'unique among loaded picks');
+assert(mixed.note === COPY.oneFailed, 'quiet note that overlap uses loaded picks');
+assert(!/sunnyside|zenleaf/i.test(mixed.note), 'failed note has no retailer host');
+
+const noCommon = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'A', status: 'ok', terpenes: { Limonene: 0 } },
+  { name: 'B', status: 'ok', terpenes: { Limonene: 0.4, Myrcene: 0.2 } }
+]);
+assert(!noCommon.shared.includes('Limonene'), 'zero percent is not shared');
+assert(noCommon.note === COPY.noneShared, 'quiet note when nothing is in common');
 
 console.log('smoke-adapters: OK');

@@ -233,6 +233,159 @@
       .join('\n');
   }
 
+  /**
+   * Static compare-overlap copy. No retailer names, no medical or effects claims.
+   * Overlap ships with free compare — do not add an upgrade gate.
+   */
+  const TERP_OVERLAP_COPY = {
+    title: 'Terpene overlap',
+    shared: 'Shared',
+    unique: 'Only on one',
+    partial: 'On some',
+    noneShared: 'No terpenes in common.',
+    needAnother: 'Select another pick to see shared and unique terpenes.',
+    noneNamed: 'No named terpenes listed for these picks.',
+    noneNamedLoaded: 'No named terpenes listed on the picks that loaded.',
+    allFailed: 'Could not load chemistry for these picks.',
+    notEnoughLoaded: 'Not enough loaded picks to compare terpenes.',
+    oneFailed: 'One pick could not be loaded. Overlap uses the picks that did.',
+    someFailed: 'Some picks could not be loaded. Overlap uses the picks that did.'
+  };
+
+  function namedTerpeneMap(terpenes) {
+    const map = CSI.normalizeTerpeneMap(terpenes);
+    const named = {};
+    Object.entries(map).forEach(([name, pct]) => {
+      if (/total\s*terpenes?/i.test(name)) return;
+      if (!(pct > 0)) return;
+      named[name] = pct;
+    });
+    return named;
+  }
+
+  /**
+   * Shared = named terpene listed on every loaded pick.
+   * Unique = listed on exactly one loaded pick.
+   * On some = listed on more than one, but not all (three-pick tray).
+   * Failed fetches are left out of the sets. Total-only rows are not names.
+   */
+  function summarizeTerpeneOverlap(products) {
+    const COPY = TERP_OVERLAP_COPY;
+    const list = Array.isArray(products) ? products : [];
+    const loaded = list.filter((p) => p && p.status !== 'error');
+    const failedCount = list.length - loaded.length;
+    const summary = {
+      shared: [],
+      unique: [],
+      partial: [],
+      failedCount,
+      comparedCount: loaded.length,
+      note: ''
+    };
+
+    if (list.length < 2) {
+      summary.note = COPY.needAnother;
+      return summary;
+    }
+    if (loaded.length < 2) {
+      summary.note = loaded.length === 0 ? COPY.allFailed : COPY.notEnoughLoaded;
+      return summary;
+    }
+
+    const namedMaps = loaded.map((p, i) => ({
+      label: String(p.name || '').trim() || `Pick ${i + 1}`,
+      map: namedTerpeneMap(p.terpenes)
+    }));
+
+    if (!namedMaps.some((m) => Object.keys(m.map).length)) {
+      summary.note = failedCount ? COPY.noneNamedLoaded : COPY.noneNamed;
+      return summary;
+    }
+
+    const names = new Set();
+    namedMaps.forEach((m) => Object.keys(m.map).forEach((n) => names.add(n)));
+    const total = namedMaps.length;
+    Array.from(names)
+      .sort((a, b) => a.localeCompare(b))
+      .forEach((name) => {
+        const holders = namedMaps.filter((m) => m.map[name] > 0);
+        if (holders.length === total) summary.shared.push(name);
+        else if (holders.length === 1) summary.unique.push({ name, label: holders[0].label });
+        else summary.partial.push({ name, count: holders.length, total });
+      });
+
+    const notes = [];
+    if (failedCount === 1) notes.push(COPY.oneFailed);
+    else if (failedCount > 1) notes.push(COPY.someFailed);
+    if (!summary.shared.length) notes.push(COPY.noneShared);
+    summary.note = notes.join(' ');
+    return summary;
+  }
+
+  function appendOverlapGroup(block, label, chips) {
+    if (!chips.length) return;
+    const heading = document.createElement('p');
+    heading.className = 'csi-terp-overlap-label';
+    heading.textContent = label;
+    const row = document.createElement('div');
+    row.className = 'csi-terp-overlap-chips';
+    chips.forEach((chip) => row.appendChild(chip));
+    block.appendChild(heading);
+    block.appendChild(row);
+  }
+
+  function overlapChip(name, where) {
+    const chip = document.createElement('span');
+    chip.className = 'csi-terp-overlap-chip';
+    const nameEl = document.createElement('span');
+    nameEl.className = 'csi-terp-overlap-name';
+    nameEl.setAttribute('data-csi-terp', name);
+    nameEl.textContent = name;
+    chip.appendChild(nameEl);
+    if (where) {
+      const whereEl = document.createElement('span');
+      whereEl.className = 'csi-terp-overlap-where';
+      whereEl.textContent = ` · ${where}`;
+      chip.appendChild(whereEl);
+    }
+    return chip;
+  }
+
+  function renderTerpeneOverlap(container, productData) {
+    const COPY = TERP_OVERLAP_COPY;
+    const summary = summarizeTerpeneOverlap(productData);
+    const block = document.createElement('section');
+    block.className = 'csi-terp-overlap';
+    block.setAttribute('data-csi-terp-overlap', '1');
+    const title = document.createElement('h3');
+    title.className = 'csi-terp-overlap-title';
+    title.textContent = COPY.title;
+    block.appendChild(title);
+    if (summary.note) {
+      const note = document.createElement('p');
+      note.className = 'csi-terp-overlap-note';
+      note.textContent = summary.note;
+      block.appendChild(note);
+    }
+    appendOverlapGroup(
+      block,
+      COPY.shared,
+      summary.shared.map((name) => overlapChip(name))
+    );
+    appendOverlapGroup(
+      block,
+      COPY.unique,
+      summary.unique.map((item) => overlapChip(item.name, item.label))
+    );
+    appendOverlapGroup(
+      block,
+      COPY.partial,
+      summary.partial.map((item) => overlapChip(item.name, `${item.count} of ${item.total}`))
+    );
+    container.appendChild(block);
+    return summary;
+  }
+
   async function copyText(text) {
     try {
       await navigator.clipboard.writeText(text);
@@ -365,6 +518,7 @@
     }
 
     function renderTable(container, productData, tasteMap) {
+      renderTerpeneOverlap(container, productData);
       const table = document.createElement('table');
       const header = document.createElement('tr');
       header.style.cssText = `background:${CSI.ACCENT_ORANGE};color:#fff;`;
@@ -463,18 +617,10 @@
       addRow(
         'Status',
         productData.map((p) =>
-          p.status === 'error' ? p.fetchError || 'Error' : p.status === 'empty' ? 'No chem data' : 'OK'
+          p.status === 'error' ? 'Could not load' : p.status === 'empty' ? 'No chem data' : 'OK'
         ),
         { always: true }
       );
-
-      const failed = productData.filter((p) => p.status === 'error');
-      if (failed.length) {
-        const note = document.createElement('p');
-        note.className = 'csi-status csi-status-error';
-        note.textContent = `Some products could not be loaded: ${failed.map((p) => p.name || p.url).join(', ')}`;
-        container.appendChild(note);
-      }
 
       container.appendChild(table);
       CSI.glossary?.wireTerpeneClicks(container);
@@ -485,6 +631,8 @@
 
   CSI.ui = {
     WHAT_SAGE_ADDS,
+    TERP_OVERLAP_COPY,
+    summarizeTerpeneOverlap,
     formatCannabinoids,
     formatTerpenes,
     buildWhatSageAddsChip,

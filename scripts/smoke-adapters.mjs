@@ -294,12 +294,12 @@ const sharedPair = CSI.ui.summarizeTerpeneOverlap([
 ]);
 assert(sharedPair.shared.length === 1 && sharedPair.shared[0] === 'Limonene', `shared ${sharedPair.shared}`);
 assert(
-  sharedPair.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 0.4%'),
-  'unique myrcene on first pick uses chem lead'
+  sharedPair.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 0.4% · Alpha'),
+  'unique myrcene on first pick uses chem lead plus name'
 );
 assert(
-  sharedPair.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 0.5%'),
-  'unique pinene on second pick uses chem lead'
+  sharedPair.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 0.5% · Beta'),
+  'unique pinene on second pick uses chem lead plus name'
 );
 assert(sharedPair.note === '', 'no empty note when a terpene is shared');
 
@@ -313,7 +313,7 @@ assert(
   partial.partial.some((p) => p.name === 'Beta-Myrcene' && p.count === 2 && p.total === 3),
   'myrcene is on some, not shared'
 );
-assert(partial.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 1%'), 'pinene only on one uses chem lead');
+assert(partial.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 1% · A'), 'pinene only on one uses chem lead plus name');
 
 const totalsOnly = CSI.ui.summarizeTerpeneOverlap([
   { name: 'A', status: 'ok', terpenes: { 'Total Terpenes': 1.2 } },
@@ -342,7 +342,7 @@ const mixed = CSI.ui.summarizeTerpeneOverlap([
 ]);
 assert(mixed.shared.includes('Limonene'), 'shared ignores the failed pick');
 assert(!mixed.unique.some((u) => u.name === 'Alpha-Pinene'), 'failed pick terpenes are not unique');
-assert(mixed.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 1%'), 'unique among loaded picks uses chem lead');
+assert(mixed.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 1% · A'), 'unique among loaded picks uses chem lead plus name');
 assert(mixed.note === COPY.oneFailed, 'quiet note that overlap uses loaded picks');
 assert(!/sunnyside|zenleaf/i.test(mixed.note), 'failed note has no retailer host');
 
@@ -837,7 +837,74 @@ assert(chemHeaderHtml.indexOf('Limonene') < chemHeaderHtml.indexOf('Beta Label')
 assert(CSI.ui.buildChemOverStrainHeaderHtml({ name: 'Only Name' }).includes('csi-chem-secondary'), 'name only is secondary');
 assert(!CSI.ui.buildChemOverStrainHeaderHtml({ name: 'Only Name' }).includes('csi-chem-lead'), 'no invented chem lead');
 assert(CSI.ui.buildTooltipContent({ status: 'loading' }).includes('Loading listed chemistry'), 'hover loading is listed chem');
+assert(
+  CSI.ui.formatChemLead({ cannabinoids: { THCA: 30 } }) === 'THCA 30.0%',
+  'THCA-only lead is labeled THCA, not THC'
+);
+assert(
+  CSI.ui.formatChemLead({ cannabinoids: { THC: 22, THCA: 30 } }) === 'THC 22.0%',
+  'mixed listing prefers listed THC and does not rename THCA'
+);
+assert(
+  CSI.ui.formatChemLead({ cannabinoids: { totalTHC: 26 } }) === 'Total THC 26.0%',
+  'totalTHC-only lead keeps the total label'
+);
+assert(
+  CSI.readListedThcDisplay({ THCA: 30, THC: 22 }).label === 'THC' &&
+    CSI.readListedThcDisplay({ THCA: 30 }).label === 'THCA',
+  'listed display labels match the published cannabinoid'
+);
+const thcaBadge = CSI.ui.buildListingBadgeChips({ product: { cannabinoids: { THCA: 28 } }, status: 'ok' }).join('');
+assert(thcaBadge.includes('THCA 28.0%') && !thcaBadge.includes('THC 28.0%'), 'listing badge does not label THCA as THC');
+const mixedBadge = CSI.ui.buildListingBadgeChips({
+  product: { cannabinoids: { THC: 22, THCA: 30 } },
+  status: 'ok'
+}).join('');
+assert(mixedBadge.includes('THC 22.0%') && !mixedBadge.includes('THCA 30'), 'listing badge uses listed THC when both exist');
+assert(
+  CSI.ui.buildTooltipContent({ status: 'error', error: 'Fetch failed' }).includes(
+    'Could not load listed chemistry. Fetch failed'
+  ),
+  'hover error shows listed-chemistry status before the detail'
+);
+assert(
+  CSI.ui.formatStatusError('Fetch failed') === 'Could not load listed chemistry. Fetch failed',
+  'status error helper prefixes details'
+);
+assert(
+  CSI.ui.formatStatusError(CSI.ui.STATUS_COPY.loadError) === CSI.ui.STATUS_COPY.loadError,
+  'status error helper does not duplicate the status copy'
+);
+assert(pdpSrc.includes('CSI.ui.formatStatusError(product.error)'), 'PDP error uses shared status-then-detail copy');
 assert(pdpSrc.includes('CSI.ui.STATUS_COPY.loading'), 'PDP loading uses shared chem status copy');
+const cssSrc = fs.readFileSync(path.join(ext, 'content.css'), 'utf8');
+assert(
+  /#cannabis-sage-comparison-sidebar th \.csi-chem-secondary[\s\S]*?color:\s*rgba\(255,\s*255,\s*255/.test(cssSrc),
+  'compare header secondary name contrasts on orange'
+);
+const landingSrc = fs.readFileSync(path.join(root, 'web/app/page.tsx'), 'utf8');
+assert(
+  landingSrc.includes('floating chemistry panel') && !landingSrc.includes('inline chemistry panel'),
+  'landing PDP screenshot alt matches floating caption'
+);
+const sameChemUnique = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'Alpha', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Myrcene: 0.2 } },
+  { name: 'Beta', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Pinene: 0.1 } }
+]);
+assert(
+  sameChemUnique.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 0.5% · THC 22.0% · Alpha') &&
+    sameChemUnique.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 0.5% · THC 22.0% · Beta'),
+  'matching chem leads stay tied to a named pick'
+);
+const twinNameUnique = CSI.ui.summarizeTerpeneOverlap([
+  { name: 'House', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Myrcene: 0.2 } },
+  { name: 'House', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Pinene: 0.1 } }
+]);
+assert(
+  twinNameUnique.unique.some((u) => u.name === 'Beta-Myrcene' && /Pick 1/.test(u.label)) &&
+    twinNameUnique.unique.some((u) => u.name === 'Alpha-Pinene' && /Pick 2/.test(u.label)),
+  'identical name plus chem still gets a distinct pick number'
+);
 assert(uiSrc.includes('fillChemOverStrainHeader(th, p)'), 'compare columns use chem-over-strain headers');
 assert(!uiSrc.includes('Product Comparison'), 'compare sidebar dropped product-title framing');
 assert(!/\bstrain\b/i.test(CSI.ui.PREFERENCE_MATCH_COPY.lead), 'preference lead is not strain-framed');

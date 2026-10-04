@@ -240,7 +240,7 @@
 
     let body = '';
     if (product.status === 'error') {
-      body = `<div class="csi-status csi-status-error">${CSI.escapeHtml(product.error || CSI.ui.STATUS_COPY.loadError)}</div>`;
+      body = `<div class="csi-status csi-status-error">${CSI.escapeHtml(CSI.ui.formatStatusError(product.error))}</div>`;
     } else if (product.status === 'empty') {
       body = `<div class="csi-status csi-status-empty">${CSI.escapeHtml(CSI.ui.STATUS_COPY.empty)}</div>`;
     } else {

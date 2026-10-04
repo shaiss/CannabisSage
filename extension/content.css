@@ -800,10 +800,12 @@
 /* Product/strain titles Sage repeats stay quieter than chem leads */
 #cannabis-sage-comparison-sidebar th .csi-chem-lead {
   font-size: 12px;
+  color: #fff;
 }
 
 #cannabis-sage-comparison-sidebar th .csi-chem-secondary {
   font-weight: 500;
+  color: rgba(255, 255, 255, 0.82);
 }
 
 a.csi-similar-chem-line:hover {

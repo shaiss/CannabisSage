@@ -239,24 +239,34 @@
   }
 
   /**
-   * THC% from listed labels: THC, then totalTHC, then THCA if that is all
-   * the menu published. Distinct from readThcPercent (THCA-first for $/mg).
+   * Listed THC-family value for UI labels. Prefers delta-9 THC, then totalTHC,
+   * then THCA. The returned label is what the menu published — THCA is never
+   * named THC. Distinct from readThcPercent (THCA-first for $/mg).
    */
-  function readListedThcPercent(cannabinoids) {
+  function readListedThcDisplay(cannabinoids) {
     if (!cannabinoids) return null;
     const candidates = [
-      cannabinoids.THC,
-      cannabinoids.thc,
-      cannabinoids.totalTHC,
-      cannabinoids.total_thc,
-      cannabinoids.THCA,
-      cannabinoids.thca
+      ['THC', cannabinoids.THC],
+      ['THC', cannabinoids.thc],
+      ['Total THC', cannabinoids.totalTHC],
+      ['Total THC', cannabinoids.total_thc],
+      ['THCA', cannabinoids.THCA],
+      ['THCA', cannabinoids.thca]
     ];
-    for (const c of candidates) {
-      const n = parsePercent(c);
-      if (n !== null && n > 0) return n;
+    for (const [label, raw] of candidates) {
+      const n = parsePercent(raw);
+      if (n !== null && n > 0) return { label, percent: n };
     }
     return null;
+  }
+
+  /**
+   * Numeric listed THC% (same preference as readListedThcDisplay) for
+   * similarity math. Distinct from readThcPercent (THCA-first for $/mg).
+   */
+  function readListedThcPercent(cannabinoids) {
+    const listed = readListedThcDisplay(cannabinoids);
+    return listed ? listed.percent : null;
   }
 
   function activeAdapter() {
@@ -944,6 +954,7 @@
     topTerpene,
     readThcPercent,
     readThcaPercent,
+    readListedThcDisplay,
     readListedThcPercent,
     buildProductUrl,
     extractProductData,

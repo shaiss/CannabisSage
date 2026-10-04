@@ -85,7 +85,7 @@ export default function HomePage() {
           <figure className="proof-card">
             <Image
               src="/screenshots/pdp.png"
-              alt="Product detail page with inline chemistry panel and compare button"
+              alt="Product detail page with floating chemistry panel and compare button"
               width={960}
               height={540}
               className="proof-shot"

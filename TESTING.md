@@ -32,10 +32,10 @@ For each URL, confirm badges, Compare Select, filter bar, and hover tooltip:
 Checks per listing:
 
 - [ ] Filter bar visible; title includes **Sunnyside**
-- [ ] **What CannabisSage adds** chip is present **once** in the filter bar (not repeated on each card). One line: “Adds chem badges and compare beside the store page”. Expand is optional and does not name the retailer
+- [ ] **What CannabisSage adds** chip is present **once** in the filter bar (not repeated on each card). One line: chem badges, cannabinoids, primary terps, and compare. Expand is optional, does not name the retailer, and says retailer titles stay on the menu
 - [ ] Free plan still shows the chip; chem badges and compare are not hidden behind Pro. No extra Upgrade button inside the chip (existing filter-bar Upgrade stays)
 - [ ] Cards show **top-terp badge** when we have terp data (Sunnyside already shows THC/CBD on-card — no duplicate cann badges)
-- [ ] Hover shows loading → profile or clear empty/error message (never silent)
+- [ ] Hover shows loading → listed chemistry or clear empty/error message (never silent)
 - [ ] “Map match” appears when score ≥ threshold
 - [ ] Sale / `$/mg` badges only when DOM provides sale cues and weight+price+THC
 
@@ -175,7 +175,7 @@ Nothing is rendered when there are no preferred terpenes, when none of those nam
 
 The gate is the existing `tasteMap` feature, the same one as “Map match” on listing cards. It is Pro today. This does not add a second lock. If taste-map is enabled for the plan, the match shows; if it is not, the panel is omitted.
 
-Copy says “Preference match” and lists the preferred terpenes that are actually on the product. It does not name a retailer or make a medical or effects claim. An avoid name appears only when that terpene is listed on the product.
+Copy says “Preference match” and lists the preferred terpenes in this listed chem. It does not name a retailer or make a medical or effects claim. An avoid name appears only when that terpene is listed on the product.
 
 | Step | Pass? |
 | --- | --- |
@@ -222,7 +222,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.15.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.16.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -248,6 +248,22 @@ Free, like compare overlap. Missing cache or too few neighbors: one calm note �
 | Copy does not name a retailer or make medical/effects claims | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
 
+## Chem-over-strain (v1.3.16+)
+
+Sage-added copy and labels lead with listed chemistry (cannabinoids, primary terps, chem similarity). Retailer product titles stay on the store page; when Sage repeats a name (compare columns, similar-by-chem rows) it is quieter than the chem lead. No invented lab numbers. No medical / effects claims. Free chem view is unchanged.
+
+| Step | Pass? |
+| --- | --- |
+| Listing chip summary names cannabinoids / primary terps / compare, not “strain” | |
+| Hover loading says **Loading listed chemistry…** (not “profile”) | |
+| Listing badges still lead with THC / top terp; retailer card title is untouched | |
+| PDP loading / empty / error use listed-chemistry wording; panel body is chem readout | |
+| Similar-by-chem rows still lead with terp/THC; name stays secondary | |
+| Compare sidebar title is **Chem comparison**; column headers lead with chem, name quieter | |
+| Compare overlap “only on one” labels use chem lead, not the strain name | |
+| Copy does not name a retailer or make medical/effects claims | |
+| `node scripts/smoke-adapters.mjs` exits 0 | |
+
 ## What CannabisSage adds (v1.3.7+)
 
 One calm chip, free and Pro. Copy must not name a retailer or make medical/effects claims.
@@ -256,7 +272,7 @@ One calm chip, free and Pro. Copy must not name a retailer or make medical/effec
 | --- | --- |
 | Listing: chip once in the filter bar, next to the title — not on every badge row | |
 | PDP: chip inside the floating panel header (not the buy column) | |
-| Expand mentions chem badges, compare, and optional Pro tools; chemistry still visible on Free | |
+| Expand mentions listed cannabinoids, primary terps, compare, and optional Pro tools; chemistry still visible on Free | |
 | Chip has no Upgrade control (soft Pro line only). Existing Upgrade on the Free filter bar is unchanged | |
 
 ## Remote denylist (v1.3.6+)

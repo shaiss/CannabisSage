@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.15', 'version bump');
+assert(manifest.version === '1.3.16', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,10 +207,13 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.15', 'core version 1.3.15');
+assert(CSI.VERSION === '1.3.16', 'core version 1.3.16');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
+assert(/cannabinoids/i.test(addsCopy) && /primary terps/i.test(addsCopy), 'chip prefers chem labels');
+assert(!/\bstrain\b/i.test(addsCopy), 'chip does not frame by strain name');
+assert(!/hover profile/i.test(addsCopy), 'chip does not call hover a product profile');
 assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
 assert(!/sunnyside|zen\s*leaf|zenleaf|terravida/i.test(addsCopy), 'no retailer brand in chip copy');
 assert(
@@ -291,12 +294,12 @@ const sharedPair = CSI.ui.summarizeTerpeneOverlap([
 ]);
 assert(sharedPair.shared.length === 1 && sharedPair.shared[0] === 'Limonene', `shared ${sharedPair.shared}`);
 assert(
-  sharedPair.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Alpha'),
-  'unique myrcene on first pick'
+  sharedPair.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 0.4%'),
+  'unique myrcene on first pick uses chem lead'
 );
 assert(
-  sharedPair.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Beta'),
-  'unique pinene on second pick'
+  sharedPair.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 0.5%'),
+  'unique pinene on second pick uses chem lead'
 );
 assert(sharedPair.note === '', 'no empty note when a terpene is shared');
 
@@ -310,7 +313,7 @@ assert(
   partial.partial.some((p) => p.name === 'Beta-Myrcene' && p.count === 2 && p.total === 3),
   'myrcene is on some, not shared'
 );
-assert(partial.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'A'), 'pinene only on one');
+assert(partial.unique.some((u) => u.name === 'Alpha-Pinene' && u.label === 'Limonene 1%'), 'pinene only on one uses chem lead');
 
 const totalsOnly = CSI.ui.summarizeTerpeneOverlap([
   { name: 'A', status: 'ok', terpenes: { 'Total Terpenes': 1.2 } },
@@ -339,7 +342,7 @@ const mixed = CSI.ui.summarizeTerpeneOverlap([
 ]);
 assert(mixed.shared.includes('Limonene'), 'shared ignores the failed pick');
 assert(!mixed.unique.some((u) => u.name === 'Alpha-Pinene'), 'failed pick terpenes are not unique');
-assert(mixed.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'A'), 'unique among loaded picks');
+assert(mixed.unique.some((u) => u.name === 'Beta-Myrcene' && u.label === 'Limonene 1%'), 'unique among loaded picks uses chem lead');
 assert(mixed.note === COPY.oneFailed, 'quiet note that overlap uses loaded picks');
 assert(!/sunnyside|zenleaf/i.test(mixed.note), 'failed note has no retailer host');
 
@@ -800,6 +803,45 @@ const loadMediansSrc = storageSrc.slice(
   storageSrc.indexOf('async function saveCategoryMedians')
 );
 assert(/normalizeHostName\(snap\.host\)/.test(loadMediansSrc), 'category medians host is www-insensitive');
+
+// Chem-over-strain (v1.3.16) — Sage labels lead with listed chem; names stay secondary
+assert(CSI.ui.STATUS_COPY.loading === 'Loading listed chemistry…', 'loading is chem, not profile');
+assert(CSI.ui.STATUS_COPY.loadError === 'Could not load listed chemistry.', 'error is chem, not profile');
+assert(CSI.ui.COMPARE_COPY.title === 'Chem comparison', 'compare title is chem-first');
+assert(!/\bstrain\b/i.test(Object.values(CSI.ui.STATUS_COPY).join(' ')), 'status copy has no strain framing');
+assert(!/\bstrain\b/i.test(Object.values(CSI.ui.COMPARE_COPY).join(' ')), 'compare copy has no strain framing');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(
+    `${CSI.ui.STATUS_COPY.loading} ${CSI.ui.COMPARE_COPY.title}`
+  ),
+  'chem-over-strain copy has no medical or effects claims'
+);
+assert(CSI.ui.formatChemLead({}) === '', 'missing chem is omitted, not invented');
+assert(CSI.ui.formatChemLead({ cannabinoids: { THC: 0 }, terpenes: { Limonene: 0 } }) === '', 'zero chem is omitted');
+assert(
+  CSI.ui.formatChemLead({
+    name: 'Blue Dream',
+    cannabinoids: { THC: 22 },
+    terpenes: { Limonene: 0.55, Myrcene: 0.2 }
+  }) === 'Limonene 0.55% · THC 22.0%',
+  'chem lead is terp then THC'
+);
+assert(!/Blue Dream/.test(CSI.ui.formatChemLead({ name: 'Blue Dream', cannabinoids: { THC: 22 } })), 'lead excludes strain name');
+const chemHeaderHtml = CSI.ui.buildChemOverStrainHeaderHtml({
+  name: 'Beta Label',
+  cannabinoids: { THC: 21 },
+  terpenes: { Limonene: 0.5 }
+});
+assert(chemHeaderHtml.includes('csi-chem-lead') && chemHeaderHtml.includes('csi-chem-secondary'), 'header has chem then name');
+assert(chemHeaderHtml.indexOf('Limonene') < chemHeaderHtml.indexOf('Beta Label'), 'compare header chem before name');
+assert(CSI.ui.buildChemOverStrainHeaderHtml({ name: 'Only Name' }).includes('csi-chem-secondary'), 'name only is secondary');
+assert(!CSI.ui.buildChemOverStrainHeaderHtml({ name: 'Only Name' }).includes('csi-chem-lead'), 'no invented chem lead');
+assert(CSI.ui.buildTooltipContent({ status: 'loading' }).includes('Loading listed chemistry'), 'hover loading is listed chem');
+assert(pdpSrc.includes('CSI.ui.STATUS_COPY.loading'), 'PDP loading uses shared chem status copy');
+assert(uiSrc.includes('fillChemOverStrainHeader(th, p)'), 'compare columns use chem-over-strain headers');
+assert(!uiSrc.includes('Product Comparison'), 'compare sidebar dropped product-title framing');
+assert(!/\bstrain\b/i.test(CSI.ui.PREFERENCE_MATCH_COPY.lead), 'preference lead is not strain-framed');
+assert(/listed chem/.test(CSI.ui.PREFERENCE_MATCH_COPY.lead), 'preference lead names listed chem');
 
 // Soft Pro unlock mid-browse (v1.3.12) — after chem is visible, not a wall
 const softCopy = Object.values(CSI.ui.SOFT_UNLOCK_COPY).join(' ');

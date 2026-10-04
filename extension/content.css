@@ -773,6 +773,22 @@
   margin-bottom: 0;
 }
 
+.csi-chem-lead {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.csi-chem-secondary,
+.csi-similar-chem-name {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #889;
+}
+
 .csi-similar-chem-line {
   display: block;
   font-size: 12px;
@@ -781,17 +797,18 @@
   text-decoration: none;
 }
 
+/* Product/strain titles Sage repeats stay quieter than chem leads */
+#cannabis-sage-comparison-sidebar th .csi-chem-lead {
+  font-size: 12px;
+}
+
+#cannabis-sage-comparison-sidebar th .csi-chem-secondary {
+  font-weight: 500;
+}
+
 a.csi-similar-chem-line:hover {
   color: #ff6b35;
   text-decoration: underline;
-}
-
-.csi-similar-chem-name {
-  display: block;
-  margin-top: 1px;
-  font-size: 11px;
-  font-weight: 500;
-  color: #889;
 }
 
 /* Push page content slightly when filter bar present */

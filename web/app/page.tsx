@@ -91,8 +91,8 @@ export default function HomePage() {
               className="proof-shot"
             />
             <figcaption>
-              <strong>Product page</strong> — Inline chem summary, sale/value badges, and add-to-compare
-              on the PDP you already have open.
+              <strong>Product page</strong> — Floating chem panel (cannabinoids and primary terps). The
+              retailer&apos;s product title stays on the page.
             </figcaption>
           </figure>
           <figure className="proof-card">
@@ -174,20 +174,20 @@ export default function HomePage() {
       <section className="section section-alt" id="whats-next" aria-labelledby="whats-next-heading">
         <h2 id="whats-next-heading">Coming soon</h2>
         <p>
-          Next up on product pages—chem-first shopping tools. No ship-date guarantees; we ship when
-          each piece is solid.
+          Listing and product-page labels now lead with listed chemistry. Next: match that chem when
+          you change stores. No ship-date guarantees; we ship when each piece is solid.
         </p>
         <ul className="fomo-list">
           <li>
-            <strong>Match across stores</strong> — Soft-match the same chem profile when you jump
+            <strong>Match across stores</strong> — Soft-match the same listed chem when you jump
             retailers.
           </li>
           <li>
-            <strong>$/mg multi-store compare</strong> — Side-by-side value across supported menus.
+            <strong>Store switcher + polish</strong> — Move between supported menus without losing
+            chem context.
           </li>
           <li>
-            <strong>Similar-by-chem when something is OOS</strong> — Same-menu neighbors by chemistry
-            when a pick is gone.
+            <strong>$/mg multi-store compare</strong> — Side-by-side value across supported menus.
           </li>
         </ul>
         <p className="fomo-always muted">

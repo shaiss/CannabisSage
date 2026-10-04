@@ -133,7 +133,7 @@ assert(cfg.denylistPath === '/denylist.json', 'denylistPath unchanged');
 
 const ext = path.join(root, 'extension');
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.15', 'extension 1.3.15');
+assert(manifest.version === '1.3.16', 'extension 1.3.16');
 assert(
   manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
   'csi-partners.js in content scripts'

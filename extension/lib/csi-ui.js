@@ -73,10 +73,83 @@
    * Same copy on listing and PDP so the chip never names the store.
    */
   const WHAT_SAGE_ADDS = {
-    summary: 'Adds chem badges and compare beside the store page',
+    summary: 'Adds chem badges — cannabinoids, primary terps, and compare — beside the store page',
     detail:
-      'Badges, a hover profile, and compare sit beside this menu — they do not replace the store page. Filters, taste-map, and more supported stores are optional Pro tools. Published chemistry stays available without Pro.'
+      'Listed cannabinoids, primary terps, hover chem, and compare sit beside this menu — they do not replace the store page. Retailer titles stay on the menu. Filters, taste-map, and more supported stores are optional Pro tools. Published chemistry stays available without Pro.'
   };
+
+  const STATUS_COPY = {
+    loading: 'Loading listed chemistry…',
+    loadError: 'Could not load listed chemistry.',
+    empty: 'No cannabinoid or terpene details were published for this product.'
+  };
+
+  const COMPARE_COPY = {
+    title: 'Chem comparison',
+    loading: 'Loading listed chemistry…'
+  };
+
+  function formatListedPercent(value) {
+    const num = Number(value);
+    if (!Number.isFinite(num)) return '';
+    return num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+  }
+
+  /**
+   * Lead label Sage adds: primary listed terp + listed THC-family %.
+   * Labels the cannabinoid the menu published (THC / Total THC / THCA).
+   * Omits missing numbers. Product/strain names are not part of the lead.
+   */
+  function formatListedThcLead(cannabinoids) {
+    const listed = CSI.readListedThcDisplay
+      ? CSI.readListedThcDisplay(cannabinoids)
+      : null;
+    if (!listed) return '';
+    return `${listed.label} ${listed.percent.toFixed(1)}%`;
+  }
+
+  function readDelta9ThcPercent(cannabinoids) {
+    if (!cannabinoids) return null;
+    for (const raw of [cannabinoids.THC, cannabinoids.thc]) {
+      const n = CSI.parsePercent(raw);
+      if (n != null && n > 0) return n;
+    }
+    return null;
+  }
+
+  function formatChemLead(row) {
+    const bits = [];
+    const top = CSI.topTerpene(row && row.terpenes);
+    if (top && top.name) {
+      const shown = formatListedPercent(top.percentage);
+      bits.push(shown ? `${top.name} ${shown}%` : top.name);
+    }
+    const thcLead = formatListedThcLead(row && row.cannabinoids);
+    if (thcLead) bits.push(thcLead);
+    return bits.join(' · ');
+  }
+
+  function formatStatusError(detail) {
+    const status = STATUS_COPY.loadError;
+    const extra = String(detail || '').trim();
+    if (!extra || extra === status) return status;
+    return `${status} ${extra}`;
+  }
+
+  function buildChemOverStrainHeaderHtml(product) {
+    const chem = formatChemLead(product);
+    const name = String(product && product.name ? product.name : '').trim();
+    const parts = [];
+    if (chem) parts.push(`<span class="csi-chem-lead">${CSI.escapeHtml(chem)}</span>`);
+    if (name) parts.push(`<span class="csi-chem-secondary">${CSI.escapeHtml(name)}</span>`);
+    return parts.join('');
+  }
+
+  function fillChemOverStrainHeader(th, product) {
+    if (!th) return;
+    th.innerHTML = buildChemOverStrainHeaderHtml(product);
+    if (!th.innerHTML) th.textContent = 'Pick';
+  }
 
   function buildWhatSageAddsChip() {
     return `<details class="csi-adds-chip" data-csi-adds="1"><summary>${CSI.escapeHtml(
@@ -125,7 +198,7 @@
    */
   function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
     const chips = [];
-    const thc = CSI.readThcPercent(product?.cannabinoids);
+    const thcLead = formatListedThcLead(product?.cannabinoids);
     const cbd = CSI.parsePercent(product?.cannabinoids?.CBD ?? product?.cannabinoids?.cbd);
     const top = CSI.topTerpene(product?.terpenes);
     const suppressCann = shouldSuppressListingCannabinoidBadges(adapter, cardEl);
@@ -139,13 +212,13 @@
       );
     } else {
       const hasVisibleChem =
-        !!top || (!suppressCann && (thc != null || (cbd != null && cbd > 0)));
+        !!top || (!suppressCann && (thcLead || (cbd != null && cbd > 0)));
       if (status === 'empty' || !hasVisibleChem) {
         chips.push(`<span class="csi-badge csi-badge-empty">No chem data</span>`);
       } else {
         if (!suppressCann) {
-          if (thc != null) {
-            chips.push(`<span class="csi-badge csi-badge-thc">THC ${thc.toFixed(1)}%</span>`);
+          if (thcLead) {
+            chips.push(`<span class="csi-badge csi-badge-thc">${CSI.escapeHtml(thcLead)}</span>`);
           }
           if (cbd != null && cbd > 0) {
             chips.push(`<span class="csi-badge csi-badge-thc">CBD ${cbd.toFixed(1)}%</span>`);
@@ -182,13 +255,13 @@
       return `<div class="csi-status csi-status-error">No product data available.</div>`;
     }
     if (insights.status === 'loading') {
-      return `<div class="csi-status csi-status-loading">Loading profile…</div>`;
+      return `<div class="csi-status csi-status-loading">${CSI.escapeHtml(STATUS_COPY.loading)}</div>`;
     }
     if (insights.status === 'error' || insights.error) {
-      return `<div class="csi-status csi-status-error">${CSI.escapeHtml(insights.error || 'Could not load product details.')}</div>`;
+      return `<div class="csi-status csi-status-error">${CSI.escapeHtml(formatStatusError(insights.error))}</div>`;
     }
     if (insights.status === 'empty') {
-      return `<div class="csi-status csi-status-empty">No cannabinoid or terpene details were published for this product.</div>`;
+      return `<div class="csi-status csi-status-empty">${CSI.escapeHtml(STATUS_COPY.empty)}</div>`;
     }
     let html = `${formatCannabinoids(insights.cannabinoids)}<br><br>${formatTerpenes(insights.terpenes)}`;
     if (extra.matchScore != null) {
@@ -322,7 +395,7 @@
    */
   const PREFERENCE_MATCH_COPY = {
     chip: 'Preference match',
-    lead: 'Preferred terpenes on this product',
+    lead: 'Preferred terpenes in this listed chem',
     avoid: 'Also on your avoid list'
   };
 
@@ -399,15 +472,7 @@
   }
 
   function similarChemLine(row) {
-    const bits = [];
-    const top = CSI.topTerpene(row && row.terpenes);
-    if (top && top.name) {
-      const shown = formatListedPercent(top.percentage);
-      bits.push(shown ? `${top.name} ${shown}%` : top.name);
-    }
-    const thc = CSI.readListedThcPercent(row && row.cannabinoids);
-    if (thc != null) bits.push(`THC ${thc.toFixed(1)}%`);
-    return bits.join(' · ');
+    return formatChemLead(row);
   }
 
   function buildSimilarByChemPanel(product) {
@@ -431,7 +496,7 @@
           : `<span class="csi-similar-chem-line">${CSI.escapeHtml(chem)}</span>`;
         const name = String(row.name || '').trim();
         const nameHtml = name
-          ? `<span class="csi-similar-chem-name">${CSI.escapeHtml(name)}</span>`
+          ? `<span class="csi-similar-chem-name csi-chem-secondary">${CSI.escapeHtml(name)}</span>`
           : '';
         const shared = Array.isArray(row.sharedTerpenes) ? row.sharedTerpenes.slice(0, 4) : [];
         const sharedHtml = shared.length
@@ -447,12 +512,6 @@
     )}</p><p class="csi-similar-chem-lead">${CSI.escapeHtml(
       COPY.lead
     )}</p><ul class="csi-similar-chem-list">${items}</ul></section>`;
-  }
-
-  function formatListedPercent(value) {
-    const num = Number(value);
-    if (!Number.isFinite(num)) return '';
-    return num.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
   }
 
   function buildPreferenceMatchPanel(product, tasteMap) {
@@ -491,7 +550,7 @@
       rows.push([
         p.name || '',
         p.url || '',
-        CSI.readThcPercent(p.cannabinoids) ?? '',
+        readDelta9ThcPercent(p.cannabinoids) ?? '',
         CSI.readThcaPercent(p.cannabinoids) ?? '',
         CSI.parsePercent(p.cannabinoids?.CBD ?? p.cannabinoids?.cbd) ?? '',
         top ? top.name : '',
@@ -543,6 +602,28 @@
     return named;
   }
 
+  function overlapPickLabel(product, index) {
+    const lead = formatChemLead(product);
+    const name = String(product && product.name ? product.name : '').trim();
+    const pick = `Pick ${index + 1}`;
+    if (lead && name) return `${lead} · ${name}`;
+    if (lead) return `${lead} · ${pick}`;
+    if (name) return `${name} · ${pick}`;
+    return pick;
+  }
+
+  function disambiguateOverlapLabels(entries) {
+    const counts = {};
+    entries.forEach((e) => {
+      counts[e.label] = (counts[e.label] || 0) + 1;
+    });
+    entries.forEach((e, i) => {
+      if (counts[e.label] < 2) return;
+      const pick = `Pick ${i + 1}`;
+      if (!e.label.includes(pick)) e.label = `${e.label} · ${pick}`;
+    });
+  }
+
   /**
    * Shared = named terpene listed on every loaded pick.
    * Unique = listed on exactly one loaded pick.
@@ -573,9 +654,10 @@
     }
 
     const namedMaps = loaded.map((p, i) => ({
-      label: String(p.name || '').trim() || `Pick ${i + 1}`,
+      label: overlapPickLabel(p, i),
       map: namedTerpeneMap(p.terpenes)
     }));
+    disambiguateOverlapLabels(namedMaps);
 
     if (!namedMaps.some((m) => Object.keys(m.map).length)) {
       summary.note = failedCount ? COPY.noneNamedLoaded : COPY.noneNamed;
@@ -730,7 +812,7 @@
       sidebar.id = 'cannabis-sage-comparison-sidebar';
       sidebar.innerHTML = `
         <div class="csi-sidebar-header">
-          <h2>Product Comparison</h2>
+          <h2>${CSI.escapeHtml(COMPARE_COPY.title)}</h2>
           <div class="csi-sidebar-actions">
             ${
               CSI.features?.can?.('exportCompare')
@@ -741,7 +823,9 @@
             <button type="button" class="csi-sidebar-close" aria-label="Close">✕</button>
           </div>
         </div>
-        <div id="cannabis-sage-comparison-loading" class="csi-status csi-status-loading">Loading product data…</div>
+        <div id="cannabis-sage-comparison-loading" class="csi-status csi-status-loading">${CSI.escapeHtml(
+          COMPARE_COPY.loading
+        )}</div>
       `;
       document.body.appendChild(sidebar);
       sidebar.querySelector('.csi-sidebar-close').addEventListener('click', () => {
@@ -805,7 +889,7 @@
       header.appendChild(document.createElement('th'));
       productData.forEach((p) => {
         const th = document.createElement('th');
-        th.textContent = p.name || 'Product';
+        fillChemOverStrainHeader(th, p);
         header.appendChild(th);
       });
       table.appendChild(header);
@@ -848,7 +932,7 @@
           productData.map((p) => {
             const raw =
               key === 'THC'
-                ? CSI.readThcPercent(p.cannabinoids)
+                ? readDelta9ThcPercent(p.cannabinoids)
                 : key === 'THCA'
                   ? CSI.readThcaPercent(p.cannabinoids)
                   : CSI.parsePercent(p.cannabinoids?.[key] ?? p.cannabinoids?.[key.toLowerCase()]);
@@ -911,6 +995,8 @@
 
   CSI.ui = {
     WHAT_SAGE_ADDS,
+    STATUS_COPY,
+    COMPARE_COPY,
     PARTNER_CHROME_COPY,
     TERP_OVERLAP_COPY,
     DEAL_VS_MEDIAN_COPY,
@@ -930,6 +1016,10 @@
     buildProvenanceListingNote,
     buildPreferenceMatchPanel,
     buildSimilarByChemPanel,
+    formatChemLead,
+    formatStatusError,
+    buildChemOverStrainHeaderHtml,
+    fillChemOverStrainHeader,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

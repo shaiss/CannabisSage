@@ -240,9 +240,9 @@
 
     let body = '';
     if (product.status === 'error') {
-      body = `<div class="csi-status csi-status-error">${CSI.escapeHtml(product.error || 'Failed to load profile')}</div>`;
+      body = `<div class="csi-status csi-status-error">${CSI.escapeHtml(CSI.ui.formatStatusError(product.error))}</div>`;
     } else if (product.status === 'empty') {
-      body = `<div class="csi-status csi-status-empty">No cannabinoid or terpene details were published for this product.</div>`;
+      body = `<div class="csi-status csi-status-empty">${CSI.escapeHtml(CSI.ui.STATUS_COPY.empty)}</div>`;
     } else {
       body = CSI.ui.buildTooltipContent(product);
     }
@@ -332,7 +332,7 @@
       loading.id = 'csi-pdp-panel';
       loading.setAttribute('data-csi-pdp', '1');
       applyPdpPanelBox(loading);
-      loading.innerHTML = `${CSI.ui.buildPdpHeader({ showClose: false })}<div class="csi-status csi-status-loading">Loading profile…</div>`;
+      loading.innerHTML = `${CSI.ui.buildPdpHeader({ showClose: false })}<div class="csi-status csi-status-loading">${CSI.escapeHtml(CSI.ui.STATUS_COPY.loading)}</div>`;
       (document.documentElement || document.body).appendChild(loading);
       CSI.partners?.mountChip?.(loading);
       loadProfile()

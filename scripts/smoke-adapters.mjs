@@ -1110,7 +1110,7 @@ const identicalPair = CSI.rankCrossStoreSoftMatch(
       categoryKey: 'flower',
       weightText: '3.5g',
       price: 41,
-      cannabinoids: { THC: 22, THCA: 40 },
+      cannabinoids: { THC: 22, THCA: 8 },
       terpenes: { Limonene: 0.5, Myrcene: 0.2 }
     }
   ]
@@ -1118,6 +1118,59 @@ const identicalPair = CSI.rankCrossStoreSoftMatch(
 assert(identicalPair.matches.length === 1, 'identical candidate kept');
 assert(identicalPair.matches[0].identical === true, 'same name size and chem is identical');
 assert(/same listed/i.test(identicalPair.matches[0].reason), 'identical reason is explicit');
+
+const thcaMismatch = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-a-thca',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    weightText: '3.5g',
+    cannabinoids: { THC: 22, THCA: 8 },
+    terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend-thca',
+      name: 'House Blend 3.5g Flower',
+      adapterId: 'zenleaf',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 41,
+      cannabinoids: { THC: 22, THCA: 40 },
+      terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+    }
+  ]
+);
+assert(thcaMismatch.matches.length === 1, 'THCA-mismatch candidate still ranks as near match');
+assert(thcaMismatch.matches[0].identical !== true, 'THCA mismatch is not identical');
+assert(!/same listed/i.test(thcaMismatch.matches[0].reason), 'THCA mismatch keeps near-match reason');
+
+const unknownSizePair = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-a-nosize',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    cannabinoids: { THC: 22, THCA: 8 },
+    terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend-nosize',
+      name: 'House Blend Flower',
+      adapterId: 'zenleaf',
+      categoryKey: 'flower',
+      price: 41,
+      cannabinoids: { THC: 22, THCA: 8 },
+      terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+    }
+  ]
+);
+assert(
+  unknownSizePair.matches.length === 0 || unknownSizePair.matches[0].identical !== true,
+  'unknown package size is not identical'
+);
 
 const nameOnlyFarChem = CSI.rankCrossStoreSoftMatch(
   {

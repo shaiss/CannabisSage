@@ -530,6 +530,8 @@
   const CROSS_STORE_MAX_MATCHES = 3;
   /** Cosine at or above this, plus matching name/size, may be called the same item. */
   const CROSS_STORE_IDENTICAL_CHEM = 0.97;
+  /** Max absolute %-point gap for a shared listed cannabinoid to still count as identical. */
+  const CROSS_STORE_IDENTICAL_CANNABINOID_PTS = 1.5;
 
   const PRODUCT_NAME_STOP = new Set([
     'the',
@@ -683,6 +685,47 @@
     return 0;
   }
 
+  /** Fold common key casing/aliases. THCA stays THCA (never renamed to THC). */
+  function normalizeCannabinoidKey(key) {
+    const k = String(key || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '');
+    if (!k) return '';
+    if (k === 'thca' || k === 'totalthca') return 'THCA';
+    if (k === 'thc') return 'THC';
+    if (k === 'totalthc') return 'totalTHC';
+    if (k === 'cbd' || k === 'totalcbd') return 'CBD';
+    if (k === 'cbda') return 'CBDa';
+    if (k === 'cbg' || k === 'totalcbg') return 'CBG';
+    if (k === 'cbn') return 'CBN';
+    if (k === 'cbc') return 'CBC';
+    return k.toUpperCase();
+  }
+
+  /**
+   * Every cannabinoid both rows list must agree within tolPts.
+   * Keys present on only one side are ignored. Empty overlap → true.
+   */
+  function listedCannabinoidsAgree(left, right, tolPts) {
+    const tol = Number.isFinite(tolPts) ? tolPts : CROSS_STORE_IDENTICAL_CANNABINOID_PTS;
+    const a = {};
+    const b = {};
+    Object.entries(left && typeof left === 'object' ? left : {}).forEach(([raw, val]) => {
+      const key = normalizeCannabinoidKey(raw);
+      const n = parsePercent(val);
+      if (key && n != null && n > 0 && a[key] == null) a[key] = n;
+    });
+    Object.entries(right && typeof right === 'object' ? right : {}).forEach(([raw, val]) => {
+      const key = normalizeCannabinoidKey(raw);
+      const n = parsePercent(val);
+      if (key && n != null && n > 0 && b[key] == null) b[key] = n;
+    });
+    const shared = Object.keys(a).filter((k) => b[k] != null);
+    if (!shared.length) return true;
+    return shared.every((k) => Math.abs(a[k] - b[k]) <= tol);
+  }
+
   function listedDollarsPerMg(product) {
     if (!product) return null;
     const grams = parseWeightGrams(product.weightText);
@@ -819,13 +862,20 @@
       const score = combineCrossStoreScore(parts);
       if (!(score >= minScore)) return;
 
+      const cannabinoidsAgree = listedCannabinoidsAgree(
+        anchor.cannabinoids,
+        cand.cannabinoids,
+        CROSS_STORE_IDENTICAL_CANNABINOID_PTS
+      );
       const identical =
         nameScore === 1 &&
-        (sizeScore == null || sizeScore >= 0.7) &&
+        sizeScore != null &&
+        sizeScore >= 0.7 &&
         (formScore == null || formScore === 1) &&
         (brandScore == null || brandScore === 1) &&
+        cannabinoidsAgree &&
         ((hasChem && candHasChem && chemScore >= CROSS_STORE_IDENTICAL_CHEM) ||
-          (!hasChem && !candHasChem && nameScore === 1 && (sizeScore == null || sizeScore === 1)));
+          (!hasChem && !candHasChem && nameScore === 1 && sizeScore === 1));
 
       parts.identical = identical;
       const dollarsPerMg = listedDollarsPerMg(cand);
@@ -1303,6 +1353,8 @@
     CROSS_STORE_MIN_SCORE,
     CROSS_STORE_MAX_MATCHES,
     CROSS_STORE_IDENTICAL_CHEM,
+    CROSS_STORE_IDENTICAL_CANNABINOID_PTS,
+    listedCannabinoidsAgree,
     adapterIdFromUrl,
     adapterDisplayName,
     normalizeProductName,

@@ -1146,6 +1146,78 @@ assert(thcaMismatch.matches.length === 1, 'THCA-mismatch candidate still ranks a
 assert(thcaMismatch.matches[0].identical !== true, 'THCA mismatch is not identical');
 assert(!/same listed/i.test(thcaMismatch.matches[0].reason), 'THCA mismatch keeps near-match reason');
 
+const zeroVsPositiveCbn = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-a-cbn0',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    weightText: '3.5g',
+    cannabinoids: { THC: 22, THCA: 8, CBN: 0 },
+    terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend-cbn5',
+      name: 'House Blend 3.5g Flower',
+      adapterId: 'zenleaf',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 41,
+      cannabinoids: { THC: 22, THCA: 8, CBN: 5 },
+      terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+    }
+  ]
+);
+assert(zeroVsPositiveCbn.matches.length === 1, 'CBN 0 vs 5 still ranks as near match');
+assert(zeroVsPositiveCbn.matches[0].identical !== true, 'CBN 0 vs positive is not identical');
+assert(!/same listed/i.test(zeroVsPositiveCbn.matches[0].reason), 'CBN 0 vs positive keeps near-match reason');
+assert(
+  CSI.listedCannabinoidsAgree({ THC: 22, CBN: 0 }, { THC: 22, CBN: 5 }) === false,
+  'shared CBN 0 vs 5 fails listedCannabinoidsAgree'
+);
+
+const absentCbnNotDisqualifying = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-a-nocbn',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    weightText: '3.5g',
+    cannabinoids: { THC: 22, THCA: 8 },
+    terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend-with-cbn',
+      name: 'House Blend 3.5g Flower',
+      adapterId: 'zenleaf',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 41,
+      cannabinoids: { THC: 22, THCA: 8, CBN: 5 },
+      terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+    }
+  ]
+);
+assert(absentCbnNotDisqualifying.matches.length === 1, 'absent CBN candidate still ranks');
+assert(
+  absentCbnNotDisqualifying.matches[0].identical === true,
+  'CBN present on only one side does not block identical'
+);
+assert(
+  CSI.listedCannabinoidsAgree({ THC: 22, THCA: 8 }, { THC: 22, THCA: 8, CBN: 5 }) === true,
+  'one-sided CBN is ignored by listedCannabinoidsAgree'
+);
+assert(
+  CSI.listedCannabinoidsAgree({ THC: 22, CBN: 0 }, { THC: 22, CBN: 0 }) === true,
+  'shared CBN 0 vs 0 still agrees'
+);
+assert(
+  CSI.listedCannabinoidsAgree({ THC: 22, CBN: null }, { THC: 22, CBN: 5 }) === true,
+  'null CBN is not treated as listed 0'
+);
+
 const unknownSizePair = CSI.rankCrossStoreSoftMatch(
   {
     url: 'https://www.sunnyside.shop/product/id-a-nosize',

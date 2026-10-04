@@ -705,7 +705,9 @@
 
   /**
    * Every cannabinoid both rows list must agree within tolPts.
-   * Keys present on only one side are ignored. Empty overlap → true.
+   * Valid numeric 0 is listed (null/undefined/NaN/empty/non-numeric are not).
+   * Keys present on only one side are ignored — absent is not treated as 0.
+   * Empty overlap → true.
    */
   function listedCannabinoidsAgree(left, right, tolPts) {
     const tol = Number.isFinite(tolPts) ? tolPts : CROSS_STORE_IDENTICAL_CANNABINOID_PTS;
@@ -714,12 +716,12 @@
     Object.entries(left && typeof left === 'object' ? left : {}).forEach(([raw, val]) => {
       const key = normalizeCannabinoidKey(raw);
       const n = parsePercent(val);
-      if (key && n != null && n > 0 && a[key] == null) a[key] = n;
+      if (key && n != null && a[key] == null) a[key] = n;
     });
     Object.entries(right && typeof right === 'object' ? right : {}).forEach(([raw, val]) => {
       const key = normalizeCannabinoidKey(raw);
       const n = parsePercent(val);
-      if (key && n != null && n > 0 && b[key] == null) b[key] = n;
+      if (key && n != null && b[key] == null) b[key] = n;
     });
     const shared = Object.keys(a).filter((k) => b[k] != null);
     if (!shared.length) return true;

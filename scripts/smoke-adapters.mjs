@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.12', 'version bump');
+assert(manifest.version === '1.3.13', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -182,15 +182,24 @@ assert(
 );
 const cfg = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
 assert(cfg.denylistPath === '/denylist.json', 'denylistPath in config');
+assert(cfg.partnersPath === '/partners.json', 'partnersPath in config');
 const denylistPublic = path.join(root, 'web', 'public', 'denylist.json');
 assert(fs.existsSync(denylistPublic), 'web/public/denylist.json');
 const denyDoc = JSON.parse(fs.readFileSync(denylistPublic, 'utf8'));
 assert(Array.isArray(denyDoc.hosts), 'denylist hosts array');
 assert(denyDoc.hosts.length === 0, 'default denylist empty (fail-open)');
+const partnersPublic = path.join(root, 'web', 'public', 'partners.json');
+assert(fs.existsSync(partnersPublic), 'web/public/partners.json');
+const partnersDoc = JSON.parse(fs.readFileSync(partnersPublic, 'utf8'));
+assert(Array.isArray(partnersDoc.partners), 'partners array');
+assert(
+  partnersDoc.partners.every((p) => p.status === 'community'),
+  'seed partners community (not verified)'
+);
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.12', 'core version 1.3.12');
+assert(CSI.VERSION === '1.3.13', 'core version 1.3.13');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');

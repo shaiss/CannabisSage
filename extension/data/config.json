@@ -3,5 +3,6 @@
   "upgradeUrl": "https://cannabissage.app/#pricing",
   "accountUrl": "https://cannabissage.app/account",
   "denylistPath": "/denylist.json",
+  "partnersPath": "/partners.json",
   "productName": "CannabisSage Pro"
 }

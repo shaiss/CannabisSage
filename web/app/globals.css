@@ -253,7 +253,11 @@ button,
 
 .section-alt > h2,
 .section-alt > p,
-.section-alt .why-grid {
+.section-alt .why-grid,
+.section-alt .supported-list,
+.section-alt .supported-empty,
+.section-alt .fomo-list,
+.section-alt .fomo-always {
   max-width: 960px;
   margin-inline: auto;
 }
@@ -283,6 +287,64 @@ button,
   font-size: 0.95rem;
   color: #405248;
   line-height: 1.5;
+}
+
+.supported-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.supported-list li {
+  display: grid;
+  gap: 0.2rem;
+  background: #fff;
+  border: 1px solid var(--sand);
+  border-radius: 12px;
+  padding: 1.1rem 1.2rem;
+}
+
+.supported-list a {
+  font-family: var(--font-display);
+  font-size: 1.15rem;
+  color: var(--moss);
+  text-decoration: none;
+  font-weight: 700;
+}
+
+.supported-list a:hover {
+  text-decoration: underline;
+}
+
+.supported-quiet,
+.supported-badge {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.supported-quiet {
+  color: #5b6b62;
+}
+
+.supported-badge {
+  color: var(--moss);
+}
+
+.supported-host {
+  font-size: 0.88rem;
+  color: #5b6b62;
+}
+
+.supported-notes,
+.supported-empty {
+  font-size: 0.9rem;
+  color: #405248;
+  line-height: 1.45;
 }
 
 .fomo-list {

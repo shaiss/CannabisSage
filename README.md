@@ -2,7 +2,7 @@
 
 Chrome extension (**Manifest V3**, v1.3) that enhances supported dispensary listing and product pages with retailer-published cannabinoid and terpene information, comparison, filters, sorting, and a local taste-map match score. Optional **Pro** unlocks via Stripe Checkout on the website (never inside the extension).
 
-**Stores:** Supported dispensary menus via in-repo adapters — see [`docs/ADAPTERS.md`](docs/ADAPTERS.md). Ops can pause a host without a rebuild — see [`docs/DENYLIST.md`](docs/DENYLIST.md).
+**Stores:** Supported dispensary menus via in-repo adapters — see [`docs/ADAPTERS.md`](docs/ADAPTERS.md). The public **Supported** list is the partner registry — see [`docs/PARTNERS.md`](docs/PARTNERS.md). Ops can pause a host without a rebuild — see [`docs/DENYLIST.md`](docs/DENYLIST.md).
 
 **Monetization:** [`docs/MONETIZATION.md`](docs/MONETIZATION.md) · landing + API in [`web/`](web/).
 
@@ -66,6 +66,7 @@ location.reload();
 
 ```bash
 node scripts/smoke-adapters.mjs
+node scripts/smoke-partners.mjs
 node web/scripts/smoke-monetization.mjs
 ```
 

@@ -1,12 +1,14 @@
 import Image from 'next/image';
 import { CheckoutButton } from '@/components/CheckoutButton';
 import { getPricingCatalog, FEATURE_GATES } from '@/lib/pricing-public';
+import { getVisibleSupportedPartners } from '@/lib/partners';
 
 const CHROME_STORE_SEARCH =
   'https://chrome.google.com/webstore/search/CannabisSage';
 
 export default function HomePage() {
   const pricing = getPricingCatalog();
+  const supported = getVisibleSupportedPartners();
 
   return (
     <>
@@ -16,6 +18,7 @@ export default function HomePage() {
         </a>
         <nav className="nav-links">
           <a href="#proof">See it work</a>
+          <a href="#supported">Supported</a>
           <a href="#why-pro">Why Pro</a>
           <a href="#pricing">Pricing</a>
           <a href="/account">Activate</a>
@@ -108,7 +111,35 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section section-alt" id="why-pro">
+      <section className="section section-alt" id="supported" aria-labelledby="supported-heading">
+        <h2 id="supported-heading">Supported</h2>
+        <p>
+          Menus we list here come from the public partner registry — hostnames ops controls, not a
+          name claimed by an adapter. Retailer-published chemistry only.
+        </p>
+        {supported.length ? (
+          <ul className="supported-list">
+            {supported.map((partner) => (
+              <li key={partner.host}>
+                <a href={`https://${partner.host}`} rel="noopener noreferrer">
+                  {partner.displayName}
+                </a>
+                {partner.status === 'verified' ? (
+                  <span className="supported-badge">Verified</span>
+                ) : (
+                  <span className="supported-quiet">Community adapter</span>
+                )}
+                <span className="supported-host">{partner.host}</span>
+                {partner.notes ? <span className="supported-notes">{partner.notes}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="supported-empty">No stores listed right now.</p>
+        )}
+      </section>
+
+      <section className="section" id="why-pro">
         <h2>Why shoppers upgrade to Pro</h2>
         <p>
           Pro money-savers first: match what you like, cover more of the stores you shop, and spot
@@ -140,7 +171,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="section" id="whats-next" aria-labelledby="whats-next-heading">
+      <section className="section section-alt" id="whats-next" aria-labelledby="whats-next-heading">
         <h2 id="whats-next-heading">Coming soon</h2>
         <p>
           Next up on product pages—chem-first shopping tools. No ship-date guarantees; we ship when

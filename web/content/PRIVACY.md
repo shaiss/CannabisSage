@@ -17,7 +17,7 @@ When you use CannabisSage on a supported store page:
 2. **Product detail pages (network):** Same-site HTTPS fetches to retailer hosts when chemistry details are missing.
 3. **Local extension storage (`chrome.storage.local`):** Compare selections, taste-map preferences, filters, TTL product cache, remote denylist cache, and (if you activate Pro) license key + entitlement expiry.
 4. **Bundled JSON:** Default taste-map seeds, terpene glossary, and API base URL config.
-5. **CannabisSage site (network):** Entitlement APIs and a small HTTPS **denylist JSON** (`/denylist.json`) — configuration only, never executable code.
+5. **CannabisSage site (network):** Entitlement APIs and a small HTTPS **denylist JSON** (`/denylist.json`) — configuration only, never executable code. The website also publishes a public **partners JSON** (`/partners.json`) for the landing Supported list — configuration only.
 
 ## Payments & Pro entitlement
 

@@ -48,11 +48,13 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | Compare tray (≤3) | $/mg and deal badges |
 | PDP panel | Filters & sort |
 | Same-menu similar-by-chem (cached listed chem) | CSV / JSON export |
-| Core supported menus | |
+| Core supported menus | Cross-store soft match (cached other-store chem) |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match.
 
 Same-menu similar-by-chem is Free. Neighbors use already-cached listed cannabinoids and terpenes on this host. Missing chem or too few neighbors is a quiet note — not an upgrade wall and not a guessed lab number.
+
+Cross-store soft match sits on the existing `multiStore` Pro gate (more stores you shop). It ranks already-cached products from other adapters — Sunnyside, Zen Leaf, TerraVida Malvern — using name, category/form, size, brand when present, and listed-chem closeness. It does not fetch a new host. Missing other-store cache is a quiet note. Free sees one soft Upgrade note (same `#pricing` deep link as the listing unlock), not a card form.
 
 On a Free listing that this plan can already use, one dismissible note can appear after the shopper scrolls or hovers and at least three cards have chemistry. **Upgrade** uses the same deep link as the other Upgrade controls (`https://cannabissage.app/#pricing` → Stripe Checkout on the site). **Not now** stores `csi_soft_unlock_dismissed` locally. The note is omitted for Pro, on the multi-store gate, and before that browse signal. It does not hide hover, badges, compare, or the product panel.
 

@@ -49,6 +49,7 @@ Checks per listing:
 | PDP panel appears with chem readout or empty/error state | |
 | Preference match, when taste-map is on and chem overlaps saved prefs (see v1.3.11). Otherwise the panel stays quiet | |
 | Nearby chem on this menu: up to 3 same-host neighbors from cached listed chem, or a calm “not enough” note (see v1.3.15) | |
+| At other stores: cached soft matches with price/$/mg and a short reason (Pro / v1.3.17), a quiet empty note if nothing is cached, or the soft Pro note on Free | |
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
 
@@ -222,7 +223,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.16.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.17.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -262,6 +263,27 @@ Sage-added copy and labels lead with listed chemistry (cannabinoids, primary ter
 | Compare sidebar title is **Chem comparison**; column headers lead with chem, name quieter | |
 | Compare overlap “only on one” labels use chem lead, not the strain name | |
 | Copy does not name a retailer or make medical/effects claims | |
+| `node scripts/smoke-adapters.mjs` exits 0 | |
+
+## Cross-store soft match (v1.3.17+)
+
+On the **floating PDP** only. Closest listed items at **other** built-in stores (Sunnyside, Zen Leaf, TerraVida Malvern) from the existing 6-hour product cache. Score combines normalized product name, category/form, package size, brand when both rows have one, and listed-chem cosine (same vector as similar-by-chem). Each row has a short reason. **Same listed item** only when name, size, and chemistry actually line up — never as a default.
+
+No new host permissions and no extra catalog fetch. Empty other-store cache: one calm note. Chem labels stay primary (v1.3.16); THCA stays labeled THCA.
+
+The gate is existing `multiStore` (Pro). Free sees a quiet Upgrade note (same `https://cannabissage.app/#pricing` control as the listing soft unlock). Chemistry, same-menu neighbors, and compare stay visible. This is not a store switcher.
+
+| Step | Pass? |
+| --- | --- |
+| Pro, browse a listing on store A until chem is cached, then open a PDP on store B | |
+| Panel shows **At other stores you shop** with at most 3 rows | |
+| Each row leads with listed terp/THC (or THCA when that is what was published); name and store are quieter | |
+| Price and $/mg show when those numbers were already cached; omit them when missing | |
+| Reason is plain (close listed chem, similar name, same category) — not “identical” unless it truly is | |
+| Links stay on already-supported adapter hosts | |
+| Pro, PDP with no other-store cache: calm “No cached matches…” note, no red error, no extra fetch | |
+| Free: soft Pro note + Upgrade; chem panel and same-menu neighbors still show; no card form | |
+| Copy does not make medical/effects claims | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
 
 ## What CannabisSage adds (v1.3.7+)
@@ -334,3 +356,4 @@ Prereq: `cd web && npm i && npm run dev` with `.env.local` Stripe test keys; `st
 - Strain lineage deep features
 - Remote / sideloaded community adapters (in-repo PRs only)
 - Live-mode Stripe until human goes live
+- Store switcher (next product-pages slice after v1.3.17)

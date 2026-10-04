@@ -103,3 +103,9 @@ Content script load order (isolated world):
 `csi-core` → `adapters/interface` → store adapters → `registry` → `csi-storage` / `csi-fetch` / UI → listing / PDP / router
 
 `CSI.registry.getActiveAdapter()` drives route mode, card discovery, HTML parse, and bridge strategy.
+
+## Cross-store cache (v1.3.17)
+
+The 6-hour PDP TTL cache is shared across built-in adapters. Listing and PDP writes may include price, package size, category, and `adapterId` so a product page can rank **soft matches at other stores you already opened**. TerraVida vs Zen Leaf share `zenleafdispensaries.com` but use different adapter ids (Malvern paths vs other locations).
+
+This does **not** add hosts, scrape a second catalog, or load remote adapters. If the shopper has never opened another supported store in this TTL window, the PDP shows a quiet empty note. A store switcher is not part of this slice.

@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.16', 'version bump');
+assert(manifest.version === '1.3.17', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +207,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.16', 'core version 1.3.16');
+assert(CSI.VERSION === '1.3.17', 'core version 1.3.17');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -788,7 +788,7 @@ assert(pdpSrc.includes('attachSimilarByChem'), 'pdp attaches neighbors');
 assert(pdpSrc.includes('listPdpCache'), 'pdp reads existing product cache');
 const similarAttach = pdpSrc.slice(
   pdpSrc.indexOf('async function attachSimilarByChem'),
-  pdpSrc.indexOf('function clearPdpBuyboxChemInject')
+  pdpSrc.indexOf('async function attachCrossStoreSoftMatch')
 );
 assert(similarAttach.length > 0, 'attach exists');
 assert(!/fetchProductDetails/.test(similarAttach), 'neighbors do not call fetchProductDetails');
@@ -985,5 +985,231 @@ assert(listingSrc.includes("addEventListener('scroll', onSoftUnlockScroll"), 'sc
 assert(listingSrc.includes('noteBrowseEngagement();'), 'hover counts as mid-browse');
 const configSoft = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
 assert(configSoft.upgradeUrl === 'https://cannabissage.app/#pricing', 'upgrade still opens site checkout');
+
+// Cross-store soft match (v1.3.17) — other adapters, cached only, multiStore Pro
+assert(CSI.CROSS_STORE_MAX_MATCHES === 3, 'at most three other-store rows');
+assert(CSI.CROSS_STORE_MIN_SCORE === 0.38, 'soft-match floor');
+const crossCopy = Object.values(CSI.ui.CROSS_STORE_COPY).join(' ');
+assert(CSI.ui.CROSS_STORE_COPY.title === 'At other stores you shop', 'cross-store title');
+assert(/already opened|already shop/.test(crossCopy), 'cache-only framing');
+assert(!/switcher/i.test(CSI.ui.CROSS_STORE_COPY.tooFew), 'empty state is not a switcher');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria|strain)\b/i.test(
+    crossCopy
+  ),
+  'no medical, effects, or strain-name framing in cross-store copy'
+);
+const hostPerms = JSON.stringify(manifest.host_permissions);
+assert(
+  hostPerms ===
+    JSON.stringify([
+      'https://www.sunnyside.shop/*',
+      'https://sunnyside.shop/*',
+      'https://zenleafdispensaries.com/*',
+      'https://www.zenleafdispensaries.com/*',
+      'https://cannabissage.app/*',
+      'https://cannabissage.vercel.app/*',
+      'http://localhost:3000/*',
+      'https://localhost:3000/*'
+    ]),
+  'host permissions unchanged'
+);
+
+const zlFlower = {
+  url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/blue-dream-1',
+  name: 'Blue Dream 3.5g Flower',
+  adapterId: 'zenleaf',
+  categoryKey: 'flower',
+  weightText: '3.5g',
+  price: 42,
+  cannabinoids: { THC: 22 },
+  terpenes: { Limonene: 0.55, Myrcene: 0.2 }
+};
+const syNear = {
+  url: 'https://www.sunnyside.shop/product/blue-dream',
+  name: 'Blue Dream',
+  adapterId: 'sunnyside',
+  categoryKey: 'flower',
+  weightText: '3.5 g',
+  price: 40,
+  cannabinoids: { THC: 21.5 },
+  terpenes: { Limonene: 0.5, Myrcene: 0.18 }
+};
+const syFar = {
+  url: 'https://www.sunnyside.shop/product/linalool-only',
+  name: 'Night Cap',
+  adapterId: 'sunnyside',
+  categoryKey: 'flower',
+  weightText: '3.5g',
+  price: 50,
+  cannabinoids: { THC: 8 },
+  terpenes: { Linalool: 0.9 }
+};
+const tvMalvern = {
+  url: 'https://zenleafdispensaries.com/locations/malvern/medical-menu/menu/flower-709/blue-dream-9',
+  name: 'Blue Dream',
+  adapterId: 'terravida',
+  categoryKey: 'flower',
+  weightText: '3.5g',
+  price: 38,
+  cannabinoids: { THC: 22 },
+  terpenes: { Limonene: 0.55, Myrcene: 0.2 }
+};
+const sameStore = {
+  url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/other',
+  name: 'Blue Dream',
+  adapterId: 'zenleaf',
+  categoryKey: 'flower',
+  cannabinoids: { THC: 22 },
+  terpenes: { Limonene: 0.55, Myrcene: 0.2 }
+};
+
+assert(CSI.normalizeProductName('Blue Dream 3.5g Flower') === 'blue dream', 'name drops size and form');
+assert(CSI.nameSimilarity('Blue Dream 3.5g', 'Blue Dream') === 1, 'same listed name after normalize');
+assert(CSI.adapterIdFromUrl(tvMalvern.url) === 'terravida', 'malvern url is terravida');
+assert(CSI.adapterIdFromUrl(zlFlower.url) === 'zenleaf', 'abington url is zenleaf');
+assert(CSI.adapterIdFromUrl(syNear.url) === 'sunnyside', 'sunnyside url');
+
+const rankedCross = CSI.rankCrossStoreSoftMatch(zlFlower, [syNear, syFar, tvMalvern, sameStore, zlFlower], {
+  excludeAdapterId: 'zenleaf'
+});
+assert(rankedCross.matches.length >= 1, 'other-store matches exist');
+assert(
+  rankedCross.matches.every((m) => m.adapterId !== 'zenleaf'),
+  'same adapter excluded'
+);
+assert(
+  rankedCross.matches.some((m) => m.adapterId === 'sunnyside' && /sunnyside/i.test(m.url)),
+  'sunnyside neighbor included'
+);
+assert(
+  rankedCross.matches.some((m) => m.adapterId === 'terravida'),
+  'terra vida malvern is another store on the same host'
+);
+assert(!rankedCross.matches.some((m) => m.url === syFar.url), 'far chem is not a match');
+assert(rankedCross.matches[0].reason, 'each match has a reason');
+assert(!/identical/i.test(rankedCross.matches[0].reason) || rankedCross.matches[0].identical, 'identical only when flagged');
+assert(rankedCross.matches[0].price != null, 'cached price carried');
+assert(rankedCross.matches[0].dollarsPerMg > 0, '$/mg from cached price and weight');
+
+const identicalPair = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-a',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    weightText: '3.5g',
+    cannabinoids: { THC: 22, THCA: 8 },
+    terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend',
+      name: 'House Blend 3.5g Flower',
+      adapterId: 'zenleaf',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 41,
+      cannabinoids: { THC: 22, THCA: 40 },
+      terpenes: { Limonene: 0.5, Myrcene: 0.2 }
+    }
+  ]
+);
+assert(identicalPair.matches.length === 1, 'identical candidate kept');
+assert(identicalPair.matches[0].identical === true, 'same name size and chem is identical');
+assert(/same listed/i.test(identicalPair.matches[0].reason), 'identical reason is explicit');
+
+const nameOnlyFarChem = CSI.rankCrossStoreSoftMatch(
+  {
+    url: 'https://www.sunnyside.shop/product/id-b',
+    name: 'House Blend',
+    adapterId: 'sunnyside',
+    categoryKey: 'flower',
+    cannabinoids: { THC: 22 },
+    terpenes: { Limonene: 0.5 }
+  },
+  [
+    {
+      url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/house-blend-far',
+      name: 'House Blend',
+      adapterId: 'zenleaf',
+      categoryKey: 'edibles',
+      cannabinoids: { THC: 5 },
+      terpenes: { Linalool: 1.2 }
+    }
+  ]
+);
+assert(
+  nameOnlyFarChem.matches.length === 0 || nameOnlyFarChem.matches[0].identical !== true,
+  'divergent chem is not claimed identical'
+);
+
+const noOther = CSI.rankCrossStoreSoftMatch(zlFlower, [sameStore], { excludeAdapterId: 'zenleaf' });
+assert(noOther.matches.length === 0, 'only same-store cache is empty for cross-store');
+
+const thcaLead = CSI.ui.formatChemLead({ cannabinoids: { THCA: 30 } });
+assert(thcaLead === 'THCA 30.0%', 'cross-store chem lead still labels THCA');
+
+sandbox.CSI.features = { can: () => false };
+assert(
+  CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross }).includes('data-csi-cross-store-locked'),
+  'multiStore off is a soft lock'
+);
+assert(
+  CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross }).includes('Upgrade'),
+  'locked panel reuses Upgrade'
+);
+sandbox.CSI.features = { can: (id) => id === 'multiStore' };
+const crossHtml = CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross });
+assert(crossHtml.includes('data-csi-cross-store="1"'), 'cross-store panel marker');
+assert(crossHtml.includes('At other stores you shop'), 'title copy');
+assert(/Limonene|THC/.test(crossHtml), 'chem lead in row');
+assert(crossHtml.includes('csi-chem-secondary'), 'name and store are secondary');
+assert(!/cardNumber|PaymentElement|stripe\.elements/i.test(crossHtml), 'no card collection');
+assert(
+  CSI.ui.buildCrossStoreMatchPanel({
+    crossStoreMatch: { matches: [], note: CSI.ui.CROSS_STORE_COPY.tooFew }
+  }).includes('csi-cross-store-note'),
+  'too few is a calm note'
+);
+assert(CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: { matches: [] } }) === '', 'empty without note is omitted');
+assert(
+  CSI.ui.buildCrossStoreMatchPanel({
+    crossStoreMatch: {
+      matches: [
+        {
+          url: 'https://evil.example/p',
+          name: 'Nope',
+          cannabinoids: { THC: 22 },
+          storeLabel: 'Sunnyside',
+          reason: 'Close listed chem.',
+          identical: false
+        }
+      ]
+    }
+  }).includes('<span class="csi-cross-store-line'),
+  'unsupported host is not a link'
+);
+delete sandbox.CSI.features;
+
+assert(/multiStore:\s*true/.test(featuresSrcPref), 'cross-store reuses multiStore');
+assert(!/crossStore/.test(featuresSrcPref), 'no second gate id');
+assert(pdpSrc.includes('buildCrossStoreMatchPanel(product)'), 'floating panel mounts cross-store');
+assert(pdpSrc.includes('attachCrossStoreSoftMatch'), 'pdp attaches other-store matches');
+assert(pdpSrc.includes("listPdpCache?.({ excludeAdapterId"), 'pdp lists cache excluding this adapter');
+assert(pdpSrc.includes("can?.('multiStore')"), 'pdp uses existing multiStore gate');
+assert(pdpSrc.includes('data-csi-cross-store-upgrade') && pdpSrc.includes('openUpgrade'), 'locked Upgrade uses site checkout');
+const crossAttach = pdpSrc.slice(
+  pdpSrc.indexOf('async function attachCrossStoreSoftMatch'),
+  pdpSrc.indexOf('function clearPdpBuyboxChemInject')
+);
+assert(crossAttach.length > 0, 'cross-store attach exists');
+assert(!/fetchProductDetails/.test(crossAttach), 'other-store rows do not call fetchProductDetails');
+assert(!/FETCH_PRODUCT_HTML|sendMessage/.test(crossAttach), 'other-store rows do not fetch extra HTML');
+assert(listingSrc.includes('buildPdpCacheRecord') && listingSrc.includes('merge: true'), 'listing merges price/size into TTL cache');
+assert(!listingSrc.includes('buildCrossStoreMatchPanel'), 'listing does not spam other-store cards');
+assert(storageSrc.includes('excludeAdapterId'), 'storage can list cache minus this adapter');
+assert(storageSrc.includes('opts.merge') || storageSrc.includes('opts && opts.merge'), 'cache merge keeps TTL');
+assert(!/new Function|eval\(/.test(pdpSrc + listingSrc), 'no eval loaders on listing/pdp');
 
 console.log('smoke-adapters: OK');

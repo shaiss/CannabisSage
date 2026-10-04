@@ -72,6 +72,7 @@
         await attachDealVsMedian(failed);
         await attachPreferenceMatch(failed);
         await attachSimilarByChem(failed);
+        await attachCrossStoreSoftMatch(failed);
         return failed;
       }
       product = {
@@ -102,6 +103,7 @@
     await attachDealVsMedian(product);
     await attachPreferenceMatch(product);
     await attachSimilarByChem(product);
+    await attachCrossStoreSoftMatch(product);
     return product;
   }
 
@@ -197,6 +199,45 @@
     product.similarByChem = ranked;
   }
 
+  /**
+   * Other-store soft matches from the same 6-hour TTL cache.
+   * Pro (multiStore): list cached rows from other adapters.
+   * Free: quiet upsell, same Upgrade deep link as the listing note.
+   * No other-store rows in cache → calm note. Never fetches a new host.
+   */
+  async function attachCrossStoreSoftMatch(product) {
+    product.crossStoreMatch = null;
+    if (!product || product.status === 'error' || product.status === 'empty') return;
+    if (!CSI.features?.can?.('multiStore')) {
+      product.crossStoreMatch = { locked: true };
+      return;
+    }
+    const url = product.url || (typeof location !== 'undefined' ? location.href : '');
+    const adapterId =
+      CSI.registry?.getActiveAdapter?.()?.id || CSI.adapterIdFromUrl?.(url) || null;
+    if (adapterId) product.adapterId = product.adapterId || adapterId;
+    if (!product.categoryKey && typeof location !== 'undefined') {
+      product.categoryKey = CSI.categoryKeyFromPath(location.pathname) || product.categoryKey;
+    }
+    if (url && CSI.storage?.setPdpCache && CSI.buildPdpCacheRecord) {
+      const record = CSI.buildPdpCacheRecord(product, { url, adapterId });
+      if (record && (CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes))) {
+        await CSI.storage.setPdpCache(url, record, { merge: true });
+      }
+    }
+    const entries = (await CSI.storage?.listPdpCache?.({ excludeAdapterId: adapterId })) || [];
+    const ranked = CSI.rankCrossStoreSoftMatch(product, entries, {
+      excludeAdapterId: adapterId,
+      origin: typeof location !== 'undefined' ? location.origin : '',
+      max: CSI.CROSS_STORE_MAX_MATCHES,
+      minScore: CSI.CROSS_STORE_MIN_SCORE
+    });
+    if (!ranked.matches.length) {
+      ranked.note = CSI.ui?.CROSS_STORE_COPY?.tooFew || '';
+    }
+    product.crossStoreMatch = ranked;
+  }
+
   function clearPdpBuyboxChemInject() {
     document
       .querySelectorAll('#csi-pdp-inline, [data-csi-pdp-inline], .csi-pdp-buybox-chem')
@@ -265,6 +306,7 @@
       ${CSI.ui.buildProvenanceStrip(product.provenance)}
       ${prefMatch}
       ${CSI.ui.buildSimilarByChemPanel(product)}
+      ${CSI.ui.buildCrossStoreMatchPanel(product)}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
       ${medianStrip}
       <div class="csi-pdp-body">${body}</div>
@@ -278,6 +320,9 @@
     CSI.partners?.mountChip?.(panel);
 
     panel.querySelector('.csi-pdp-close').addEventListener('click', () => panel.remove());
+    panel.querySelector('[data-csi-cross-store-upgrade]')?.addEventListener('click', () => {
+      CSI.entitlement?.openUpgrade?.();
+    });
     panel.querySelector('.csi-pdp-compare').addEventListener('click', async () => {
       const list = await CSI.storage.loadCompare();
       if (list.some((p) => p.url === product.url)) {

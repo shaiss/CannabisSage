@@ -100,3 +100,29 @@ export function listSupportedPartners(
 export function getVisibleSupportedPartners(): PartnerRecord[] {
   return listSupportedPartners(partnersDoc, denylistDoc);
 }
+
+export type PartnerChrome = {
+  host: string;
+  status: Exclude<PartnerStatus, 'denied'>;
+  displayName: string;
+};
+
+/**
+ * In-page partner chrome. Denylist wins. Registry `denied` and missing/invalid
+ * documents yield no chip. Display name is ops-owned — never invented here.
+ */
+export function lookupPartnerChrome(
+  hostname: string | null | undefined,
+  partnersDocInput: unknown,
+  denylistDocInput: unknown
+): PartnerChrome | null {
+  const host = normalizeHost(hostname);
+  if (!isValidHostname(host)) return null;
+  if (parseDenylistHosts(denylistDocInput).includes(host)) return null;
+  const parsed = parsePartnersDocument(partnersDocInput);
+  if (!parsed) return null;
+  const row = parsed.partners.find((p) => p.host === host);
+  if (!row) return null;
+  if (row.status !== 'verified' && row.status !== 'community') return null;
+  return { host: row.host, status: row.status, displayName: row.displayName };
+}

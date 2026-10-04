@@ -221,6 +221,7 @@
     `;
     document.documentElement.appendChild(panel);
     CSI.glossary?.wireTerpeneClicks(panel);
+    CSI.partners?.mountChip?.(panel);
 
     panel.querySelector('.csi-pdp-close').addEventListener('click', () => panel.remove());
     panel.querySelector('.csi-pdp-compare').addEventListener('click', async () => {
@@ -279,6 +280,7 @@
       applyPdpPanelBox(loading);
       loading.innerHTML = `${CSI.ui.buildPdpHeader({ showClose: false })}<div class="csi-status csi-status-loading">Loading profile…</div>`;
       (document.documentElement || document.body).appendChild(loading);
+      CSI.partners?.mountChip?.(loading);
       loadProfile()
         .then((product) => {
           if (!active) return;

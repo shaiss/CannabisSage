@@ -40,6 +40,7 @@ required=(
   "${EXT_DIR}/lib/csi-entitlement.js"
   "${EXT_DIR}/lib/csi-features.js"
   "${EXT_DIR}/lib/csi-denylist.js"
+  "${EXT_DIR}/lib/csi-partners.js"
   "${EXT_DIR}/popup/popup.html"
   "${EXT_DIR}/popup/popup.js"
   "${EXT_DIR}/popup/popup.css"

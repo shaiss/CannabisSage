@@ -7,7 +7,7 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.13 |
+| **Version** | 1.3.14 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
@@ -70,7 +70,7 @@ Call entitlement activate/validate APIs and open Upgrade / Manage links on the p
 
 ### Permission: `storage`
 
-Persist compare tray, taste-map prefs, filters, TTL cache, and Pro license entitlement on device.
+Persist compare tray, taste-map prefs, filters, TTL cache, denylist/partners caches, and Pro license entitlement on device.
 
 ## Single purpose statement
 
@@ -82,14 +82,14 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 
 - All extension logic ships inside the package.
 - No eval of remote scripts; adapters are in-repo only.
-- Network: retailer HTML fetches + CannabisSage entitlement HTTPS API + remote denylist JSON (config only) + user-initiated navigation to Stripe Checkout on the website. The site also serves a public partners registry JSON for the landing Supported list (config only; not remote extension code).
+- Network: retailer HTML fetches + CannabisSage entitlement HTTPS API + remote denylist JSON (config only) + partner registry JSON (`/partners.json`, config only) + user-initiated navigation to Stripe Checkout on the website. The same partners file feeds the landing Supported list. Not remote extension code.
 
 ## Human steps remaining
 
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.13.zip` (CWS **1.3.2** may still be pending review; next upload needs this bump).
+4. Upload `dist/cannabis-sage-1.3.14.zip` (CWS **1.3.2** may still be pending review; next upload needs this bump).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

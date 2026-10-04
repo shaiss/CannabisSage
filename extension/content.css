@@ -736,6 +736,64 @@
   color: #1f883d;
 }
 
+.csi-similar-chem {
+  margin: 0 0 8px;
+  padding: 8px 0 0;
+  border-top: 1px solid #eee;
+}
+
+.csi-similar-chem-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.csi-similar-chem-lead,
+.csi-similar-chem-note,
+.csi-similar-chem-shared {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667;
+  font-weight: 500;
+}
+
+.csi-similar-chem-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.csi-similar-chem-item {
+  margin: 0 0 8px;
+}
+
+.csi-similar-chem-item:last-child {
+  margin-bottom: 0;
+}
+
+.csi-similar-chem-line {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-decoration: none;
+}
+
+a.csi-similar-chem-line:hover {
+  color: #ff6b35;
+  text-decoration: underline;
+}
+
+.csi-similar-chem-name {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #889;
+}
+
 /* Push page content slightly when filter bar present */
 body:has(#csi-filter-bar) {
   scroll-padding-top: 56px;

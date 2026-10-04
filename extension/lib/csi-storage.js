@@ -184,6 +184,44 @@
   }
 
   /** Drop expired cache entries (best-effort). */
+  function cacheEntryHostMatches(url, host) {
+    if (!host) return true;
+    if (typeof CSI.sameMenuHost === 'function') return CSI.sameMenuHost(url, host);
+    try {
+      const u = new URL(url);
+      return (
+        u.hostname.replace(/^www\./i, '').toLowerCase() ===
+        String(host).replace(/^www\./i, '').toLowerCase()
+      );
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Already-fetched menu chem for this host (TTL cache).
+   * Does not scrape a new catalog — neighbors only come from prior listing/PDP loads.
+   */
+  async function listPdpCache(opts) {
+    const host = opts && opts.host;
+    try {
+      const all = await new Promise((resolve) => chrome.storage.local.get(null, resolve));
+      const out = [];
+      Object.entries(all || {}).forEach(([k, v]) => {
+        if (!k.startsWith(KEYS.CACHE_PREFIX)) return;
+        if (!v || !v.data || !v.fetchedAt) return;
+        if (Date.now() - v.fetchedAt > CSI.CACHE_TTL_MS) return;
+        const url = k.slice(KEYS.CACHE_PREFIX.length);
+        if (host && !cacheEntryHostMatches(url, host)) return;
+        out.push({ url, data: v.data, fetchedAt: v.fetchedAt });
+      });
+      return out;
+    } catch (e) {
+      CSI.log('listPdpCache skipped', e);
+      return [];
+    }
+  }
+
   async function pruneExpiredCache() {
     try {
       const all = await new Promise((resolve) => chrome.storage.local.get(null, resolve));
@@ -278,6 +316,7 @@
     setPdpCache,
     invalidatePdpCache,
     pruneExpiredCache,
+    listPdpCache,
     loadCategoryMedians,
     saveCategoryMedians,
     loadSoftUnlockDismissed,

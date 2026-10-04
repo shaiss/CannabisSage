@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.14';
+  const VERSION = '1.3.15';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -350,6 +350,147 @@
     }
 
     return Math.max(0, Math.min(1, score));
+  }
+
+  /** Cosine cutoff for same-menu neighbors. Below this, omit the row. */
+  const SIMILAR_CHEM_MIN_SCORE = 0.4;
+  /** Calm density on the floating PDP — not a product-card grid. */
+  const SIMILAR_CHEM_MAX_NEIGHBORS = 3;
+  /** When neither pick lists named terpenes, THC must be this close (percentage points). */
+  const SIMILAR_CHEM_THC_NEAR_PTS = 4;
+
+  function namedTerpenePercents(terpenes) {
+    const map = normalizeTerpeneMap(terpenes);
+    const named = {};
+    Object.entries(map).forEach(([name, pct]) => {
+      if (/total\s*terpenes?/i.test(name)) return;
+      if (!(pct > 0)) return;
+      named[name] = pct;
+    });
+    return named;
+  }
+
+  /**
+   * Vector from retailer-published numbers only.
+   * THC/CBD are percent/100. Named terp percents are capped at 2% → 1.0.
+   * Missing values stay missing (not guessed zeros in the source product).
+   */
+  function chemSimilarityVector(product) {
+    const dims = {};
+    if (!product) return dims;
+    const thc = readThcPercent(product.cannabinoids);
+    if (thc != null && thc > 0) dims.THC = thc / 100;
+    const cbd = parsePercent(
+      product.cannabinoids?.CBD ?? product.cannabinoids?.cbd ?? product.cannabinoids?.totalCBD
+    );
+    if (cbd != null && cbd > 0) dims.CBD = cbd / 100;
+    Object.entries(namedTerpenePercents(product.terpenes)).forEach(([name, pct]) => {
+      dims[`t:${name}`] = Math.min(1, pct / 2);
+    });
+    return dims;
+  }
+
+  function cosineSimilarity(a, b) {
+    const keys = new Set([...Object.keys(a || {}), ...Object.keys(b || {})]);
+    let dot = 0;
+    let na = 0;
+    let nb = 0;
+    keys.forEach((k) => {
+      const va = Number(a && a[k]) || 0;
+      const vb = Number(b && b[k]) || 0;
+      dot += va * vb;
+      na += va * va;
+      nb += vb * vb;
+    });
+    if (!(na > 0) || !(nb > 0)) return 0;
+    return dot / (Math.sqrt(na) * Math.sqrt(nb));
+  }
+
+  function sharedNamedTerpenes(left, right) {
+    const a = namedTerpenePercents(left && left.terpenes);
+    const b = namedTerpenePercents(right && right.terpenes);
+    return Object.keys(a)
+      .filter((name) => b[name] > 0)
+      .sort((x, y) => x.localeCompare(y));
+  }
+
+  function sameMenuHost(url, host) {
+    if (!host) return true;
+    try {
+      const u = new URL(url);
+      const want = String(host).replace(/^www\./i, '').toLowerCase();
+      const got = u.hostname.replace(/^www\./i, '').toLowerCase();
+      return want === got;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Same-menu neighbors by cosine similarity of listed chem.
+   * Never invents lab numbers. Same hostname; same category when both known.
+   * Named-terp rows need at least one shared terpene. Cannabinoid-only rows
+   * need THC within SIMILAR_CHEM_THC_NEAR_PTS.
+   */
+  function rankSimilarByChem(anchor, candidates, opts) {
+    const options = opts || {};
+    const maxRaw = Number(options.max);
+    const max = Number.isFinite(maxRaw) ? Math.max(0, maxRaw) : SIMILAR_CHEM_MAX_NEIGHBORS;
+    const minRaw = Number(options.minScore);
+    const minScore = Number.isFinite(minRaw) ? minRaw : SIMILAR_CHEM_MIN_SCORE;
+    const list = Array.isArray(candidates) ? candidates : [];
+    const result = { neighbors: [], note: '' };
+    if (!anchor || anchor.status === 'error' || anchor.status === 'empty') return result;
+    const anchorVec = chemSimilarityVector(anchor);
+    if (!Object.keys(anchorVec).length) return result;
+    const anchorHasTerps = Object.keys(anchorVec).some((k) => k.startsWith('t:'));
+    const origin = options.origin;
+    const anchorUrl = normalizeMenuUrl(anchor.url || '', origin);
+    const categoryKey = options.categoryKey || null;
+    const host = options.host || null;
+
+    const scored = [];
+    list.forEach((raw) => {
+      if (!raw || typeof raw !== 'object') return;
+      const nested = raw.data && typeof raw.data === 'object' ? raw.data : raw;
+      const cand = { ...nested, url: raw.url || nested.url };
+      if (cand.status === 'error' || cand.status === 'empty') return;
+      const url = normalizeMenuUrl(cand.url || '', origin);
+      if (!url || (anchorUrl && url === anchorUrl)) return;
+      if (host && !sameMenuHost(url, host)) return;
+      const candCategory = cand.categoryKey || raw.categoryKey || null;
+      if (categoryKey && candCategory && candCategory !== categoryKey) return;
+      const vec = chemSimilarityVector(cand);
+      if (!Object.keys(vec).length) return;
+      const candHasTerps = Object.keys(vec).some((k) => k.startsWith('t:'));
+      const shared = sharedNamedTerpenes(anchor, cand);
+      if (anchorHasTerps || candHasTerps) {
+        if (!shared.length) return;
+      } else {
+        const aThc = readThcPercent(anchor.cannabinoids);
+        const bThc = readThcPercent(cand.cannabinoids);
+        if (aThc == null || bThc == null) return;
+        if (Math.abs(aThc - bThc) > SIMILAR_CHEM_THC_NEAR_PTS) return;
+      }
+      const score = cosineSimilarity(anchorVec, vec);
+      if (!(score >= minScore)) return;
+      scored.push({
+        url,
+        name: cand.name ? String(cand.name) : '',
+        cannabinoids: cand.cannabinoids,
+        terpenes: cand.terpenes,
+        score,
+        sharedTerpenes: shared,
+        categoryKey: candCategory
+      });
+    });
+
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.name || '').localeCompare(b.name || '') || a.url.localeCompare(b.url);
+    });
+    result.neighbors = scored.slice(0, max);
+    return result;
   }
 
   function dollarsPerMgThc(price, cannabinoids, weightGrams) {
@@ -785,6 +926,15 @@
     buildProductUrl,
     extractProductData,
     scoreTasteMatch,
+    SIMILAR_CHEM_MIN_SCORE,
+    SIMILAR_CHEM_MAX_NEIGHBORS,
+    SIMILAR_CHEM_THC_NEAR_PTS,
+    namedTerpenePercents,
+    chemSimilarityVector,
+    cosineSimilarity,
+    sharedNamedTerpenes,
+    sameMenuHost,
+    rankSimilarByChem,
     dollarsPerMgThc,
     parseWeightGrams,
     detectSale,

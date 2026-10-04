@@ -47,9 +47,12 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | Basic THC / terpene badges | More stores you shop (multi-store) |
 | Compare tray (≤3) | $/mg and deal badges |
 | PDP panel | Filters & sort |
-| Core supported menus | CSV / JSON export |
+| Same-menu similar-by-chem (cached listed chem) | CSV / JSON export |
+| Core supported menus | |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match.
+
+Same-menu similar-by-chem is Free. Neighbors use already-cached listed cannabinoids and terpenes on this host. Missing chem or too few neighbors is a quiet note — not an upgrade wall and not a guessed lab number.
 
 On a Free listing that this plan can already use, one dismissible note can appear after the shopper scrolls or hovers and at least three cards have chemistry. **Upgrade** uses the same deep link as the other Upgrade controls (`https://cannabissage.app/#pricing` → Stripe Checkout on the site). **Not now** stores `csi_soft_unlock_dismissed` locally. The note is omitted for Pro, on the multi-store gate, and before that browse signal. It does not hide hover, badges, compare, or the product panel.
 

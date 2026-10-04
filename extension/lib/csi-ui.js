@@ -370,6 +370,85 @@
     return { score, minMatch, overlaps, avoid };
   }
 
+  /**
+   * Same-menu neighbors on the floating product panel.
+   * Chem labels first; product name is secondary. No medical/effects copy.
+   * Quiet note when the cache does not have enough listed chemistry.
+   */
+  const SIMILAR_CHEM_COPY = {
+    title: 'Nearby chem on this menu',
+    lead: 'Ranked from listed cannabinoids and terpenes.',
+    tooFew: 'Not enough listed chemistry on this menu to rank neighbors yet.',
+    shared: 'Shared'
+  };
+
+  function similarChemHref(url) {
+    if (!url) return '';
+    try {
+      const u = new URL(url, typeof location !== 'undefined' ? location.href : undefined);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+      if (typeof location !== 'undefined' && location.hostname) {
+        const a = u.hostname.replace(/^www\./i, '').toLowerCase();
+        const b = location.hostname.replace(/^www\./i, '').toLowerCase();
+        if (a !== b) return '';
+      }
+      return u.href;
+    } catch {
+      return '';
+    }
+  }
+
+  function similarChemLine(row) {
+    const bits = [];
+    const top = CSI.topTerpene(row && row.terpenes);
+    if (top && top.name) {
+      const shown = formatListedPercent(top.percentage);
+      bits.push(shown ? `${top.name} ${shown}%` : top.name);
+    }
+    const thc = CSI.readThcPercent(row && row.cannabinoids);
+    if (thc != null) bits.push(`THC ${thc.toFixed(1)}%`);
+    return bits.join(' · ');
+  }
+
+  function buildSimilarByChemPanel(product) {
+    if (!CSI.features?.can?.('similarByChem')) return '';
+    const block = product && product.similarByChem;
+    if (!block) return '';
+    const COPY = SIMILAR_CHEM_COPY;
+    const neighbors = Array.isArray(block.neighbors) ? block.neighbors : [];
+    if (!neighbors.length) {
+      if (!block.note) return '';
+      return `<section class="csi-similar-chem" data-csi-similar-chem="1"><p class="csi-similar-chem-title">${CSI.escapeHtml(
+        COPY.title
+      )}</p><p class="csi-similar-chem-note">${CSI.escapeHtml(block.note)}</p></section>`;
+    }
+    const items = neighbors
+      .map((row) => {
+        const chem = similarChemLine(row) || COPY.lead;
+        const href = similarChemHref(row.url);
+        const label = href
+          ? `<a class="csi-similar-chem-line" href="${CSI.escapeHtml(href)}">${CSI.escapeHtml(chem)}</a>`
+          : `<span class="csi-similar-chem-line">${CSI.escapeHtml(chem)}</span>`;
+        const name = String(row.name || '').trim();
+        const nameHtml = name
+          ? `<span class="csi-similar-chem-name">${CSI.escapeHtml(name)}</span>`
+          : '';
+        const shared = Array.isArray(row.sharedTerpenes) ? row.sharedTerpenes.slice(0, 4) : [];
+        const sharedHtml = shared.length
+          ? `<p class="csi-similar-chem-shared">${CSI.escapeHtml(COPY.shared)}: ${shared
+              .map((t) => `<span data-csi-terp="${CSI.escapeHtml(t)}">${CSI.escapeHtml(t)}</span>`)
+              .join(', ')}</p>`
+          : '';
+        return `<li class="csi-similar-chem-item">${label}${nameHtml}${sharedHtml}</li>`;
+      })
+      .join('');
+    return `<section class="csi-similar-chem" data-csi-similar-chem="1"><p class="csi-similar-chem-title">${CSI.escapeHtml(
+      COPY.title
+    )}</p><p class="csi-similar-chem-lead">${CSI.escapeHtml(
+      COPY.lead
+    )}</p><ul class="csi-similar-chem-list">${items}</ul></section>`;
+  }
+
   function formatListedPercent(value) {
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
@@ -837,6 +916,7 @@
     DEAL_VS_MEDIAN_COPY,
     PROVENANCE_COPY,
     PREFERENCE_MATCH_COPY,
+    SIMILAR_CHEM_COPY,
     summarizePreferenceMatch,
     summarizeTerpeneOverlap,
     formatCannabinoids,
@@ -849,6 +929,7 @@
     buildProvenanceStrip,
     buildProvenanceListingNote,
     buildPreferenceMatchPanel,
+    buildSimilarByChemPanel,
     buildListingBadgeChips,
     buildTooltipContent,
     showTooltip,

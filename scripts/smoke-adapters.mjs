@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.13', 'version bump');
+assert(manifest.version === '1.3.14', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -196,10 +196,18 @@ assert(
   partnersDoc.partners.every((p) => p.status === 'community'),
   'seed partners community (not verified)'
 );
+assert(
+  fs.existsSync(path.join(ext, 'lib/csi-partners.js')),
+  'csi-partners.js present'
+);
+assert(
+  manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
+  'partners content script listed'
+);
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.13', 'core version 1.3.13');
+assert(CSI.VERSION === '1.3.14', 'core version 1.3.14');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -219,10 +227,30 @@ assert(headerHtml.includes('csi-pdp-header') && headerHtml.includes('data-csi-ad
 assert(headerHtml.includes('csi-pdp-close'), 'PDP close stays in header');
 const cardBadges = CSI.ui.buildListingBadgeChips({ product: { cannabinoids: { THC: 20 } }, status: 'ok' });
 assert(!cardBadges.join('').includes('data-csi-adds'), 'chip is not a per-card badge');
+assert(!cardBadges.join('').includes('data-csi-partner'), 'partner chrome is not a per-card badge');
+
+const partnerCommunity = CSI.ui.buildPartnerChip({
+  status: 'community',
+  displayName: 'Sunnyside'
+});
+assert(partnerCommunity.includes('data-csi-partner="1"'), 'partner chip marker');
+assert(partnerCommunity.includes('Community adapter'), 'community label');
+assert(partnerCommunity.includes('Sunnyside'), 'registry displayName in chip');
+assert(!/Verified/.test(partnerCommunity), 'community is not verified');
+const partnerVerified = CSI.ui.buildPartnerChip({
+  status: 'verified',
+  displayName: 'Partner Co'
+});
+assert(partnerVerified.includes('Verified') && partnerVerified.includes('Partner Co'), 'verified uses registry name');
+assert(CSI.ui.buildPartnerChip({ status: 'community', displayName: '  ' }) === '', 'blank displayName — no chip');
+assert(CSI.ui.buildPartnerChip({ status: 'denied', displayName: 'Nope' }) === '', 'denied status — no chip');
+assert(CSI.ui.buildPartnerChip({ status: 'community' }) === '', 'missing displayName — no chip');
+assert(CSI.ui.buildPartnerChip(null) === '', 'null chrome — no chip');
 
 const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
 const pdpSrc = fs.readFileSync(path.join(ext, 'content-pdp.js'), 'utf8');
 assert(listingSrc.includes('${CSI.ui.buildWhatSageAddsChip()}'), 'listing filter bar mounts chip');
+assert(listingSrc.includes('CSI.partners?.mountChip?.(filterBar)'), 'listing mounts partner chip on filter bar');
 const renderBadgesFn = listingSrc.slice(
   listingSrc.indexOf('function renderBadges'),
   listingSrc.indexOf('async function enrichCard')

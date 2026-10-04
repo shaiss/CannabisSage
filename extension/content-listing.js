@@ -445,6 +445,7 @@
       }
     `;
     document.body.appendChild(filterBar);
+    CSI.partners?.mountChip?.(filterBar);
 
     filterBar.querySelector('#csi-upgrade-btn')?.addEventListener('click', () => {
       CSI.entitlement?.openUpgrade?.();

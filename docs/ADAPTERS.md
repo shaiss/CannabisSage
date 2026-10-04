@@ -4,7 +4,7 @@ CannabisSage supports multiple retailers through **in-repo store adapters**. Cor
 
 **Remote code is not supported.** Chrome Web Store policy forbids loading extension logic from the network. New stores ship as PRs that add files under `extension/adapters/` and update the manifest.
 
-Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only) — see [`docs/DENYLIST.md`](DENYLIST.md). The landing **Supported** list is a separate HTTPS JSON registry keyed by hostname — see [`docs/PARTNERS.md`](PARTNERS.md). Never treat adapter `displayName` as the public list.
+Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only) — see [`docs/DENYLIST.md`](DENYLIST.md). The landing **Supported** list and in-page community/verified chips come from a separate HTTPS JSON registry keyed by hostname — see [`docs/PARTNERS.md`](PARTNERS.md). Never treat adapter `displayName` as the public list or as partner chrome.
 
 ## Layout
 

@@ -576,6 +576,44 @@
   flex: 0 1 auto;
 }
 
+.csi-partner-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.35;
+  font-weight: 500;
+  color: #445;
+  background: #fafafa;
+  border: 1px solid #e4e7eb;
+  border-radius: 999px;
+  padding: 2px 8px;
+  max-width: min(420px, 100%);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.csi-partner-name {
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.csi-partner-status {
+  font-weight: 500;
+  color: #556;
+}
+
+.csi-partner-chip[data-csi-partner-status='verified'] {
+  background: #f6f8f6;
+}
+
+#csi-filter-bar .csi-partner-chip {
+  flex: 0 1 auto;
+}
+
+.csi-pdp-header .csi-partner-chip {
+  align-self: flex-start;
+}
+
 .csi-pdp-header {
   display: flex;
   flex-direction: column;

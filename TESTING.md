@@ -221,7 +221,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.13.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.14.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -260,6 +260,20 @@ Public list of supported hosts. Not adapter display names. Denylist wins.
 | Registry `denied` rows omitted | |
 | TerraVida/Malvern is not a separate invented hostname | |
 | Ops notes in `docs/PARTNERS.md` | |
+| `node scripts/smoke-partners.mjs` exits 0 | |
+
+## In-page partner chrome (v1.3.14)
+
+Extension fetches `/partners.json` (same origin/TTL as denylist). Calm chip on listing + PDP only.
+
+| Step | Pass? |
+| --- | --- |
+| Seed hosts show **Community adapter** + registry `displayName` (Sunnyside / Zen Leaf), not Verified | |
+| Chip sits in the listing filter bar and PDP header — not on every product card | |
+| Chip uses registry `displayName`, not adapter `displayName` (Malvern still labeled Zen Leaf) | |
+| Host on denylist: pause notice only; no partner/Supported/verified/community chip | |
+| Missing or invalid `partners.json`: no chip; listing/PDP otherwise continue | |
+| No DNS TXT or `/.well-known` fetch | |
 | `node scripts/smoke-partners.mjs` exits 0 | |
 
 ## P3 — Monetization (Stripe test mode)

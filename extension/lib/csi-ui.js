@@ -85,6 +85,30 @@
   }
 
   /**
+   * Calm partner chrome (listing filter bar + PDP header only).
+   * Uses ops registry displayName — never adapter displayName.
+   * Verified only when registry status is verified; community otherwise.
+   */
+  const PARTNER_CHROME_COPY = {
+    verified: 'Verified',
+    community: 'Community adapter'
+  };
+
+  function buildPartnerChip(info) {
+    if (!info || typeof info !== 'object') return '';
+    if (info.status !== 'verified' && info.status !== 'community') return '';
+    const displayName = typeof info.displayName === 'string' ? info.displayName.trim() : '';
+    if (!displayName) return '';
+    const statusLabel =
+      info.status === 'verified' ? PARTNER_CHROME_COPY.verified : PARTNER_CHROME_COPY.community;
+    return `<span class="csi-partner-chip" data-csi-partner="1" data-csi-partner-status="${CSI.escapeHtml(
+      info.status
+    )}"><span class="csi-partner-name">${CSI.escapeHtml(
+      displayName
+    )}</span><span class="csi-partner-status">${CSI.escapeHtml(statusLabel)}</span></span>`;
+  }
+
+  /**
    * Floating PDP header. Chem stays in this panel (never the buy column).
    * Chip lives in the header so it is visible while loading and after render.
    */
@@ -808,6 +832,7 @@
 
   CSI.ui = {
     WHAT_SAGE_ADDS,
+    PARTNER_CHROME_COPY,
     TERP_OVERLAP_COPY,
     DEAL_VS_MEDIAN_COPY,
     PROVENANCE_COPY,
@@ -817,6 +842,7 @@
     formatCannabinoids,
     formatTerpenes,
     buildWhatSageAddsChip,
+    buildPartnerChip,
     buildPdpHeader,
     buildDealVsMedianBadge,
     buildDealVsMedianStrip,

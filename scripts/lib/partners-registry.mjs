@@ -64,3 +64,19 @@ export function listSupportedPartners(partnersDoc, denylistDoc) {
   const denied = new Set(parseDenylistHosts(denylistDoc));
   return parsed.partners.filter((p) => p.status !== 'denied' && !denied.has(p.host));
 }
+
+/**
+ * In-page partner chrome. Denylist wins. Missing/invalid registry → no chip.
+ * Never invents displayName.
+ */
+export function lookupPartnerChrome(hostname, partnersDoc, denylistDoc) {
+  const host = normalizeHost(hostname);
+  if (!isValidHostname(host)) return null;
+  if (parseDenylistHosts(denylistDoc).includes(host)) return null;
+  const parsed = parsePartnersDocument(partnersDoc);
+  if (!parsed) return null;
+  const row = parsed.partners.find((p) => p.host === host);
+  if (!row) return null;
+  if (row.status !== 'verified' && row.status !== 'community') return null;
+  return { host: row.host, status: row.status, displayName: row.displayName };
+}

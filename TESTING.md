@@ -48,6 +48,7 @@ Checks per listing:
 | Floating panel **header** shows the same **what CannabisSage adds** chip (loading and loaded). Expand stays calm; no retailer name; no new Pro button | |
 | PDP panel appears with chem readout or empty/error state | |
 | Preference match, when taste-map is on and chem overlaps saved prefs (see v1.3.11). Otherwise the panel stays quiet | |
+| Nearby chem on this menu: up to 3 same-host neighbors from cached listed chem, or a calm “not enough” note (see v1.3.15) | |
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
 
@@ -221,12 +222,31 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.14.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.15.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
 | `node scripts/smoke-partners.mjs` exits 0 | |
 | `node web/scripts/smoke-monetization.mjs` exits 0 | |
+
+## Similar-by-chem (v1.3.15+)
+
+Same-menu neighbors on the **floating PDP** only. Ranked from retailer-published cannabinoids and terpenes already in the 6-hour product cache (typically after browsing a listing). No extra catalog scrape, no invented lab numbers, no strain-name medical framing. Chem labels are primary; product name is secondary.
+
+Free, like compare overlap. Missing cache or too few neighbors: one calm note — not an error banner and not an Upgrade wall. Core PDP chem stays visible.
+
+| Step | Pass? |
+| --- | --- |
+| Browse a category listing until several cards have chem, then open a PDP | |
+| Panel shows **Nearby chem on this menu** with at most 3 rows | |
+| Each row leads with listed terp/THC, not the strain name; name if shown is quieter | |
+| Shared named terpenes are listed when they overlap | |
+| Neighbor links stay on this store host | |
+| Open a PDP with no prior listing cache: calm “not enough listed chemistry” note, no red error | |
+| Product with no published chem: existing empty state only — no neighbor list | |
+| Free plan shows neighbors. No new Upgrade control on the similar block | |
+| Copy does not name a retailer or make medical/effects claims | |
+| `node scripts/smoke-adapters.mjs` exits 0 | |
 
 ## What CannabisSage adds (v1.3.7+)
 

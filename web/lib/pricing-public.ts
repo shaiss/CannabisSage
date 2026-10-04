@@ -45,6 +45,7 @@ export const FEATURE_GATES = {
     'Basic THC / terpene badges',
     'Compare tray (up to 3)',
     'Product detail panel',
+    'Same-menu nearby chem',
     'Core supported dispensary menus'
   ],
   /** Pro bullets lead with money-savers: match, multi-store coverage, $/mg. */

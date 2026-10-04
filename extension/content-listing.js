@@ -163,6 +163,24 @@
       !CSI.hasCannabinoidInfo(product.cannabinoids) && !CSI.hasTerpeneInfo(product.terpenes);
     product.status = empty ? 'empty' : product.status || 'ok';
     CSI.storeElementProduct(cardEl, product);
+    if (
+      url &&
+      product.status !== 'error' &&
+      CSI.storage?.getPdpCache &&
+      CSI.storage?.setPdpCache &&
+      (CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes))
+    ) {
+      const cached = await CSI.storage.getPdpCache(url);
+      if (!cached) {
+        await CSI.storage.setPdpCache(url, {
+          url,
+          name: product.name,
+          cannabinoids: product.cannabinoids,
+          terpenes: product.terpenes,
+          status: product.status
+        });
+      }
+    }
     renderBadges(cardEl, product, product.status);
     return product;
   }

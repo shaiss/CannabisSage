@@ -5,6 +5,7 @@ export const FEATURE_GATES = {
     'basicBadges',
     'compareTray',
     'pdpPanel',
+    'similarByChem',
     'sunnysideStore'
   ],
   /** Requires active Pro license */

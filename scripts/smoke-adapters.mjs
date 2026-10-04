@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.14', 'version bump');
+assert(manifest.version === '1.3.15', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +207,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.14', 'core version 1.3.14');
+assert(CSI.VERSION === '1.3.15', 'core version 1.3.15');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -643,8 +643,163 @@ assert(pdpSrc.includes('buildPreferenceMatchPanel(product, product.tasteMap)'), 
 assert(!pdpSrc.includes('Map match ${'), 'pdp no longer uses the ungated percent badge');
 assert(pdpSrc.includes('clearPdpBuyboxChemInject'), 'preference match stays out of the buy column');
 const featuresSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-features.js'), 'utf8');
+const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
 assert(/tasteMap:\s*true/.test(featuresSrcPref), 'tasteMap stays the existing gate');
 assert(!/preferenceMatch:/.test(featuresSrcPref), 'no second gate for the product-page match');
+
+// Similar-by-chem same menu (v1.3.15) — cosine of listed chem, cached neighbors, Free
+assert(CSI.SIMILAR_CHEM_MAX_NEIGHBORS === 3, 'at most three neighbors');
+assert(CSI.SIMILAR_CHEM_MIN_SCORE === 0.4, 'cosine floor');
+const similarCopy = Object.values(CSI.ui.SIMILAR_CHEM_COPY).join(' ');
+assert(CSI.ui.SIMILAR_CHEM_COPY.title === 'Nearby chem on this menu', 'similar title');
+assert(/cannabinoids and terpenes/.test(CSI.ui.SIMILAR_CHEM_COPY.lead), 'lead names listed chem');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida|savvy/i.test(similarCopy), 'no retailer brand in similar copy');
+assert(
+  !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria|strain)\b/i.test(
+    similarCopy
+  ),
+  'no medical, effects, or strain-name framing in similar copy'
+);
+
+const flowerA = {
+  url: 'https://www.sunnyside.shop/product/a',
+  name: 'Alpha Label',
+  cannabinoids: { THC: 22 },
+  terpenes: [
+    { name: 'Limonene', percentage: 0.55 },
+    { name: 'Myrcene', percentage: 0.2 }
+  ]
+};
+const flowerB = {
+  url: 'https://www.sunnyside.shop/product/b',
+  name: 'Beta Label',
+  cannabinoids: { THC: 21 },
+  terpenes: { Limonene: 0.5, Myrcene: 0.18, Pinene: 0.05 }
+};
+const flowerFar = {
+  url: 'https://www.sunnyside.shop/product/c',
+  name: 'Far',
+  cannabinoids: { THC: 8 },
+  terpenes: { Linalool: 0.9 }
+};
+const otherHost = {
+  url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-1/x',
+  cannabinoids: { THC: 22 },
+  terpenes: { Limonene: 0.55, Myrcene: 0.2 }
+};
+const rankedNear = CSI.rankSimilarByChem(flowerA, [flowerB, flowerFar, otherHost, flowerA], {
+  host: 'www.sunnyside.shop',
+  origin: 'https://www.sunnyside.shop'
+});
+assert(rankedNear.neighbors.length === 1, `one same-menu neighbor ${rankedNear.neighbors.length}`);
+assert(rankedNear.neighbors[0].url.endsWith('/product/b'), 'closest chem wins');
+assert(rankedNear.neighbors[0].sharedTerpenes.includes('Limonene'), 'shared named terp');
+assert(rankedNear.neighbors[0].score >= CSI.SIMILAR_CHEM_MIN_SCORE, 'score at or above floor');
+assert(!rankedNear.neighbors.some((n) => /zenleaf/i.test(n.url)), 'other host excluded');
+
+const noShared = CSI.rankSimilarByChem(flowerA, [flowerFar], {
+  host: 'www.sunnyside.shop'
+});
+assert(noShared.neighbors.length === 0, 'no shared named terp is not a neighbor');
+
+const cannOnly = CSI.rankSimilarByChem(
+  { url: 'https://www.sunnyside.shop/product/t1', cannabinoids: { THC: 20 } },
+  [
+    { url: 'https://www.sunnyside.shop/product/t2', cannabinoids: { THC: 21 } },
+    { url: 'https://www.sunnyside.shop/product/t3', cannabinoids: { THC: 40 } }
+  ],
+  { host: 'www.sunnyside.shop' }
+);
+assert(cannOnly.neighbors.length === 1 && cannOnly.neighbors[0].url.endsWith('/t2'), 'THC-near cannabinoid-only neighbor');
+
+const cannTotals = CSI.rankSimilarByChem(
+  { url: 'https://www.sunnyside.shop/product/u1', terpenes: { 'Total Terpenes': 2.1 }, cannabinoids: { THC: 20 } },
+  [{ url: 'https://www.sunnyside.shop/product/u2', terpenes: { 'Total Terpenes': 2.0 }, cannabinoids: { THC: 21 } }],
+  { host: 'www.sunnyside.shop' }
+);
+assert(cannTotals.neighbors.length === 1, 'total-only terps fall back to THC nearness');
+
+assert(
+  CSI.readThcPercent({ THCA: 30, THC: 22, totalTHC: 26 }) === 30,
+  'listing readThcPercent still prefers THCA'
+);
+assert(
+  CSI.readListedThcPercent({ THCA: 30, THC: 22, totalTHC: 26 }) === 22,
+  'similar-by-chem prefers listed THC over THCA'
+);
+const mixedVec = CSI.chemSimilarityVector({ cannabinoids: { THCA: 30, THC: 22 } });
+assert(Math.abs(mixedVec.THC - 0.22) < 1e-9, 'vector uses listed THC when THCA is also present');
+assert(
+  Math.abs(CSI.chemSimilarityVector({ cannabinoids: { THCA: 30, totalTHC: 26 } }).THC - 0.26) < 1e-9,
+  'vector uses totalTHC when THC is absent'
+);
+assert(
+  Math.abs(CSI.chemSimilarityVector({ cannabinoids: { THCA: 30 } }).THC - 0.3) < 1e-9,
+  'THCA-only menus still get a THC dimension'
+);
+const thcNotThca = CSI.rankSimilarByChem(
+  { url: 'https://www.sunnyside.shop/product/m1', cannabinoids: { THC: 22, THCA: 8 } },
+  [
+    { url: 'https://www.sunnyside.shop/product/m2', cannabinoids: { THC: 21, THCA: 40 } },
+    { url: 'https://www.sunnyside.shop/product/m3', cannabinoids: { THC: 8, THCA: 8 } }
+  ],
+  { host: 'www.sunnyside.shop' }
+);
+assert(
+  thcNotThca.neighbors.length === 1 && thcNotThca.neighbors[0].url.endsWith('/m2'),
+  'cannabinoid-only nearness uses listed THC, not THCA'
+);
+
+const invent = CSI.chemSimilarityVector({ cannabinoids: {}, terpenes: {} });
+assert(Object.keys(invent).length === 0, 'missing chem is not a guessed vector');
+
+assert(
+  CSI.rankSimilarByChem({ status: 'empty', ...flowerA }, [flowerB]).neighbors.length === 0,
+  'empty anchor has no neighbors'
+);
+
+sandbox.CSI.features = { can: () => false };
+assert(CSI.ui.buildSimilarByChemPanel({ similarByChem: rankedNear }) === '', 'gate off renders nothing');
+sandbox.CSI.features = { can: (id) => id === 'similarByChem' };
+const similarHtml = CSI.ui.buildSimilarByChemPanel({ similarByChem: rankedNear });
+assert(similarHtml.includes('data-csi-similar-chem="1"'), 'similar panel marker');
+assert(similarHtml.includes('Nearby chem on this menu'), 'title copy');
+assert(similarHtml.includes('Limonene'), 'chem label in row');
+assert(similarHtml.includes('Beta Label'), 'name is secondary');
+assert(similarHtml.indexOf('Limonene') < similarHtml.indexOf('Beta Label'), 'chem before name');
+assert(!/Upgrade|openUpgrade/i.test(similarHtml), 'similar panel has no upgrade control');
+assert(
+  CSI.ui.buildSimilarByChemPanel({ similarByChem: { neighbors: [], note: CSI.ui.SIMILAR_CHEM_COPY.tooFew } }).includes(
+    'csi-similar-chem-note'
+  ),
+  'too few is a calm note'
+);
+assert(CSI.ui.buildSimilarByChemPanel({ similarByChem: { neighbors: [] } }) === '', 'empty without note is omitted');
+delete sandbox.CSI.features;
+
+assert(/similarByChem:\s*true/.test(featuresSrcPref), 'similarByChem is free');
+assert(!/const PRO_FEATURES = \{[^}]*similarByChem/s.test(featuresSrcPref), 'similarByChem is not Pro');
+assert(gatesSrc.includes("'similarByChem'"), 'landing free gates list similarByChem');
+assert(pdpSrc.includes('buildSimilarByChemPanel(product)'), 'floating panel mounts similar chem');
+assert(pdpSrc.includes('attachSimilarByChem'), 'pdp attaches neighbors');
+assert(pdpSrc.includes('listPdpCache'), 'pdp reads existing product cache');
+const similarAttach = pdpSrc.slice(
+  pdpSrc.indexOf('async function attachSimilarByChem'),
+  pdpSrc.indexOf('function clearPdpBuyboxChemInject')
+);
+assert(similarAttach.length > 0, 'attach exists');
+assert(!/fetchProductDetails/.test(similarAttach), 'neighbors do not call fetchProductDetails');
+assert(!/openUpgrade/.test(similarAttach), 'missing neighbors do not nag to upgrade');
+assert(!/FETCH_PRODUCT_HTML|sendMessage/.test(similarAttach), 'neighbors do not fetch extra product HTML');
+assert(listingSrc.includes('setPdpCache'), 'listing writes chem into the existing TTL cache');
+assert(!listingSrc.includes('buildSimilarByChemPanel'), 'listing does not spam neighbor cards');
+assert(storageSrc.includes('function listPdpCache'), 'storage lists cache by host');
+assert(storageSrc.includes('CACHE_PREFIX'), 'neighbors reuse pdp cache keys');
+const loadMediansSrc = storageSrc.slice(
+  storageSrc.indexOf('async function loadCategoryMedians'),
+  storageSrc.indexOf('async function saveCategoryMedians')
+);
+assert(/normalizeHostName\(snap\.host\)/.test(loadMediansSrc), 'category medians host is www-insensitive');
 
 // Soft Pro unlock mid-browse (v1.3.12) — after chem is visible, not a wall
 const softCopy = Object.values(CSI.ui.SOFT_UNLOCK_COPY).join(' ');
@@ -714,7 +869,6 @@ assert(/hoverTooltip:\s*true/.test(featuresSrcPref), 'hover stays free');
 assert(/compareTray:\s*true/.test(featuresSrcPref), 'compare stays free');
 assert(/pdpPanel:\s*true/.test(featuresSrcPref), 'product panel stays free');
 assert(/basicBadges:\s*true/.test(featuresSrcPref), 'chem badges stay free');
-const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
 assert(storageSrc.includes("SOFT_UNLOCK_DISMISS: 'csi_soft_unlock_dismissed'"), 'dismiss key');
 assert(storageSrc.includes('function loadSoftUnlockDismissed'), 'dismiss load');
 assert(storageSrc.includes('function saveSoftUnlockDismissed'), 'dismiss save');

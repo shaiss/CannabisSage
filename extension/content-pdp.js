@@ -71,6 +71,7 @@
         failed.price = failed.price ?? CSI.parsePrice(document.body?.innerText || '');
         await attachDealVsMedian(failed);
         await attachPreferenceMatch(failed);
+        await attachSimilarByChem(failed);
         return failed;
       }
       product = {
@@ -100,6 +101,7 @@
 
     await attachDealVsMedian(product);
     await attachPreferenceMatch(product);
+    await attachSimilarByChem(product);
     return product;
   }
 
@@ -142,6 +144,57 @@
       stats && stats.median,
       stats && stats.sampleCount
     );
+  }
+
+  /**
+   * Same-menu neighbors from already-cached listing/PDP chem on this host.
+   * No extra product fetches and no new catalog. Too few neighbors → calm note.
+   * Free: the list is chem, not a Pro wall. Gate off (if ever) omits the block.
+   */
+  async function attachSimilarByChem(product) {
+    product.similarByChem = null;
+    if (!CSI.features?.can?.('similarByChem')) return;
+    if (!product || product.status === 'error' || product.status === 'empty') return;
+    if (!CSI.hasCannabinoidInfo(product.cannabinoids) && !CSI.hasTerpeneInfo(product.terpenes)) {
+      return;
+    }
+    const host = typeof location !== 'undefined' ? location.hostname : '';
+    const origin = typeof location !== 'undefined' ? location.origin : '';
+    const entries = (await CSI.storage?.listPdpCache?.({ host })) || [];
+    const snap = await CSI.storage?.loadCategoryMedians?.(host);
+    const byUrl = new Map();
+    (snap && Array.isArray(snap.products) ? snap.products : []).forEach((row) => {
+      if (!row || !row.url) return;
+      byUrl.set(CSI.normalizeMenuUrl(row.url, origin), row.categoryKey || null);
+    });
+    let categoryKey = CSI.categoryKeyFromPath(
+      typeof location !== 'undefined' ? location.pathname : ''
+    );
+    const selfUrl = CSI.normalizeMenuUrl(product.url || (typeof location !== 'undefined' ? location.href : ''), origin);
+    if (!categoryKey && selfUrl) categoryKey = byUrl.get(selfUrl) || null;
+    if (categoryKey) product.categoryKey = product.categoryKey || categoryKey;
+
+    const candidates = entries.map((row) => {
+      const url = CSI.normalizeMenuUrl(row.url, origin);
+      const data = row.data && typeof row.data === 'object' ? row.data : {};
+      return {
+        ...data,
+        url,
+        categoryKey: data.categoryKey || byUrl.get(url) || null
+      };
+    });
+
+    const ranked = CSI.rankSimilarByChem(product, candidates, {
+      host,
+      origin,
+      categoryKey: product.categoryKey || categoryKey || null,
+      max: CSI.SIMILAR_CHEM_MAX_NEIGHBORS,
+      minScore: CSI.SIMILAR_CHEM_MIN_SCORE
+    });
+    if (!ranked.neighbors.length) {
+      ranked.note = CSI.ui?.SIMILAR_CHEM_COPY?.tooFew || '';
+    }
+    product.similarByChem = ranked;
   }
 
   function clearPdpBuyboxChemInject() {
@@ -211,6 +264,7 @@
       ${CSI.ui.buildPdpHeader({ showClose: true })}
       ${CSI.ui.buildProvenanceStrip(product.provenance)}
       ${prefMatch}
+      ${CSI.ui.buildSimilarByChemPanel(product)}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
       ${medianStrip}
       <div class="csi-pdp-body">${body}</div>

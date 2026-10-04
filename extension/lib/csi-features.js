@@ -13,6 +13,7 @@
     basicBadges: true,
     compareTray: true,
     pdpPanel: true,
+    similarByChem: true,
     sunnysideStore: true
   };
 

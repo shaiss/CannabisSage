@@ -405,7 +405,7 @@
       const shown = formatListedPercent(top.percentage);
       bits.push(shown ? `${top.name} ${shown}%` : top.name);
     }
-    const thc = CSI.readThcPercent(row && row.cannabinoids);
+    const thc = CSI.readListedThcPercent(row && row.cannabinoids);
     if (thc != null) bits.push(`THC ${thc.toFixed(1)}%`);
     return bits.join(' · ');
   }

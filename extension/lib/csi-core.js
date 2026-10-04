@@ -238,6 +238,27 @@
     return parsePercent(cannabinoids.THCA ?? cannabinoids.thca ?? cannabinoids.totalTHCA);
   }
 
+  /**
+   * THC% from listed labels: THC, then totalTHC, then THCA if that is all
+   * the menu published. Distinct from readThcPercent (THCA-first for $/mg).
+   */
+  function readListedThcPercent(cannabinoids) {
+    if (!cannabinoids) return null;
+    const candidates = [
+      cannabinoids.THC,
+      cannabinoids.thc,
+      cannabinoids.totalTHC,
+      cannabinoids.total_thc,
+      cannabinoids.THCA,
+      cannabinoids.thca
+    ];
+    for (const c of candidates) {
+      const n = parsePercent(c);
+      if (n !== null && n > 0) return n;
+    }
+    return null;
+  }
+
   function activeAdapter() {
     return global.CSI?.registry?.getActiveAdapter?.() || global.CSI?._activeAdapter || null;
   }
@@ -378,7 +399,7 @@
   function chemSimilarityVector(product) {
     const dims = {};
     if (!product) return dims;
-    const thc = readThcPercent(product.cannabinoids);
+    const thc = readListedThcPercent(product.cannabinoids);
     if (thc != null && thc > 0) dims.THC = thc / 100;
     const cbd = parsePercent(
       product.cannabinoids?.CBD ?? product.cannabinoids?.cbd ?? product.cannabinoids?.totalCBD
@@ -467,8 +488,8 @@
       if (anchorHasTerps || candHasTerps) {
         if (!shared.length) return;
       } else {
-        const aThc = readThcPercent(anchor.cannabinoids);
-        const bThc = readThcPercent(cand.cannabinoids);
+        const aThc = readListedThcPercent(anchor.cannabinoids);
+        const bThc = readListedThcPercent(cand.cannabinoids);
         if (aThc == null || bThc == null) return;
         if (Math.abs(aThc - bThc) > SIMILAR_CHEM_THC_NEAR_PTS) return;
       }
@@ -923,6 +944,7 @@
     topTerpene,
     readThcPercent,
     readThcaPercent,
+    readListedThcPercent,
     buildProductUrl,
     extractProductData,
     scoreTasteMatch,

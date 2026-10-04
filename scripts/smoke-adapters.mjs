@@ -719,6 +719,37 @@ const cannTotals = CSI.rankSimilarByChem(
 );
 assert(cannTotals.neighbors.length === 1, 'total-only terps fall back to THC nearness');
 
+assert(
+  CSI.readThcPercent({ THCA: 30, THC: 22, totalTHC: 26 }) === 30,
+  'listing readThcPercent still prefers THCA'
+);
+assert(
+  CSI.readListedThcPercent({ THCA: 30, THC: 22, totalTHC: 26 }) === 22,
+  'similar-by-chem prefers listed THC over THCA'
+);
+const mixedVec = CSI.chemSimilarityVector({ cannabinoids: { THCA: 30, THC: 22 } });
+assert(Math.abs(mixedVec.THC - 0.22) < 1e-9, 'vector uses listed THC when THCA is also present');
+assert(
+  Math.abs(CSI.chemSimilarityVector({ cannabinoids: { THCA: 30, totalTHC: 26 } }).THC - 0.26) < 1e-9,
+  'vector uses totalTHC when THC is absent'
+);
+assert(
+  Math.abs(CSI.chemSimilarityVector({ cannabinoids: { THCA: 30 } }).THC - 0.3) < 1e-9,
+  'THCA-only menus still get a THC dimension'
+);
+const thcNotThca = CSI.rankSimilarByChem(
+  { url: 'https://www.sunnyside.shop/product/m1', cannabinoids: { THC: 22, THCA: 8 } },
+  [
+    { url: 'https://www.sunnyside.shop/product/m2', cannabinoids: { THC: 21, THCA: 40 } },
+    { url: 'https://www.sunnyside.shop/product/m3', cannabinoids: { THC: 8, THCA: 8 } }
+  ],
+  { host: 'www.sunnyside.shop' }
+);
+assert(
+  thcNotThca.neighbors.length === 1 && thcNotThca.neighbors[0].url.endsWith('/m2'),
+  'cannabinoid-only nearness uses listed THC, not THCA'
+);
+
 const invent = CSI.chemSimilarityVector({ cannabinoids: {}, terpenes: {} });
 assert(Object.keys(invent).length === 0, 'missing chem is not a guessed vector');
 
@@ -752,17 +783,23 @@ assert(gatesSrc.includes("'similarByChem'"), 'landing free gates list similarByC
 assert(pdpSrc.includes('buildSimilarByChemPanel(product)'), 'floating panel mounts similar chem');
 assert(pdpSrc.includes('attachSimilarByChem'), 'pdp attaches neighbors');
 assert(pdpSrc.includes('listPdpCache'), 'pdp reads existing product cache');
-assert(!pdpSrc.includes('fetchProductDetails') || pdpSrc.indexOf('async function attachSimilarByChem') > 0, 'attach exists');
 const similarAttach = pdpSrc.slice(
   pdpSrc.indexOf('async function attachSimilarByChem'),
   pdpSrc.indexOf('function clearPdpBuyboxChemInject')
 );
+assert(similarAttach.length > 0, 'attach exists');
+assert(!/fetchProductDetails/.test(similarAttach), 'neighbors do not call fetchProductDetails');
 assert(!/openUpgrade/.test(similarAttach), 'missing neighbors do not nag to upgrade');
 assert(!/FETCH_PRODUCT_HTML|sendMessage/.test(similarAttach), 'neighbors do not fetch extra product HTML');
 assert(listingSrc.includes('setPdpCache'), 'listing writes chem into the existing TTL cache');
 assert(!listingSrc.includes('buildSimilarByChemPanel'), 'listing does not spam neighbor cards');
 assert(storageSrc.includes('function listPdpCache'), 'storage lists cache by host');
 assert(storageSrc.includes('CACHE_PREFIX'), 'neighbors reuse pdp cache keys');
+const loadMediansSrc = storageSrc.slice(
+  storageSrc.indexOf('async function loadCategoryMedians'),
+  storageSrc.indexOf('async function saveCategoryMedians')
+);
+assert(/normalizeHostName\(snap\.host\)/.test(loadMediansSrc), 'category medians host is www-insensitive');
 
 // Soft Pro unlock mid-browse (v1.3.12) — after chem is visible, not a wall
 const softCopy = Object.values(CSI.ui.SOFT_UNLOCK_COPY).join(' ');

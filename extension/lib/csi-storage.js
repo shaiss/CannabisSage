@@ -184,15 +184,18 @@
   }
 
   /** Drop expired cache entries (best-effort). */
+  function normalizeHostName(host) {
+    return String(host || '')
+      .replace(/^www\./i, '')
+      .toLowerCase();
+  }
+
   function cacheEntryHostMatches(url, host) {
     if (!host) return true;
     if (typeof CSI.sameMenuHost === 'function') return CSI.sameMenuHost(url, host);
     try {
       const u = new URL(url);
-      return (
-        u.hostname.replace(/^www\./i, '').toLowerCase() ===
-        String(host).replace(/^www\./i, '').toLowerCase()
-      );
+      return normalizeHostName(u.hostname) === normalizeHostName(host);
     } catch {
       return false;
     }
@@ -245,7 +248,7 @@
     const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
     const snap = data[KEYS.CATEGORY_MEDIANS];
     if (!snap || typeof snap !== 'object') return null;
-    if (host && snap.host !== host) return null;
+    if (host && normalizeHostName(snap.host) !== normalizeHostName(host)) return null;
     const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
     if (!snap.savedAt || Date.now() - snap.savedAt > ttl) {
       await storageRemove([KEYS.CATEGORY_MEDIANS]);

@@ -221,10 +221,11 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.12.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.13.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
+| `node scripts/smoke-partners.mjs` exits 0 | |
 | `node web/scripts/smoke-monetization.mjs` exits 0 | |
 
 ## What CannabisSage adds (v1.3.7+)
@@ -246,6 +247,20 @@ One calm chip, free and Pro. Copy must not name a retailer or make medical/effec
 | Adding a host → calm notice “Support for this store is paused.”; no badges/compare inject | |
 | Manifest `host_permissions` for retailer hosts unchanged | |
 | Ops notes in `docs/DENYLIST.md` | |
+
+## Partner registry / Supported landing (v1.3.13+)
+
+Public list of supported hosts. Not adapter display names. Denylist wins.
+
+| Step | Pass? |
+| --- | --- |
+| `https://cannabissage.app/partners.json` (or local `web/public/partners.json`) is `{ version, partners: [...] }` | |
+| Seeds are `community` (Sunnyside + Zen Leaf hosts); no verified badge on landing | |
+| Host on `denylist.json` does not appear under Supported even if registry says community/verified | |
+| Registry `denied` rows omitted | |
+| TerraVida/Malvern is not a separate invented hostname | |
+| Ops notes in `docs/PARTNERS.md` | |
+| `node scripts/smoke-partners.mjs` exits 0 | |
 
 ## P3 — Monetization (Stripe test mode)
 

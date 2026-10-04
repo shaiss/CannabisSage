@@ -68,7 +68,9 @@ export default function PrivacyPage() {
             <li>
               <strong>CannabisSage site (network):</strong> Entitlement APIs and a small HTTPS{' '}
               <strong>denylist JSON</strong> (<code>/denylist.json</code>) — configuration only,
-              never executable code.
+              never executable code. The website also publishes a public{' '}
+              <strong>partners JSON</strong> (<code>/partners.json</code>) for the landing Supported
+              list — configuration only.
             </li>
           </ol>
 
@@ -132,7 +134,7 @@ export default function PrivacyPage() {
                   <td><code>https://cannabissage.app/*</code></td>
                   <td>
                     Primary production origin: entitlement activate/validate against the CannabisSage
-                    API; Upgrade/Manage deep links; remote denylist JSON.
+                    API; Upgrade/Manage deep links; remote denylist JSON; public partners JSON.
                   </td>
                 </tr>
                 <tr>

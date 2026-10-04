@@ -10,7 +10,7 @@ Production (default):
 https://cannabissage.app/denylist.json
 ```
 
-Served from `web/public/denylist.json` on the CannabisSage Vercel site. Override for local testing via `chrome.storage.local.csi_api_base` (same as entitlement) or `extension/data/config.json` → `denylistPath` (default `/denylist.json`).
+Served from `web/public/denylist.json` on the CannabisSage Vercel site. Override for local testing via `chrome.storage.local.csi_api_base` (same as entitlement) or `extension/data/config.json` → `denylistPath` (default `/denylist.json`). Partner registry lives on the same plane (`/partners.json`) — see [`docs/PARTNERS.md`](PARTNERS.md). **Denylist wins** over a partner `verified` or `community` status.
 
 ## Schema
 

@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "updatedAt": "2026-10-04T00:00:00.000Z",
+  "partners": [
+    {
+      "host": "sunnyside.shop",
+      "status": "community",
+      "displayName": "Sunnyside"
+    },
+    {
+      "host": "zenleafdispensaries.com",
+      "status": "community",
+      "displayName": "Zen Leaf",
+      "notes": "TerraVida Holistic Centers (Malvern) is a path alias on this host, not a separate ecommerce hostname."
+    }
+  ]
+}

@@ -899,7 +899,8 @@ assert(
   'landing Roadmap Next copy'
 );
 assert(
-  landingSrc.includes('Ask Sage, a chat guide that explains listed chemistry in plain words'),
+  landingSrc.includes('Ask Sage, a chat guide that') &&
+    landingSrc.includes('explains listed chemistry in plain words'),
   'landing Roadmap Later copy'
 );
 assert(

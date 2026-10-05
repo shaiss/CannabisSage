@@ -394,13 +394,24 @@
     return CSI.profile?.exportJson?.(profile) || { ok: false, error: 'profile module missing' };
   }
 
+  let boughtBeforeWrite = Promise.resolve();
+
   async function setBoughtBeforeFlag(url, flag) {
+    const run = boughtBeforeWrite.then(() => setBoughtBeforeFlagUnlocked(url, flag));
+    boughtBeforeWrite = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  async function setBoughtBeforeFlagUnlocked(url, flag) {
     const profile = await loadTasteProfile();
     if (!profile.enabled) return { ok: false, error: 'profile is not enabled' };
     const key = CSI.profile.productKeyFromUrl(url);
     if (!key) return { ok: false, error: 'unsupported product URL' };
-    const nextFlag = profile.boughtBefore[key] === flag ? null : flag;
-    const boughtBefore = { ...profile.boughtBefore };
+    const nextFlag = (profile.boughtBefore || {})[key] === flag ? null : flag;
+    const boughtBefore = { ...(profile.boughtBefore || {}) };
     if (!nextFlag) delete boughtBefore[key];
     else boughtBefore[key] = nextFlag;
     return saveTasteProfile({ ...profile, boughtBefore });

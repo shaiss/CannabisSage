@@ -158,32 +158,45 @@
   function getElementProduct(el) {
     if (!el?.dataset?.csiProductData) return null;
     try {
-      return JSON.parse(el.dataset.csiProductData);
+      return omitSensitivePrefs(JSON.parse(el.dataset.csiProductData));
     } catch {
       return null;
     }
   }
 
+  /**
+   * Host-page `data-csi-product-data` is readable by retailer origin JS.
+   * Taste profile / taste-map prefs stay in chrome.storage.local only.
+   */
+  function omitSensitivePrefs(data) {
+    if (!data || typeof data !== 'object') return data;
+    const out = { ...data };
+    delete out.tasteProfile;
+    delete out.tasteMap;
+    return out;
+  }
+
   function storeElementProduct(el, partialData) {
     if (!el || !partialData) return;
-    const existing = getElementProduct(el) || {};
+    const existing = omitSensitivePrefs(getElementProduct(el) || {});
+    const incoming = omitSensitivePrefs(partialData);
     const merged = {
       ...existing,
-      ...partialData,
+      ...incoming,
       cannabinoids: {
         ...(existing.cannabinoids || {}),
-        ...(partialData.cannabinoids || {})
+        ...(incoming.cannabinoids || {})
       }
     };
-    if (partialData.terpenes !== undefined) {
-      if (Array.isArray(partialData.terpenes)) {
-        if (partialData.terpenes.length) merged.terpenes = partialData.terpenes;
-      } else if (partialData.terpenes) {
-        merged.terpenes = partialData.terpenes;
+    if (incoming.terpenes !== undefined) {
+      if (Array.isArray(incoming.terpenes)) {
+        if (incoming.terpenes.length) merged.terpenes = incoming.terpenes;
+      } else if (incoming.terpenes) {
+        merged.terpenes = incoming.terpenes;
       }
     }
     try {
-      el.dataset.csiProductData = JSON.stringify(merged);
+      el.dataset.csiProductData = JSON.stringify(omitSensitivePrefs(merged));
     } catch (e) {
       CSI.warn('Failed to cache element product', e);
     }

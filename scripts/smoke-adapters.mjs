@@ -1495,5 +1495,10 @@ assert(featuresSrcPref.includes('tasteProfile: true'), 'tasteProfile is Free');
 assert(/tasteMap:\s*true/.test(featuresSrcPref), 'taste-map remains Pro');
 assert(pdpSrc.includes('applyToTasteMap'), 'enabled profile can feed Pro taste-map scoring');
 assert(!/chrome\.storage\.sync/.test(storageSrc), 'profile uses local storage only');
+assert(!/p\.tasteProfile\s*=/.test(listingSrc) && !/product\.tasteProfile\s*=/.test(listingSrc), 'listing does not copy profile onto cards');
+assert(!/product\.tasteProfile/.test(pdpSrc), 'pdp keeps profile in content-script state');
+const fetchSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-fetch.js'), 'utf8');
+assert(fetchSrcPref.includes('delete out.tasteProfile') && fetchSrcPref.includes('delete out.tasteMap'), 'host product cache strips prefs');
+assert(fetchSrcPref.includes('omitSensitivePrefs'), 'host cache sanitizes data-csi-product-data');
 
 console.log('smoke-adapters: OK');

@@ -78,14 +78,14 @@
     const row = ensureBadgeRow(cardEl);
     const adapter = CSI.registry?.getActiveAdapter?.();
     const minMatch = state.tasteMap?.minMatchScore ?? 0.35;
-    if (product && state.profile?.enabled) product.tasteProfile = state.profile;
     const chips = CSI.ui.buildListingBadgeChips({
       product,
       status,
       cardEl,
       adapter,
       tasteMap: state.tasteMap,
-      minMatch
+      minMatch,
+      tasteProfile: state.profile
     });
     row.innerHTML = chips.join('');
     const note = CSI.ui.buildProvenanceListingNote?.(product?.provenance);
@@ -110,7 +110,6 @@
       document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
         const p = CSI.getElementProduct(card);
         if (!p) return;
-        p.tasteProfile = state.profile;
         renderBadges(card, p, p.status || 'ok');
       });
     });
@@ -797,7 +796,6 @@
             document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
               const p = CSI.getElementProduct(card);
               if (!p) return;
-              p.tasteProfile = state.profile;
               if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
               CSI.storeElementProduct(card, p);
               renderBadges(card, p, p.status || 'ok');

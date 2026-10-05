@@ -66,7 +66,10 @@ const sandbox = {
 sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 
-loadScripts(['lib/csi-core.js', 'lib/csi-profile.js', 'lib/csi-storage.js'], vm.createContext(sandbox));
+loadScripts(
+  ['lib/csi-core.js', 'lib/csi-profile.js', 'lib/csi-storage.js', 'lib/csi-fetch.js'],
+  vm.createContext(sandbox)
+);
 
 const CSI = sandbox.CSI;
 const assert = (cond, msg) => {
@@ -110,6 +113,19 @@ const rejectedTerp = CSI.profile.normalize({
   likedTerpenes: ['smells like candy']
 });
 assert(!rejectedTerp.ok, 'unknown terpene string rejected');
+
+const rejectedSubstring = CSI.profile.normalize({
+  enabled: true,
+  likedTerpenes: ['contains limonene']
+});
+assert(!rejectedSubstring.ok, 'substring terpene phrases are rejected');
+
+const aliasTerp = CSI.profile.normalize({
+  enabled: true,
+  likedTerpenes: ['myrcene', 'Limonene']
+});
+assert(aliasTerp.ok && aliasTerp.value.likedTerpenes.includes('Beta-Myrcene'), 'explicit myrcene alias');
+assert(aliasTerp.value.likedTerpenes.includes('Limonene'), 'canonical Limonene id');
 
 const rejectedForm = CSI.profile.normalize({
   enabled: true,
@@ -169,6 +185,38 @@ const flagged = await CSI.storage.setBoughtBeforeFlag(sampleUrl, 'never');
 assert(flagged.ok && flagged.value.boughtBefore[CSI.profile.productKeyFromUrl(sampleUrl)] === 'never', 'flag update');
 const cleared = await CSI.storage.setBoughtBeforeFlag(sampleUrl, 'never');
 assert(cleared.ok && !cleared.value.boughtBefore[CSI.profile.productKeyFromUrl(sampleUrl)], 'same flag clears');
+
+const otherUrl = 'https://www.sunnyside.shop/product/xyz-2';
+const [flagA, flagB] = await Promise.all([
+  CSI.storage.setBoughtBeforeFlag(sampleUrl, 'rebuy'),
+  CSI.storage.setBoughtBeforeFlag(otherUrl, 'fine')
+]);
+assert(flagA.ok && flagB.ok, 'concurrent bought-before writes succeed');
+const afterConcurrent = await CSI.storage.loadTasteProfile();
+assert(
+  afterConcurrent.boughtBefore[CSI.profile.productKeyFromUrl(sampleUrl)] === 'rebuy',
+  'first concurrent flag kept'
+);
+assert(
+  afterConcurrent.boughtBefore[CSI.profile.productKeyFromUrl(otherUrl)] === 'fine',
+  'second concurrent flag kept'
+);
+
+assert(typeof CSI.storeElementProduct === 'function', 'host product cache helper');
+const hostCard = { dataset: {} };
+CSI.storeElementProduct(hostCard, {
+  url: sampleUrl,
+  name: 'Test Flower',
+  matchScore: 0.88,
+  tasteProfile: afterConcurrent,
+  tasteMap: { preferredTerpenes: { Limonene: 1 }, avoidTerpenes: [] }
+});
+const hostJson = JSON.parse(hostCard.dataset.csiProductData);
+assert(!Object.prototype.hasOwnProperty.call(hostJson, 'tasteProfile'), 'data-csi-product-data omits taste profile');
+assert(!Object.prototype.hasOwnProperty.call(hostJson, 'tasteMap'), 'data-csi-product-data omits taste map');
+assert(hostJson.matchScore === 0.88, 'derived match score may be cached on the card');
+assert(hostJson.name === 'Test Flower', 'product fields still cached');
+assert(!CSI.getElementProduct(hostCard).tasteProfile, 'getElementProduct does not return profile');
 
 const map = {
   preferredTerpenes: { Humulene: 0.4 },
@@ -249,6 +297,8 @@ assert(!/dealTier/.test(rankingSrc), 'dealTier not used in core ranking');
 assert(!/tripBudget/.test(rankingSrc), 'tripBudget not used in core ranking');
 assert(!/dealTier|tripBudget/.test(pdpSrc), 'dealTier/tripBudget inert on PDP');
 assert(!/dealTier|tripBudget/.test(listingSrc), 'dealTier/tripBudget inert on listing');
+assert(!/p\.tasteProfile\s*=/.test(listingSrc), 'listing storage listener does not attach profile to cards');
+assert(listingSrc.includes('tasteProfile: state.profile'), 'listing badges receive profile from content-script state');
 
 const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
 assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');

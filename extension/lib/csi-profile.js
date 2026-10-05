@@ -134,6 +134,37 @@
     return uniqueIn(list, new Set(allowedList));
   }
 
+  function terpeneAliasMap() {
+    const map = new Map();
+    (Array.isArray(CSI.TERPENE_CANON) ? CSI.TERPENE_CANON : []).forEach((entry) => {
+      if (!entry || !entry.name) return;
+      const id = entry.name;
+      map.set(id, id);
+      map.set(id.toLowerCase(), id);
+      (entry.keys || []).forEach((k) => {
+        if (typeof k !== 'string' || !k.trim()) return;
+        map.set(k.trim().toLowerCase(), id);
+      });
+    });
+    return map;
+  }
+
+  /**
+   * Profile import: exact canonical name or listed alias only.
+   * Do not use substring matching (e.g. "contains limonene").
+   */
+  function exactTerpeneId(raw, known) {
+    if (typeof raw !== 'string') return null;
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+    if (known.has(trimmed)) return trimmed;
+    const aliases = terpeneAliasMap();
+    const lower = trimmed.toLowerCase();
+    const id = aliases.get(trimmed) || aliases.get(lower);
+    if (!id || !known.has(id)) return null;
+    return id;
+  }
+
   function canonTerpeneList(list, known) {
     if (list == null) return { values: [] };
     if (!Array.isArray(list)) return { error: 'terpene list must be an array' };
@@ -142,8 +173,8 @@
     for (const raw of list) {
       if (typeof raw !== 'string') return { error: 'terpene list must be strings' };
       if (!raw.trim()) continue;
-      const name = CSI.canonicalizeTerpeneName(raw);
-      if (!name || !known.has(name)) return { error: 'unknown terpene' };
+      const name = exactTerpeneId(raw, known);
+      if (!name) return { error: 'unknown terpene' };
       if (seen.has(name)) continue;
       seen.add(name);
       out.push(name);

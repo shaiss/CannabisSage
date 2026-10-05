@@ -8,6 +8,7 @@
 
   const BRIDGE_SOURCE = 'cannabis-sage-bridge';
   let active = false;
+  let pdpTasteProfile = { enabled: false };
 
   function requestPdpBridge(timeoutMs = 1000) {
     return new Promise((resolve) => {
@@ -120,10 +121,10 @@
     product.matchScore = null;
     product.tasteMap = null;
     const profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
-    product.tasteProfile = profile.enabled ? profile : { enabled: false };
+    pdpTasteProfile = profile.enabled ? profile : { enabled: false };
     if (!CSI.features?.can?.('tasteMap')) return;
     const taste = await CSI.storage.loadTasteMap();
-    product.tasteMap = CSI.profile?.applyToTasteMap?.(taste, product.tasteProfile) || taste || null;
+    product.tasteMap = CSI.profile?.applyToTasteMap?.(taste, pdpTasteProfile) || taste || null;
     product.matchScore = product.tasteMap ? CSI.scoreTasteMatch(product, product.tasteMap) : null;
   }
 
@@ -299,7 +300,7 @@
       dealBits.push(`<span class="csi-badge csi-badge-deal">≈ $${product.dollarsPerMg.toFixed(3)}/mg THC*</span>`);
     }
     const prefMatch = CSI.ui.buildPreferenceMatchPanel(product, product.tasteMap) || '';
-    const boughtPanel = CSI.ui.buildBoughtBeforePanel(product, product.tasteProfile) || '';
+    const boughtPanel = CSI.ui.buildBoughtBeforePanel(product, pdpTasteProfile) || '';
     let medianStrip = '';
     if (CSI.features?.can?.('dealBadges')) {
       const medianBadge = CSI.ui.buildDealVsMedianBadge(product.belowCategoryMedian);
@@ -337,7 +338,7 @@
       const url = panel.querySelector('[data-csi-bought]')?.getAttribute('data-csi-product-url') || product.url;
       const saved = await CSI.storage.setBoughtBeforeFlag(url, btn.getAttribute('data-csi-flag'));
       if (!saved?.ok) return;
-      product.tasteProfile = saved.value;
+      pdpTasteProfile = saved.value;
       renderPanel(product);
     });
     panel.querySelector('.csi-pdp-compare').addEventListener('click', async () => {

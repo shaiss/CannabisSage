@@ -196,7 +196,7 @@
    * Listing card chips (terp-only when retail already shows THC/CBD on-card).
    * Explainer chip is NOT repeated here — once per listing, in the filter bar.
    */
-  function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
+  function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35, tasteProfile } = {}) {
     const chips = [];
     const thcLead = formatListedThcLead(product?.cannabinoids);
     const cbd = CSI.parsePercent(product?.cannabinoids?.CBD ?? product?.cannabinoids?.cbd);
@@ -247,7 +247,7 @@
       const medianBadge = buildDealVsMedianBadge(product?.belowCategoryMedian);
       if (medianBadge) chips.push(medianBadge);
     }
-    const bought = buildBoughtBeforeControl(product);
+    const bought = buildBoughtBeforeControl(product, tasteProfile);
     if (bought) chips.push(bought);
     return chips;
   }
@@ -259,7 +259,7 @@
   };
 
   function buildBoughtBeforeControl(product, profile) {
-    const p = profile || product?.tasteProfile;
+    const p = profile;
     if (!p || p.enabled !== true) return '';
     const url = product && product.url;
     const key = CSI.profile?.productKeyFromUrl?.(url);

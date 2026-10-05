@@ -887,6 +887,53 @@ assert(
   landingSrc.includes('floating chemistry panel') && !landingSrc.includes('inline chemistry panel'),
   'landing PDP screenshot alt matches floating caption'
 );
+assert(landingSrc.includes('id="roadmap"'), 'landing has a Roadmap section');
+assert(
+  landingSrc.includes(
+    'Listed cannabinoids and primary terpenes on supported menus, side-by-side'
+  ) && landingSrc.includes('close matches at your other supported'),
+  'landing Roadmap Now copy includes cross-store match'
+);
+assert(
+  landingSrc.includes('A saved taste profile, picks that match it across nearby supported menus'),
+  'landing Roadmap Next copy'
+);
+assert(
+  landingSrc.includes('Ask Sage, a chat guide that') &&
+    landingSrc.includes('explains listed chemistry in plain words'),
+  'landing Roadmap Later copy'
+);
+assert(
+  landingSrc.includes("Plans can change. We ship each piece when it&apos;s solid."),
+  'landing Roadmap footer copy'
+);
+assert(!/AI budtender|Taylor/i.test(landingSrc), 'landing does not name an AI budtender or Taylor');
+assert(
+  !landingSrc.includes('docs/ROADMAP.md') && !landingSrc.includes('Full roadmap'),
+  'landing does not link to docs/ROADMAP.md or say Full roadmap'
+);
+const roadmapSrc = fs.readFileSync(path.join(root, 'docs/ROADMAP.md'), 'utf8');
+const roadmapForbidden = [
+  'Stripe',
+  'acct_',
+  'StrainChain',
+  'Taylor',
+  'Gmail',
+  'Assay',
+  'Cheech',
+  'Web3',
+  'Avalanche',
+  'Blockticity',
+  'Sunnyside',
+  'Zen Leaf',
+  'TerraVida'
+];
+for (const needle of roadmapForbidden) {
+  assert(
+    !new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(roadmapSrc),
+    `docs/ROADMAP.md must not contain ${needle}`
+  );
+}
 const sameChemUnique = CSI.ui.summarizeTerpeneOverlap([
   { name: 'Alpha', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Myrcene: 0.2 } },
   { name: 'Beta', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Pinene: 0.1 } }

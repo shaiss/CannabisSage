@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.17';
+  const VERSION = '1.3.18';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -526,7 +526,7 @@
 
   /** Soft match floor for other-store rows. Below this, omit the row. */
   const CROSS_STORE_MIN_SCORE = 0.38;
-  /** Calm density on the floating PDP — not a store switcher. */
+  /** Calm density on the floating PDP (match list + optional store switcher). */
   const CROSS_STORE_MAX_MATCHES = 3;
   /** Cosine at or above this, plus matching name/size, may be called the same item. */
   const CROSS_STORE_IDENTICAL_CHEM = 0.97;

@@ -271,12 +271,17 @@
   }
 
   /**
-   * Menu medians from scraped listing prices, keyed by host under csi_category_medians.
-   * Shape: { byHost: { [normalizedHost]: { host, adapterId, savedAt, categories, products } } }
-   * Legacy flat snapshots ({ host, categories, ... }) migrate on read.
+   * Menu medians from scraped listing prices, one chrome.storage.local key per host
+   * (`csi_category_medians:<normalizedHost>`). Distinct keys so two menu tabs saving
+   * different stores cannot clobber each other. The legacy shared key
+   * `csi_category_medians` (flat snapshot or `{ byHost }`) still migrates on read.
    * Same host merges categories; a category seen again replaces its previous median.
-   * Expired host entries are dropped; other hosts stay.
+   * Expired host keys are dropped; other hosts stay.
    */
+  function categoryMediansKey(host) {
+    return KEYS.CATEGORY_MEDIANS + ':' + host;
+  }
+
   function isLegacyMedianSnap(raw) {
     return !!(
       raw &&
@@ -307,43 +312,46 @@
     return out;
   }
 
-  async function writeMedianStore(byHost) {
-    const hosts = Object.keys(byHost || {});
-    if (!hosts.length) {
-      await storageRemove([KEYS.CATEGORY_MEDIANS]);
-      return;
+  function hostMedianSnap(raw, key) {
+    if (raw && typeof raw === 'object' && raw.categories && typeof raw.categories === 'object') {
+      return { ...raw, host: key };
     }
-    await storageSet({
-      [KEYS.CATEGORY_MEDIANS]: { byHost }
-    });
+    return null;
   }
 
   async function loadCategoryMedians(host) {
     const key = normalizeHostName(host);
     if (!key) return null;
-    const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
-    const byHost = readMedianStore(data[KEYS.CATEGORY_MEDIANS]);
-    const snap = byHost[key];
+    const hostKey = categoryMediansKey(key);
+    const data = await storageGet([hostKey, KEYS.CATEGORY_MEDIANS]);
+    const fromHostKey = hostMedianSnap(data[hostKey], key);
+    const fromLegacy = readMedianStore(data[KEYS.CATEGORY_MEDIANS])[key] || null;
+    // Prefer the per-host key once present so an expired write is not resurrected
+    // from a leftover shared blob.
+    const snap = fromHostKey || fromLegacy;
     if (!snap) return null;
     const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
     if (!snap.savedAt || Date.now() - snap.savedAt > ttl) {
-      delete byHost[key];
-      await writeMedianStore(byHost);
+      await storageRemove([hostKey]);
       return null;
     }
     // Host key is www-insensitive; keep snap.host normalized for callers.
     if (normalizeHostName(snap.host) !== key) return null;
-    return snap;
+    if (!fromHostKey) {
+      await storageSet({ [hostKey]: { ...snap, host: key } });
+    }
+    return { ...snap, host: key };
   }
 
   async function saveCategoryMedians(snapshot) {
     if (!snapshot || !snapshot.host) return;
     const host = normalizeHostName(snapshot.host);
     if (!host) return;
+    const hostKey = categoryMediansKey(host);
 
-    const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
-    const byHost = readMedianStore(data[KEYS.CATEGORY_MEDIANS]);
-    const existing = byHost[host] || null;
+    const data = await storageGet([hostKey, KEYS.CATEGORY_MEDIANS]);
+    const existing =
+      hostMedianSnap(data[hostKey], host) || readMedianStore(data[KEYS.CATEGORY_MEDIANS])[host] || null;
     const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
     const existingFresh =
       existing &&
@@ -382,14 +390,15 @@
     });
     const products = Array.from(byUrl.values()).slice(-400);
 
-    byHost[host] = {
-      host,
-      adapterId: snapshot.adapterId || '',
-      savedAt: Date.now(),
-      categories,
-      products
-    };
-    await writeMedianStore(byHost);
+    await storageSet({
+      [hostKey]: {
+        host,
+        adapterId: snapshot.adapterId || '',
+        savedAt: Date.now(),
+        categories,
+        products
+      }
+    });
   }
 
   async function loadSoftUnlockDismissed() {

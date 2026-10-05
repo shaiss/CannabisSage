@@ -446,9 +446,31 @@ assert(sunMedian && sunMedian.categories.flower.median === 40, 'sunnyside median
 assert(zlMedian && zlMedian.categories.flower.median === 45, 'zenleaf median stored independently');
 assert(sunMedian.host === 'sunnyside.shop', 'median host is www-normalized');
 assert(
-  store.csi_category_medians?.byHost?.['sunnyside.shop'] &&
-    store.csi_category_medians?.byHost?.['zenleafdispensaries.com'],
-  'both hosts nest under csi_category_medians.byHost'
+  store['csi_category_medians:sunnyside.shop'] &&
+    store['csi_category_medians:zenleafdispensaries.com'],
+  'each host has its own csi_category_medians:<host> key'
+);
+
+// Concurrent saves for different hosts must not drop either snapshot
+await Promise.all([
+  CSI.storage.saveCategoryMedians({
+    host: 'curaleaf.com',
+    adapterId: 'curaleaf',
+    categories: { flower: { median: 50, sampleCount: 6 } }
+  }),
+  CSI.storage.saveCategoryMedians({
+    host: 'www.rise-dispensaries.com',
+    adapterId: 'rise',
+    categories: { flower: { median: 55, sampleCount: 7 } }
+  })
+]);
+const concurrentA = await CSI.storage.loadCategoryMedians('curaleaf.com');
+const concurrentB = await CSI.storage.loadCategoryMedians('rise-dispensaries.com');
+assert(concurrentA && concurrentA.categories.flower.median === 50, 'concurrent save keeps first host medians');
+assert(concurrentB && concurrentB.categories.flower.median === 55, 'concurrent save keeps second host medians');
+assert(
+  store['csi_category_medians:curaleaf.com'] && store['csi_category_medians:rise-dispensaries.com'],
+  'concurrent saves write independent per-host keys'
 );
 
 // loadAndRank resolves each cache host's median independently for below-median
@@ -477,6 +499,7 @@ assert(
 );
 
 // Legacy flat snapshot still loads (migrates on read)
+delete store['csi_category_medians:sunnyside.shop'];
 store.csi_category_medians = {
   host: 'sunnyside.shop',
   adapterId: 'sunnyside',
@@ -486,6 +509,25 @@ store.csi_category_medians = {
 };
 const legacyMedian = await CSI.storage.loadCategoryMedians('www.sunnyside.shop');
 assert(legacyMedian && legacyMedian.categories.flower.median === 41, 'legacy flat median snapshot still loads');
+assert(
+  store['csi_category_medians:sunnyside.shop']?.categories?.flower?.median === 41,
+  'legacy flat snapshot migrates onto the per-host key'
+);
+
+delete store['csi_category_medians:sunnyside.shop'];
+store.csi_category_medians = {
+  byHost: {
+    'sunnyside.shop': {
+      host: 'sunnyside.shop',
+      adapterId: 'sunnyside',
+      savedAt: now,
+      categories: { flower: { median: 42, sampleCount: 4 } },
+      products: []
+    }
+  }
+};
+const byHostLegacy = await CSI.storage.loadCategoryMedians('www.sunnyside.shop');
+assert(byHostLegacy && byHostLegacy.categories.flower.median === 42, 'legacy byHost blob still loads');
 
 // Budget preference alone
 const budgeted = CSI.picks.rankPicks({

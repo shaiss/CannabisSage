@@ -803,7 +803,8 @@ const loadMediansSrc = storageSrc.slice(
   storageSrc.indexOf('async function saveCategoryMedians')
 );
 assert(/normalizeHostName\(snap\.host\)/.test(loadMediansSrc), 'category medians host is www-insensitive');
-assert(storageSrc.includes('byHost'), 'category medians nest per host under one key');
+assert(storageSrc.includes('byHost'), 'category medians still migrate legacy byHost blobs');
+assert(storageSrc.includes("KEYS.CATEGORY_MEDIANS + ':'"), 'category medians use a per-host storage key');
 assert(storageSrc.includes('readMedianStore'), 'category medians migrate legacy flat snapshots');
 
 // Chem-over-strain (v1.3.16) — Sage labels lead with listed chem; names stay secondary

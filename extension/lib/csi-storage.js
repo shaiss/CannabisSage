@@ -170,11 +170,35 @@
     return entry.data;
   }
 
-  async function setPdpCache(url, productData) {
+  async function setPdpCache(url, productData, opts) {
     if (!url || !productData) return;
     const key = cacheKey(url);
+    const merge = !!(opts && opts.merge);
+    let fetchedAt = Date.now();
+    let data = productData;
+    if (merge) {
+      const existing = await getPdpCache(url);
+      if (existing) {
+        const prev = await storageGet([key]);
+        if (prev[key] && prev[key].fetchedAt) fetchedAt = prev[key].fetchedAt;
+        const keepDetailedTerps =
+          CSI.hasDetailedTerpeneBreakdown?.(existing.terpenes) &&
+          !CSI.hasDetailedTerpeneBreakdown?.(productData.terpenes);
+        data = {
+          ...existing,
+          ...productData,
+          cannabinoids: {
+            ...(existing.cannabinoids || {}),
+            ...(productData.cannabinoids || {})
+          },
+          terpenes: keepDetailedTerps ? existing.terpenes : productData.terpenes ?? existing.terpenes,
+          url: productData.url || existing.url,
+          name: productData.name || existing.name
+        };
+      }
+    }
     await storageSet({
-      [key]: { data: productData, fetchedAt: Date.now() }
+      [key]: { data, fetchedAt }
     });
   }
 
@@ -202,11 +226,13 @@
   }
 
   /**
-   * Already-fetched menu chem for this host (TTL cache).
+   * Already-fetched menu chem (TTL cache).
    * Does not scrape a new catalog — neighbors only come from prior listing/PDP loads.
+   * Optional host / excludeAdapterId filters; omit host to include every cached store.
    */
   async function listPdpCache(opts) {
     const host = opts && opts.host;
+    const excludeAdapterId = opts && opts.excludeAdapterId;
     try {
       const all = await new Promise((resolve) => chrome.storage.local.get(null, resolve));
       const out = [];
@@ -216,7 +242,11 @@
         if (Date.now() - v.fetchedAt > CSI.CACHE_TTL_MS) return;
         const url = k.slice(KEYS.CACHE_PREFIX.length);
         if (host && !cacheEntryHostMatches(url, host)) return;
-        out.push({ url, data: v.data, fetchedAt: v.fetchedAt });
+        const adapterId =
+          (v.data && v.data.adapterId) ||
+          (typeof CSI.adapterIdFromUrl === 'function' ? CSI.adapterIdFromUrl(url) : null);
+        if (excludeAdapterId && adapterId === excludeAdapterId) return;
+        out.push({ url, data: v.data, fetchedAt: v.fetchedAt, adapterId: adapterId || null });
       });
       return out;
     } catch (e) {

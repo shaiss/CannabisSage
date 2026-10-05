@@ -62,7 +62,12 @@
             const empty =
               !CSI.hasCannabinoidInfo(parsed.cannabinoids) && !CSI.hasTerpeneInfo(parsed.terpenes);
             if (empty) parsed.status = 'empty';
-            if (CSI.storage) await CSI.storage.setPdpCache(url, parsed);
+            const adapter = CSI.registry?.getActiveAdapter?.() || CSI.registry?.resolveAdapter?.(url);
+            if (adapter?.id) parsed.adapterId = adapter.id;
+            if (CSI.storage) {
+              const record = CSI.buildPdpCacheRecord?.(parsed, { url: parsed.url || url }) || parsed;
+              await CSI.storage.setPdpCache(url, record, { merge: true });
+            }
             resolve(parsed);
           } catch (e) {
             CSI.warn('Parse error', e);

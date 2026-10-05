@@ -813,6 +813,78 @@ a.csi-similar-chem-line:hover {
   text-decoration: underline;
 }
 
+.csi-cross-store {
+  margin: 0 0 8px;
+  padding: 8px 0 0;
+  border-top: 1px solid #eee;
+}
+
+.csi-cross-store-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.csi-cross-store-lead,
+.csi-cross-store-note,
+.csi-cross-store-reason {
+  margin: 4px 0 0;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667;
+  font-weight: 500;
+}
+
+.csi-cross-store-list {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+}
+
+.csi-cross-store-item {
+  margin: 0 0 8px;
+}
+
+.csi-cross-store-item:last-child {
+  margin-bottom: 0;
+}
+
+.csi-cross-store-line {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-decoration: none;
+}
+
+a.csi-cross-store-line:hover {
+  color: #ff6b35;
+  text-decoration: underline;
+}
+
+.csi-cross-store-name,
+.csi-cross-store-value {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 500;
+  color: #889;
+}
+
+.csi-cross-store-upgrade {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background: #ff6b35;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
 /* Push page content slightly when filter bar present */
 body:has(#csi-filter-bar) {
   scroll-padding-top: 56px;

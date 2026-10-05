@@ -162,6 +162,8 @@
     const empty =
       !CSI.hasCannabinoidInfo(product.cannabinoids) && !CSI.hasTerpeneInfo(product.terpenes);
     product.status = empty ? 'empty' : product.status || 'ok';
+    const categoryKey = cardCategoryKey(cardEl, product);
+    if (categoryKey) product.categoryKey = categoryKey;
     CSI.storeElementProduct(cardEl, product);
     if (
       url &&
@@ -170,16 +172,19 @@
       CSI.storage?.setPdpCache &&
       (CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes))
     ) {
-      const cached = await CSI.storage.getPdpCache(url);
-      if (!cached) {
-        await CSI.storage.setPdpCache(url, {
+      const record =
+        CSI.buildPdpCacheRecord?.(product, {
+          url,
+          categoryKey: product.categoryKey,
+          adapterId: CSI.registry?.getActiveAdapter?.()?.id
+        }) || {
           url,
           name: product.name,
           cannabinoids: product.cannabinoids,
           terpenes: product.terpenes,
           status: product.status
-        });
-      }
+        };
+      await CSI.storage.setPdpCache(url, record, { merge: true });
     }
     renderBadges(cardEl, product, product.status);
     return product;

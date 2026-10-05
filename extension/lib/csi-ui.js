@@ -514,6 +514,96 @@
     )}</p><ul class="csi-similar-chem-list">${items}</ul></section>`;
   }
 
+  /**
+   * Closest listed items at other supported stores, from the TTL cache only.
+   * Chem labels first. Store name is the adapter display name for that URL.
+   * Free plan sees a quiet Pro note, not a wall and not a card form.
+   */
+  const CROSS_STORE_COPY = {
+    title: 'At other stores you shop',
+    lead: 'Closest listed chem from menus you already opened. Not a store switcher.',
+    tooFew: 'No cached matches at other stores yet.',
+    locked:
+      'Pro matches listed chem at other stores you already shop. Chemistry on this page stays visible.',
+    upgrade: 'Upgrade',
+    sameItem: 'Same listed item',
+    nearMatch: 'Near match'
+  };
+
+  function crossStoreHref(url) {
+    if (!url) return '';
+    try {
+      const u = new URL(url, typeof location !== 'undefined' ? location.href : undefined);
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+      if (!CSI.registry?.resolveAdapter?.(u.href)) return '';
+      return u.href;
+    } catch {
+      return '';
+    }
+  }
+
+  function formatListedPerMg(dollarsPerMg) {
+    const n = Number(dollarsPerMg);
+    if (!Number.isFinite(n) || n <= 0) return '';
+    return `≈ $${n.toFixed(3)}/mg`;
+  }
+
+  function buildCrossStoreMatchPanel(product) {
+    const block = product && product.crossStoreMatch;
+    if (!block) return '';
+    const COPY = CROSS_STORE_COPY;
+    const gatedOff = !!(CSI.features?.can && !CSI.features.can('multiStore'));
+    if (block.locked || gatedOff) {
+      return `<section class="csi-cross-store" data-csi-cross-store="1" data-csi-cross-store-locked="1"><p class="csi-cross-store-title">${CSI.escapeHtml(
+        COPY.title
+      )}</p><p class="csi-cross-store-note">${CSI.escapeHtml(
+        COPY.locked
+      )}</p><button type="button" class="csi-cross-store-upgrade" data-csi-cross-store-upgrade="1">${CSI.escapeHtml(
+        COPY.upgrade
+      )}</button></section>`;
+    }
+    const matches = Array.isArray(block.matches) ? block.matches : [];
+    if (!matches.length) {
+      if (!block.note) return '';
+      return `<section class="csi-cross-store" data-csi-cross-store="1"><p class="csi-cross-store-title">${CSI.escapeHtml(
+        COPY.title
+      )}</p><p class="csi-cross-store-note">${CSI.escapeHtml(block.note)}</p></section>`;
+    }
+    const items = matches
+      .map((row) => {
+        const chem = formatChemLead(row) || COPY.lead;
+        const href = crossStoreHref(row.url);
+        const label = href
+          ? `<a class="csi-cross-store-line csi-chem-lead" href="${CSI.escapeHtml(href)}">${CSI.escapeHtml(chem)}</a>`
+          : `<span class="csi-cross-store-line csi-chem-lead">${CSI.escapeHtml(chem)}</span>`;
+        const store = String(row.storeLabel || '').trim();
+        const name = String(row.name || '').trim();
+        const secondary = [store, name].filter(Boolean).join(' · ');
+        const nameHtml = secondary
+          ? `<span class="csi-cross-store-name csi-chem-secondary">${CSI.escapeHtml(secondary)}</span>`
+          : '';
+        const priceNum = formatListedPrice(row.price);
+        const price = priceNum ? `$${priceNum}` : '';
+        const perMg = formatListedPerMg(row.dollarsPerMg);
+        const valueBits = [price, perMg].filter(Boolean);
+        const valueHtml = valueBits.length
+          ? `<span class="csi-cross-store-value">${CSI.escapeHtml(valueBits.join(' · '))}</span>`
+          : '';
+        const flag = row.identical ? COPY.sameItem : COPY.nearMatch;
+        const reason = String(row.reason || '').trim();
+        const reasonHtml = `<p class="csi-cross-store-reason">${CSI.escapeHtml(flag)}: ${CSI.escapeHtml(
+          reason
+        )}</p>`;
+        return `<li class="csi-cross-store-item">${label}${nameHtml}${valueHtml}${reasonHtml}</li>`;
+      })
+      .join('');
+    return `<section class="csi-cross-store" data-csi-cross-store="1"><p class="csi-cross-store-title">${CSI.escapeHtml(
+      COPY.title
+    )}</p><p class="csi-cross-store-lead">${CSI.escapeHtml(
+      COPY.lead
+    )}</p><ul class="csi-cross-store-list">${items}</ul></section>`;
+  }
+
   function buildPreferenceMatchPanel(product, tasteMap) {
     if (!CSI.features?.can?.('tasteMap')) return '';
     const summary = summarizePreferenceMatch(product, tasteMap);
@@ -1003,6 +1093,7 @@
     PROVENANCE_COPY,
     PREFERENCE_MATCH_COPY,
     SIMILAR_CHEM_COPY,
+    CROSS_STORE_COPY,
     summarizePreferenceMatch,
     summarizeTerpeneOverlap,
     formatCannabinoids,
@@ -1016,6 +1107,7 @@
     buildProvenanceListingNote,
     buildPreferenceMatchPanel,
     buildSimilarByChemPanel,
+    buildCrossStoreMatchPanel,
     formatChemLead,
     formatStatusError,
     buildChemOverStrainHeaderHtml,

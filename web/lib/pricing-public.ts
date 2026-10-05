@@ -51,7 +51,7 @@ export const FEATURE_GATES = {
   /** Pro bullets lead with money-savers: match, multi-store coverage, $/mg. */
   proLabels: [
     'Taste-map match on listings',
-    'More stores you shop (multi-store)',
+    'More stores you shop (multi-store, including cached PDP matches)',
     '$/mg and deal badges',
     'Listing filters & sort',
     'CSV / JSON export'

@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.16';
+  const VERSION = '1.3.17';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -524,6 +524,390 @@
     return result;
   }
 
+  /** Soft match floor for other-store rows. Below this, omit the row. */
+  const CROSS_STORE_MIN_SCORE = 0.38;
+  /** Calm density on the floating PDP — not a store switcher. */
+  const CROSS_STORE_MAX_MATCHES = 3;
+  /** Cosine at or above this, plus matching name/size, may be called the same item. */
+  const CROSS_STORE_IDENTICAL_CHEM = 0.97;
+  /** Max absolute %-point gap for a shared listed cannabinoid to still count as identical. */
+  const CROSS_STORE_IDENTICAL_CANNABINOID_PTS = 1.5;
+
+  const PRODUCT_NAME_STOP = new Set([
+    'the',
+    'and',
+    'with',
+    'for',
+    'from',
+    'pack',
+    'thc',
+    'cbd',
+    'thca',
+    'delta',
+    'live',
+    'resin',
+    'rosin',
+    'hybrid',
+    'indica',
+    'sativa',
+    'infused',
+    'distillate',
+    'cartridge',
+    'cart',
+    'carts',
+    'vape',
+    'vapes',
+    'flower',
+    'preroll',
+    'pre-roll',
+    'gummies',
+    'gummy',
+    'edible',
+    'edibles',
+    'concentrate',
+    'concentrates',
+    'eighth',
+    'gram',
+    'grams',
+    'ounce',
+    'mg',
+    'oz'
+  ]);
+
+  const FORM_ALIASES = {
+    flower: 'flower',
+    bud: 'flower',
+    preroll: 'flower',
+    'pre-roll': 'flower',
+    vape: 'vape',
+    vapes: 'vape',
+    cartridge: 'vape',
+    cartridges: 'vape',
+    carts: 'vape',
+    cart: 'vape',
+    concentrate: 'concentrate',
+    concentrates: 'concentrate',
+    shatter: 'concentrate',
+    wax: 'concentrate',
+    resin: 'concentrate',
+    rosin: 'concentrate',
+    dab: 'concentrate',
+    edible: 'edible',
+    edibles: 'edible',
+    gummies: 'edible',
+    gummy: 'edible',
+    beverage: 'edible',
+    tincture: 'edible',
+    capsule: 'edible',
+    capsules: 'edible',
+    troche: 'edible',
+    topical: 'topical'
+  };
+
+  function adapterIdFromUrl(url) {
+    const registry = global.CSI && global.CSI.registry;
+    if (!registry || !url) return null;
+    try {
+      return registry.resolveAdapter(url)?.id || null;
+    } catch {
+      return null;
+    }
+  }
+
+  function adapterDisplayName(adapterId) {
+    const registry = global.CSI && global.CSI.registry;
+    if (!registry || !adapterId) return '';
+    return (registry.getAdapterById(adapterId)?.displayName || '').trim();
+  }
+
+  function normalizeProductName(raw) {
+    let s = String(raw || '')
+      .toLowerCase()
+      .replace(/&/g, ' and ')
+      .replace(/['’]/g, '');
+    s = s.replace(/\d+(?:\.\d+)?\s*(?:mg|g|oz|ml)\b/gi, ' ');
+    s = s.replace(/[^a-z0-9]+/g, ' ').trim();
+    const tokens = s.split(/\s+/).filter((t) => t && t.length > 1 && !PRODUCT_NAME_STOP.has(t) && !/^\d+$/.test(t));
+    return tokens.join(' ');
+  }
+
+  function nameTokenSet(raw) {
+    const norm = normalizeProductName(raw);
+    return new Set(norm ? norm.split(/\s+/) : []);
+  }
+
+  function nameSimilarity(a, b) {
+    const na = normalizeProductName(a);
+    const nb = normalizeProductName(b);
+    if (!na || !nb) return 0;
+    if (na === nb) return 1;
+    if (na.includes(nb) || nb.includes(na)) return 0.86;
+    const sa = nameTokenSet(a);
+    const sb = nameTokenSet(b);
+    if (!sa.size || !sb.size) return 0;
+    let inter = 0;
+    sa.forEach((t) => {
+      if (sb.has(t)) inter += 1;
+    });
+    const union = sa.size + sb.size - inter;
+    return union > 0 ? inter / union : 0;
+  }
+
+  function normalizeBrand(raw) {
+    const s = String(raw || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+    return s || null;
+  }
+
+  function productFormKey(product, url) {
+    const cat = normalizeCategorySlug((product && product.categoryKey) || '');
+    if (cat && FORM_ALIASES[cat]) return FORM_ALIASES[cat];
+    if (cat) return cat;
+    try {
+      const path = url ? new URL(url).pathname : '';
+      const fromPath = categoryKeyFromPath(path);
+      if (fromPath && FORM_ALIASES[fromPath]) return FORM_ALIASES[fromPath];
+      if (fromPath) return fromPath;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  }
+
+  function sizeCloseness(aGrams, bGrams) {
+    if (!(aGrams > 0) || !(bGrams > 0)) return null;
+    const rel = Math.abs(aGrams - bGrams) / Math.max(aGrams, bGrams);
+    if (rel <= 0.05) return 1;
+    if (rel <= 0.15) return 0.7;
+    if (rel <= 0.35) return 0.35;
+    return 0;
+  }
+
+  /** Fold common key casing/aliases. THCA stays THCA (never renamed to THC). */
+  function normalizeCannabinoidKey(key) {
+    const k = String(key || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[\s_-]+/g, '');
+    if (!k) return '';
+    if (k === 'thca' || k === 'totalthca') return 'THCA';
+    if (k === 'thc') return 'THC';
+    if (k === 'totalthc') return 'totalTHC';
+    if (k === 'cbd' || k === 'totalcbd') return 'CBD';
+    if (k === 'cbda') return 'CBDa';
+    if (k === 'cbg' || k === 'totalcbg') return 'CBG';
+    if (k === 'cbn') return 'CBN';
+    if (k === 'cbc') return 'CBC';
+    return k.toUpperCase();
+  }
+
+  /**
+   * Every cannabinoid both rows list must agree within tolPts.
+   * Valid numeric 0 is listed (null/undefined/NaN/empty/non-numeric are not).
+   * Keys present on only one side are ignored — absent is not treated as 0.
+   * Empty overlap → true.
+   */
+  function listedCannabinoidsAgree(left, right, tolPts) {
+    const tol = Number.isFinite(tolPts) ? tolPts : CROSS_STORE_IDENTICAL_CANNABINOID_PTS;
+    const a = {};
+    const b = {};
+    Object.entries(left && typeof left === 'object' ? left : {}).forEach(([raw, val]) => {
+      const key = normalizeCannabinoidKey(raw);
+      const n = parsePercent(val);
+      if (key && n != null && a[key] == null) a[key] = n;
+    });
+    Object.entries(right && typeof right === 'object' ? right : {}).forEach(([raw, val]) => {
+      const key = normalizeCannabinoidKey(raw);
+      const n = parsePercent(val);
+      if (key && n != null && b[key] == null) b[key] = n;
+    });
+    const shared = Object.keys(a).filter((k) => b[k] != null);
+    if (!shared.length) return true;
+    return shared.every((k) => Math.abs(a[k] - b[k]) <= tol);
+  }
+
+  function listedDollarsPerMg(product) {
+    if (!product) return null;
+    const grams = parseWeightGrams(product.weightText);
+    return dollarsPerMgThc(product.price, product.cannabinoids, grams);
+  }
+
+  function buildPdpCacheRecord(product, extras) {
+    const extra = extras || {};
+    if (!product || typeof product !== 'object') return null;
+    const url = extra.url || product.url || '';
+    if (!url) return null;
+    const adapterId = extra.adapterId || product.adapterId || adapterIdFromUrl(url);
+    const rec = {
+      url,
+      name: product.name ? String(product.name) : '',
+      cannabinoids: product.cannabinoids,
+      terpenes: product.terpenes,
+      status: product.status || 'ok'
+    };
+    if (product.price != null) rec.price = product.price;
+    if (product.weightText) rec.weightText = product.weightText;
+    const categoryKey = extra.categoryKey || product.categoryKey || null;
+    if (categoryKey) rec.categoryKey = categoryKey;
+    if (adapterId) rec.adapterId = adapterId;
+    if (product.brand) rec.brand = product.brand;
+    return rec;
+  }
+
+  function combineCrossStoreScore(parts) {
+    const name = Number(parts.name) || 0;
+    const chem = Number(parts.chem) || 0;
+    const form = parts.form == null ? 0.4 : Number(parts.form);
+    const size = parts.size == null ? 0.4 : Number(parts.size);
+    const brand = parts.brand == null ? 0.4 : Number(parts.brand);
+    const hasChem = parts.hasChem;
+    const hasName = parts.hasName;
+    if (hasChem && hasName) {
+      return 0.32 * name + 0.38 * chem + 0.15 * form + 0.1 * size + 0.05 * brand;
+    }
+    if (hasName) {
+      return 0.5 * name + 0.25 * form + 0.15 * size + 0.1 * brand;
+    }
+    if (hasChem) {
+      return 0.55 * chem + 0.25 * form + 0.15 * size + 0.05 * brand;
+    }
+    return 0;
+  }
+
+  function describeCrossStoreMatch(parts) {
+    if (parts.identical) return 'Same listed name, size, and chemistry — treated as the same item.';
+    const bits = [];
+    if (parts.chem >= 0.7) bits.push('close listed chem');
+    else if (parts.chem >= 0.4) bits.push('similar listed chem');
+    if (parts.name >= 0.85) bits.push('matching product name');
+    else if (parts.name >= 0.45) bits.push('similar product name');
+    if (parts.form === 1) bits.push('same category');
+    if (parts.size != null && parts.size >= 0.7) bits.push('similar size');
+    if (parts.brand === 1) bits.push('same brand');
+    if (!bits.length) return 'Nearby listed chem at another store.';
+    const line = bits[0].charAt(0).toUpperCase() + bits[0].slice(1);
+    if (bits.length === 1) return `${line}.`;
+    return `${line} and ${bits.slice(1).join(' and ')}.`;
+  }
+
+  /**
+   * Other-store neighbors from already-cached listing/PDP rows.
+   * Fuzzy and explainable. Never invents chem, price, or a new catalog fetch.
+   * Same adapter (including same-host TerraVida vs Zen Leaf) is excluded.
+   */
+  function rankCrossStoreSoftMatch(anchor, candidates, opts) {
+    const options = opts || {};
+    const maxRaw = Number(options.max);
+    const max = Number.isFinite(maxRaw) ? Math.max(0, maxRaw) : CROSS_STORE_MAX_MATCHES;
+    const minRaw = Number(options.minScore);
+    const minScore = Number.isFinite(minRaw) ? minRaw : CROSS_STORE_MIN_SCORE;
+    const list = Array.isArray(candidates) ? candidates : [];
+    const result = { matches: [], note: '' };
+    if (!anchor || anchor.status === 'error' || anchor.status === 'empty') return result;
+
+    const origin = options.origin;
+    const anchorUrl = normalizeMenuUrl(anchor.url || '', origin);
+    const excludeAdapter =
+      options.excludeAdapterId || anchor.adapterId || adapterIdFromUrl(anchorUrl) || null;
+    const anchorVec = chemSimilarityVector(anchor);
+    const hasChem = Object.keys(anchorVec).length > 0;
+    const hasName = !!normalizeProductName(anchor.name);
+    if (!hasChem && !hasName) return result;
+
+    const scored = [];
+    list.forEach((raw) => {
+      if (!raw || typeof raw !== 'object') return;
+      const nested = raw.data && typeof raw.data === 'object' ? raw.data : raw;
+      const cand = { ...nested, url: raw.url || nested.url };
+      if (cand.status === 'error' || cand.status === 'empty') return;
+      const url = normalizeMenuUrl(cand.url || '', origin);
+      if (!url || (anchorUrl && url === anchorUrl)) return;
+      const adapterId = cand.adapterId || raw.adapterId || adapterIdFromUrl(url);
+      if (!adapterId) return;
+      if (excludeAdapter && adapterId === excludeAdapter) return;
+
+      const nameScore = nameSimilarity(anchor.name, cand.name);
+      const vec = chemSimilarityVector(cand);
+      const candHasChem = Object.keys(vec).length > 0;
+      const chemScore = hasChem && candHasChem ? cosineSimilarity(anchorVec, vec) : 0;
+      const formA = productFormKey(anchor, anchorUrl);
+      const formB = productFormKey(cand, url);
+      let formScore = null;
+      if (formA && formB) formScore = formA === formB ? 1 : 0;
+      const gramsA = parseWeightGrams(anchor.weightText);
+      const gramsB = parseWeightGrams(cand.weightText);
+      const sizeScore = sizeCloseness(gramsA, gramsB);
+      const brandA = normalizeBrand(anchor.brand);
+      const brandB = normalizeBrand(cand.brand);
+      let brandScore = null;
+      if (brandA && brandB) brandScore = brandA === brandB ? 1 : 0;
+
+      if (hasChem && candHasChem) {
+        /* chem can carry a weak name */
+      } else if (nameScore < 0.45) {
+        return;
+      }
+      if (hasChem && candHasChem && chemScore < 0.28 && nameScore < 0.55) return;
+      if (formScore === 0 && nameScore < 0.7 && chemScore < 0.55) return;
+
+      const parts = {
+        name: nameScore,
+        chem: chemScore,
+        form: formScore,
+        size: sizeScore,
+        brand: brandScore,
+        hasChem: hasChem && candHasChem,
+        hasName: hasName && !!normalizeProductName(cand.name)
+      };
+      const score = combineCrossStoreScore(parts);
+      if (!(score >= minScore)) return;
+
+      const cannabinoidsAgree = listedCannabinoidsAgree(
+        anchor.cannabinoids,
+        cand.cannabinoids,
+        CROSS_STORE_IDENTICAL_CANNABINOID_PTS
+      );
+      const identical =
+        nameScore === 1 &&
+        sizeScore != null &&
+        sizeScore >= 0.7 &&
+        (formScore == null || formScore === 1) &&
+        (brandScore == null || brandScore === 1) &&
+        cannabinoidsAgree &&
+        ((hasChem && candHasChem && chemScore >= CROSS_STORE_IDENTICAL_CHEM) ||
+          (!hasChem && !candHasChem && nameScore === 1 && sizeScore === 1));
+
+      parts.identical = identical;
+      const dollarsPerMg = listedDollarsPerMg(cand);
+      scored.push({
+        url,
+        name: cand.name ? String(cand.name) : '',
+        cannabinoids: cand.cannabinoids,
+        terpenes: cand.terpenes,
+        price: cand.price != null ? cand.price : null,
+        dollarsPerMg,
+        weightText: cand.weightText || '',
+        adapterId,
+        storeLabel: adapterDisplayName(adapterId),
+        score,
+        identical,
+        reason: describeCrossStoreMatch(parts),
+        sharedTerpenes: sharedNamedTerpenes(anchor, cand),
+        categoryKey: cand.categoryKey || null
+      });
+    });
+
+    scored.sort((a, b) => {
+      if (Number(b.identical) !== Number(a.identical)) return Number(b.identical) - Number(a.identical);
+      if (b.score !== a.score) return b.score - a.score;
+      return (a.name || '').localeCompare(b.name || '') || a.url.localeCompare(b.url);
+    });
+    result.matches = scored.slice(0, max);
+    return result;
+  }
+
   function dollarsPerMgThc(price, cannabinoids, weightGrams) {
     if (price == null || price <= 0) return null;
     const thcPct = readThcPercent(cannabinoids);
@@ -968,6 +1352,19 @@
     sharedNamedTerpenes,
     sameMenuHost,
     rankSimilarByChem,
+    CROSS_STORE_MIN_SCORE,
+    CROSS_STORE_MAX_MATCHES,
+    CROSS_STORE_IDENTICAL_CHEM,
+    CROSS_STORE_IDENTICAL_CANNABINOID_PTS,
+    listedCannabinoidsAgree,
+    adapterIdFromUrl,
+    adapterDisplayName,
+    normalizeProductName,
+    nameSimilarity,
+    productFormKey,
+    buildPdpCacheRecord,
+    listedDollarsPerMg,
+    rankCrossStoreSoftMatch,
     dollarsPerMgThc,
     parseWeightGrams,
     detectSale,

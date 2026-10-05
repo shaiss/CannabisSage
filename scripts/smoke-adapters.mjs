@@ -918,7 +918,6 @@ const roadmapForbidden = [
   'acct_',
   'StrainChain',
   'Taylor',
-  'Gmail',
   'Assay',
   'Cheech',
   'Web3',

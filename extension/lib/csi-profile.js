@@ -43,7 +43,7 @@
 
   const COPY = Object.freeze({
     title: 'Local taste profile',
-    hint: 'Optional and Free. Stored on this device only. Nothing is saved until you turn it on. Structured chem fields — not a notes field.',
+    hint: 'Optional and Free. Stored on this device only. Nothing is saved until you turn it on. Turning off stops using the profile; Delete wipes it. Structured chem fields — not a notes field.',
     enable: 'Save a local taste profile',
     forms: 'Forms',
     sizes: 'Package sizes',
@@ -215,9 +215,19 @@
     );
   }
 
+  function hasProfileFields(input) {
+    if (!input || typeof input !== 'object') return false;
+    return Object.keys(input).some((k) => k !== 'enabled' && k !== 'schemaVersion');
+  }
+
+  function isStoredProfile(value) {
+    return !!(value && typeof value === 'object' && value.schemaVersion === SCHEMA_VERSION);
+  }
+
   /**
    * Validate and normalize a profile payload.
    * Unknown fields, free-text notes, and unknown terpene/store ids fail closed.
+   * enabled:false may retain full field data (opt-out without wipe).
    */
   function normalize(input, opts) {
     if (input == null || input === false) {
@@ -232,15 +242,18 @@
     }
     if (hasForbiddenText(input)) return fail('free-text and health/mood fields are not allowed');
 
-    if (input.enabled !== true) {
-      if (input.enabled === false || input.enabled == null) {
-        if (keys.some((k) => k !== 'enabled' && k !== 'schemaVersion')) {
-          // Data without opt-in is rejected rather than silently stored.
-          if (input.enabled !== false) return fail('profile is not enabled');
-        }
-        return { ok: true, value: { enabled: false } };
-      }
+    if (input.enabled !== true && input.enabled !== false && input.enabled != null) {
       return fail('enabled must be boolean');
+    }
+
+    // Bare disable / empty load — no field payload.
+    if (input.enabled !== true && !hasProfileFields(input)) {
+      return { ok: true, value: { enabled: false } };
+    }
+
+    // Fields without an explicit boolean mean "not opted in" — reject rather than store.
+    if (input.enabled == null) {
+      return fail('profile is not enabled');
     }
 
     if (input.schemaVersion != null && input.schemaVersion !== SCHEMA_VERSION) {
@@ -311,7 +324,7 @@
 
     const value = {
       schemaVersion: SCHEMA_VERSION,
-      enabled: true,
+      enabled: input.enabled === true,
       updatedAt,
       forms: forms.values,
       sizes: sizes.values,
@@ -332,7 +345,9 @@
 
   function exportJson(profile) {
     const parsed = normalize(profile, { now: profile && profile.updatedAt });
-    if (!parsed.ok || !parsed.value || parsed.value.enabled !== true) return fail(parsed.error || 'nothing to export');
+    if (!parsed.ok || !parsed.value || !isStoredProfile(parsed.value)) {
+      return fail(parsed.error || 'nothing to export');
+    }
     return { ok: true, json: JSON.stringify(parsed.value, null, 2), value: parsed.value };
   }
 
@@ -390,6 +405,8 @@
     COPY,
     terpeneIds,
     emptyEnabled,
+    hasProfileFields,
+    isStoredProfile,
     normalize,
     exportJson,
     applyToTasteMap,

@@ -90,8 +90,8 @@ assert(loadedEmpty.enabled === false, 'opt-in default is off');
 assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'nothing stored until opt-in');
 
 const skipped = await CSI.storage.saveTasteProfile({ enabled: false, forms: ['flower'] });
-assert(skipped.ok, 'disabled payload is accepted as a no-store');
-assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'unchecked profile is not written');
+assert(skipped.ok, 'disabled payload before opt-in is accepted as a no-store');
+assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'unchecked profile is not written before first opt-in');
 
 const rejectedNotes = CSI.profile.normalize({
   enabled: true,
@@ -182,10 +182,44 @@ assert(merged.preferredTerpenes.Limonene === 0.75, 'profile liked terpenes feed 
 assert(merged.avoidTerpenes.includes('Linalool'), 'profile avoid terpenes feed the map');
 assert(map.preferredTerpenes.Limonene == null, 'taste map object is not mutated in place');
 
+// Uncheck + Save keeps the key with enabled:false (fields + boughtBefore retained).
+const boughtKey = CSI.profile.productKeyFromUrl(sampleUrl);
+store.csi_taste_profile = {
+  ...store.csi_taste_profile,
+  boughtBefore: { [boughtKey]: 'rebuy' }
+};
+const disabled = await CSI.storage.saveTasteProfile({ enabled: false });
+assert(disabled.ok && disabled.value.enabled === false, 'disable save ok');
+assert(Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'disable keeps the storage key');
+assert(store.csi_taste_profile.enabled === false, 'stored enabled is false');
+assert(store.csi_taste_profile.forms.includes('flower'), 'forms retained while disabled');
+assert(store.csi_taste_profile.tripBudgetUsd === 120, 'budget retained while disabled');
+assert(store.csi_taste_profile.dealTier === 'sale', 'deal tier retained while disabled');
+assert(store.csi_taste_profile.boughtBefore[boughtKey] === 'rebuy', 'boughtBefore retained while disabled');
+
+const loadedDisabled = await CSI.storage.loadTasteProfile();
+assert(loadedDisabled.enabled === false, 'load reports disabled');
+assert(CSI.profile.isStoredProfile(loadedDisabled), 'load returns full stored profile when disabled');
+assert(loadedDisabled.likedTerpenes.includes('Limonene'), 'popup can reload liked terpenes while off');
+assert(loadedDisabled.boughtBefore[boughtKey] === 'rebuy', 'popup can reload boughtBefore while off');
+
+const exportWhileOff = await CSI.storage.exportTasteProfile();
+assert(exportWhileOff.ok && exportWhileOff.json.includes('"enabled": false'), 'export stays available while data exists');
+
+const noFlagWhileOff = await CSI.storage.setBoughtBeforeFlag(sampleUrl, 'fine');
+assert(!noFlagWhileOff.ok, 'bought-before writes require enabled profile');
+
+const reenabled = await CSI.storage.saveTasteProfile({ ...loadedDisabled, enabled: true });
+assert(reenabled.ok && reenabled.value.enabled === true, 're-enable without blank rewrite');
+assert(reenabled.value.forms.includes('flower'), 're-enable keeps forms');
+assert(reenabled.value.boughtBefore[boughtKey] === 'rebuy', 're-enable keeps boughtBefore');
+
+await CSI.storage.saveTasteProfile({ enabled: false });
 await CSI.storage.deleteTasteProfile();
 assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'delete removes the key');
 const afterDelete = await CSI.storage.loadTasteProfile();
 assert(afterDelete.enabled === false, 'load after delete is off');
+assert(!CSI.profile.isStoredProfile(afterDelete), 'delete leaves no stored fields');
 const noExport = await CSI.storage.exportTasteProfile();
 assert(!noExport.ok, 'export fails when nothing is stored');
 
@@ -198,7 +232,27 @@ const popupHtml = fs.readFileSync(path.join(ext, 'popup/popup.html'), 'utf8');
 assert(popupHtml.includes('id="profile-enable"'), 'popup opt-in');
 assert(popupHtml.includes('profile-export'), 'popup export');
 assert(popupHtml.includes('profile-delete'), 'popup delete');
+assert(/Turning off stops using the profile/i.test(popupHtml), 'popup copy: off stops using');
+assert(/Delete wipes it/i.test(popupHtml), 'popup copy: Delete wipes');
+const fieldsetMatch = popupHtml.match(/<fieldset[^>]*id="profile-fields"[^>]*>([\s\S]*?)<\/fieldset>/);
+assert(fieldsetMatch, 'profile-fields fieldset present');
+assert(!/id="profile-save"/.test(fieldsetMatch[1]), 'Save is outside profile-fields');
+assert(!/id="profile-export"/.test(fieldsetMatch[1]), 'Export is outside profile-fields');
+assert(!/id="profile-delete"/.test(fieldsetMatch[1]), 'Delete is outside profile-fields');
 assert(!/eval\(|new Function\(/.test(fs.readFileSync(path.join(ext, 'lib/csi-profile.js'), 'utf8')), 'no eval');
+
+// Locks: deal-tier / trip budget stay inert for Free similar-by-chem ranking.
+const rankingSrc = fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8');
+const pdpSrc = fs.readFileSync(path.join(ext, 'content-pdp.js'), 'utf8');
+const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
+assert(!/dealTier/.test(rankingSrc), 'dealTier not used in core ranking');
+assert(!/tripBudget/.test(rankingSrc), 'tripBudget not used in core ranking');
+assert(!/dealTier|tripBudget/.test(pdpSrc), 'dealTier/tripBudget inert on PDP');
+assert(!/dealTier|tripBudget/.test(listingSrc), 'dealTier/tripBudget inert on listing');
+
+const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
+assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');
+assert(popupJs.includes("zenleaf: 'Zen Leaf'"), 'Zen Leaf label in popup');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.19', 'manifest 1.3.19');

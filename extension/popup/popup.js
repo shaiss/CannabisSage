@@ -184,9 +184,11 @@
   }
 
   function fillProfileForm(profile, brands) {
+    const stored = CSI.profile.isStoredProfile(profile);
     const enabled = !!(profile && profile.enabled);
     setProfileEnabled(enabled);
-    const p = enabled ? profile : CSI.profile.emptyEnabled();
+    // Reload stored fields even when disabled so re-enable is not a blank rewrite.
+    const p = stored ? profile : CSI.profile.emptyEnabled();
     fillChecks(
       document.getElementById('profile-forms'),
       CSI.profile.FORMS.map((id) => ({ id, label: id })),
@@ -238,10 +240,9 @@
 
   function readProfileForm() {
     const enabled = document.getElementById('profile-enable').checked;
-    if (!enabled) return { enabled: false };
     const budgetRaw = document.getElementById('profile-budget').value;
     return {
-      enabled: true,
+      enabled,
       forms: readChecks(document.getElementById('profile-forms')),
       sizes: readChecks(document.getElementById('profile-sizes')),
       cannabinoidRatio: document.getElementById('profile-ratio').value || null,
@@ -259,7 +260,10 @@
 
   async function loadProfileUi() {
     const profile = await CSI.storage.loadTasteProfile();
-    const brands = await listedBrands(profile.enabled ? profile : { brandLoyal: [], brandAvoid: [] });
+    const brandSource = CSI.profile.isStoredProfile(profile)
+      ? profile
+      : { brandLoyal: [], brandAvoid: [] };
+    const brands = await listedBrands(brandSource);
     fillProfileForm(profile, brands);
   }
 
@@ -268,16 +272,30 @@
   });
   document.getElementById('profile-save').addEventListener('click', async () => {
     const raw = readProfileForm();
-    if (raw.enabled) {
-      const existing = await CSI.storage.loadTasteProfile();
-      if (existing.enabled) raw.boughtBefore = existing.boughtBefore;
+    const existing = await CSI.storage.loadTasteProfile();
+    if (CSI.profile.isStoredProfile(existing) && existing.boughtBefore) {
+      raw.boughtBefore = existing.boughtBefore;
+    }
+    // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
+    if (!raw.enabled && CSI.profile.isStoredProfile(existing)) {
+      const saved = await CSI.storage.saveTasteProfile({ ...existing, enabled: false });
+      if (!saved.ok) {
+        showStatus(saved.error || 'Invalid profile');
+        return;
+      }
+      await loadProfileUi();
+      showStatus('Profile off — data kept until Delete');
+      return;
     }
     const saved = await CSI.storage.saveTasteProfile(raw);
     if (!saved.ok) {
       showStatus(saved.error || 'Invalid profile');
       return;
     }
-    showStatus(saved.value.enabled ? 'Profile saved' : 'Profile not stored');
+    await loadProfileUi();
+    if (saved.value.enabled) showStatus('Profile saved');
+    else if (CSI.profile.isStoredProfile(saved.value)) showStatus('Profile off — data kept until Delete');
+    else showStatus('Nothing stored until you turn it on');
   });
   document.getElementById('profile-export').addEventListener('click', async () => {
     const dumped = await CSI.storage.exportTasteProfile();

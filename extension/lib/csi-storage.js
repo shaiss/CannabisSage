@@ -338,23 +338,50 @@
   async function loadTasteProfile() {
     const data = await storageGet([KEYS.PROFILE]);
     const parsed = CSI.profile?.normalize?.(data[KEYS.PROFILE]);
-    if (!parsed || !parsed.ok || !parsed.value || parsed.value.enabled !== true) {
+    if (!parsed || !parsed.ok || !parsed.value) {
       return { enabled: false };
     }
-    return parsed.value;
+    // Return full stored profiles even when disabled so the popup can reload fields.
+    if (CSI.profile.isStoredProfile(parsed.value)) return parsed.value;
+    return { enabled: false };
   }
 
   async function saveTasteProfile(raw) {
-    const parsed = CSI.profile?.normalize?.(raw, { now: Date.now() });
+    const now = Date.now();
+    const parsed = CSI.profile?.normalize?.(raw, { now });
     if (!parsed || !parsed.ok) {
       return { ok: false, error: (parsed && parsed.error) || 'invalid profile' };
     }
-    if (!parsed.value || parsed.value.enabled !== true) {
-      await storageRemove([KEYS.PROFILE]);
-      return { ok: true, value: { enabled: false } };
+
+    // Opt-in write: first save must be enabled.
+    if (parsed.value && parsed.value.enabled === true) {
+      await storageSet({ [KEYS.PROFILE]: parsed.value });
+      return { ok: true, value: parsed.value };
     }
-    await storageSet({ [KEYS.PROFILE]: parsed.value });
-    return { ok: true, value: parsed.value };
+
+    // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
+    const existingData = await storageGet([KEYS.PROFILE]);
+    const existing = CSI.profile?.normalize?.(existingData[KEYS.PROFILE]);
+    const hadStored =
+      existing && existing.ok && CSI.profile.isStoredProfile(existing.value);
+
+    if (CSI.profile.isStoredProfile(parsed.value)) {
+      // Full disabled payload — write only if a profile already exists (nothing until opt-in).
+      if (!hadStored) {
+        return { ok: true, value: { enabled: false } };
+      }
+      await storageSet({ [KEYS.PROFILE]: parsed.value });
+      return { ok: true, value: parsed.value };
+    }
+
+    // Bare { enabled: false }: flip the stored record off without wiping fields.
+    if (hadStored) {
+      const disabled = { ...existing.value, enabled: false, updatedAt: now };
+      await storageSet({ [KEYS.PROFILE]: disabled });
+      return { ok: true, value: disabled };
+    }
+
+    return { ok: true, value: { enabled: false } };
   }
 
   async function deleteTasteProfile() {

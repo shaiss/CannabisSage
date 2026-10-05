@@ -34,7 +34,8 @@
       <h2>Local taste profile</h2>
       <p class="hint">
         Optional and Free. Stored on this device only. Nothing is saved until you turn it on.
-        Structured chem fields — not a notes field.
+        Turning off stops using the profile; Delete wipes it. Structured chem fields — not a notes
+        field.
       </p>
       <label class="check">
         <input type="checkbox" id="profile-enable" />
@@ -78,13 +79,13 @@
           Deal listing
           <select id="profile-deal"></select>
         </label>
-        <div class="actions">
-          <button type="button" id="profile-save" class="primary">Save profile</button>
-          <button type="button" id="profile-export">Export JSON</button>
-          <button type="button" id="profile-delete">Delete profile</button>
-        </div>
-        <textarea id="profile-export-out" hidden readonly rows="8"></textarea>
       </fieldset>
+      <div class="actions">
+        <button type="button" id="profile-save" class="primary">Save profile</button>
+        <button type="button" id="profile-export">Export JSON</button>
+        <button type="button" id="profile-delete">Delete profile</button>
+      </div>
+      <textarea id="profile-export-out" hidden readonly rows="8"></textarea>
     </section>
 
     <section id="taste-section">

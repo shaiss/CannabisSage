@@ -872,6 +872,55 @@ a.csi-cross-store-line:hover {
   color: #889;
 }
 
+.csi-cross-store-open {
+  display: inline-block;
+  margin-top: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #ff6b35;
+  text-decoration: none;
+}
+
+a.csi-cross-store-open:hover {
+  text-decoration: underline;
+}
+
+.csi-store-switcher {
+  margin: 6px 0 2px;
+}
+
+.csi-store-switcher-lead {
+  margin: 0 0 4px;
+  font-size: 11px;
+  line-height: 1.35;
+  color: #667;
+  font-weight: 500;
+}
+
+.csi-store-switcher-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+a.csi-store-switcher-chip {
+  display: inline-block;
+  padding: 3px 8px;
+  border: 1px solid #dde3ea;
+  border-radius: 6px;
+  background: #f7f9fb;
+  color: #2c3e50;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.3;
+  text-decoration: none;
+}
+
+a.csi-store-switcher-chip:hover {
+  border-color: #ff6b35;
+  color: #ff6b35;
+}
+
 .csi-cross-store-upgrade {
   margin-top: 6px;
   padding: 6px 10px;

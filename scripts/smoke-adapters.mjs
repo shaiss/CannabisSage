@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.17', 'version bump');
+assert(manifest.version === '1.3.18', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +207,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.17', 'core version 1.3.17');
+assert(CSI.VERSION === '1.3.18', 'core version 1.3.18');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -1032,12 +1032,13 @@ assert(listingSrc.includes('noteBrowseEngagement();'), 'hover counts as mid-brow
 const configSoft = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
 assert(configSoft.upgradeUrl === 'https://cannabissage.app/#pricing', 'upgrade still opens site checkout');
 
-// Cross-store soft match (v1.3.17) — other adapters, cached only, multiStore Pro
+// Cross-store soft match (v1.3.17) + store switcher (v1.3.18) — other adapters, cached only, multiStore Pro
 assert(CSI.CROSS_STORE_MAX_MATCHES === 3, 'at most three other-store rows');
 assert(CSI.CROSS_STORE_MIN_SCORE === 0.38, 'soft-match floor');
 const crossCopy = Object.values(CSI.ui.CROSS_STORE_COPY).join(' ');
 assert(CSI.ui.CROSS_STORE_COPY.title === 'At other stores you shop', 'cross-store title');
 assert(/already opened|already shop/.test(crossCopy), 'cache-only framing');
+assert(/Open a match to jump stores|Open on|Cached stores for this item/.test(crossCopy), 'switcher framing in copy');
 assert(!/switcher/i.test(CSI.ui.CROSS_STORE_COPY.tooFew), 'empty state is not a switcher');
 assert(
   !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria|strain)\b/i.test(
@@ -1330,12 +1331,24 @@ assert(
   CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross }).includes('Upgrade'),
   'locked panel reuses Upgrade'
 );
+const freeCrossHtml = CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross });
+assert(!freeCrossHtml.includes('data-csi-store-switcher'), 'switcher hidden for free');
+assert(!freeCrossHtml.includes('data-csi-cross-store-open'), 'Open-on links hidden for free');
 sandbox.CSI.features = { can: (id) => id === 'multiStore' };
 const crossHtml = CSI.ui.buildCrossStoreMatchPanel({ crossStoreMatch: rankedCross });
 assert(crossHtml.includes('data-csi-cross-store="1"'), 'cross-store panel marker');
 assert(crossHtml.includes('At other stores you shop'), 'title copy');
 assert(/Limonene|THC/.test(crossHtml), 'chem lead in row');
 assert(crossHtml.includes('csi-chem-secondary'), 'name and store are secondary');
+assert(crossHtml.includes('data-csi-cross-store-open'), 'Open-on jump link for Pro');
+assert(crossHtml.includes('target="_blank"'), 'Open-on uses new tab');
+assert(crossHtml.includes('rel="noopener noreferrer"'), 'Open-on is noopener');
+assert(
+  rankedCross.matches.filter((m) => CSI.ui.crossStoreHref(m.url)).length >= 2
+    ? crossHtml.includes('data-csi-store-switcher="1"')
+    : !crossHtml.includes('data-csi-store-switcher'),
+  'switcher strip when ≥2 allowlisted destinations'
+);
 assert(!/cardNumber|PaymentElement|stripe\.elements/i.test(crossHtml), 'no card collection');
 assert(
   CSI.ui.buildCrossStoreMatchPanel({
@@ -1361,6 +1374,89 @@ assert(
   }).includes('<span class="csi-cross-store-line'),
   'unsupported host is not a link'
 );
+assert(
+  !CSI.ui
+    .buildCrossStoreMatchPanel({
+      crossStoreMatch: {
+        matches: [
+          {
+            url: 'https://evil.example/p',
+            name: 'Nope',
+            cannabinoids: { THC: 22 },
+            storeLabel: 'Sunnyside',
+            adapterId: 'sunnyside',
+            reason: 'Close listed chem.',
+            identical: false
+          }
+        ]
+      }
+    })
+    .includes('data-csi-cross-store-open'),
+  'unsupported host has no Open-on link'
+);
+assert(CSI.ui.crossStoreHref('https://evil.example/p') === '', 'crossStoreHref drops unknown host');
+assert(CSI.ui.crossStoreHref('javascript:alert(1)') === '', 'crossStoreHref drops non-http(s)');
+assert(
+  CSI.ui.crossStoreHref('https://www.sunnyside.shop/product/blue-dream').includes('sunnyside.shop'),
+  'crossStoreHref keeps built-in adapter URL'
+);
+assert(
+  CSI.ui.listCrossStoreDestinations([
+    { url: 'https://evil.example/p', adapterId: 'evil', storeLabel: 'Evil' },
+    { url: 'ftp://www.sunnyside.shop/product/x', adapterId: 'sunnyside', storeLabel: 'Sunnyside' }
+  ]).length === 0,
+  'destinations drop non-allowlisted URLs'
+);
+
+const singleStoreHtml = CSI.ui.buildCrossStoreMatchPanel({
+  crossStoreMatch: {
+    matches: [
+      {
+        url: syNear.url,
+        name: syNear.name,
+        cannabinoids: syNear.cannabinoids,
+        terpenes: syNear.terpenes,
+        storeLabel: 'Sunnyside',
+        adapterId: 'sunnyside',
+        reason: 'Close listed chem.',
+        identical: false,
+        price: 40
+      }
+    ]
+  }
+});
+assert(singleStoreHtml.includes('data-csi-cross-store-open'), 'single other store still has Open-on');
+assert(!singleStoreHtml.includes('data-csi-store-switcher'), 'switcher hidden when only one store has cache');
+assert(CSI.ui.buildCrossStoreSwitcher(CSI.ui.listCrossStoreDestinations([{ url: syNear.url, adapterId: 'sunnyside', storeLabel: 'Sunnyside' }])) === '', 'switcher builder empty for one destination');
+
+const twoDestHtml = CSI.ui.buildCrossStoreMatchPanel({
+  crossStoreMatch: {
+    matches: [
+      {
+        url: syNear.url,
+        name: syNear.name,
+        cannabinoids: syNear.cannabinoids,
+        storeLabel: 'Sunnyside',
+        adapterId: 'sunnyside',
+        reason: 'Close listed chem.',
+        identical: false
+      },
+      {
+        url: tvMalvern.url,
+        name: tvMalvern.name,
+        cannabinoids: tvMalvern.cannabinoids,
+        storeLabel: 'TerraVida (Zen Leaf Malvern)',
+        adapterId: 'terravida',
+        reason: 'Close listed chem.',
+        identical: false
+      }
+    ]
+  }
+});
+assert(twoDestHtml.includes('data-csi-store-switcher="1"'), 'switcher shown for two cached stores');
+assert(twoDestHtml.includes('Cached stores for this item'), 'switcher lead copy');
+assert((twoDestHtml.match(/data-csi-store-switcher-chip=/g) || []).length >= 2, 'one chip per store');
+
 delete sandbox.CSI.features;
 
 assert(/multiStore:\s*true/.test(featuresSrcPref), 'cross-store reuses multiStore');
@@ -1377,6 +1473,7 @@ const crossAttach = pdpSrc.slice(
 assert(crossAttach.length > 0, 'cross-store attach exists');
 assert(!/fetchProductDetails/.test(crossAttach), 'other-store rows do not call fetchProductDetails');
 assert(!/FETCH_PRODUCT_HTML|sendMessage/.test(crossAttach), 'other-store rows do not fetch extra HTML');
+assert(!/fetch\(|XMLHttpRequest|chrome\.runtime\.sendMessage/.test(uiSrc.match(/function buildCrossStoreMatchPanel[\s\S]*?function buildPreferenceMatchPanel/)?.[0] || ''), 'switcher UI does not fetch');
 assert(listingSrc.includes('buildPdpCacheRecord') && listingSrc.includes('merge: true'), 'listing merges price/size into TTL cache');
 assert(!listingSrc.includes('buildCrossStoreMatchPanel'), 'listing does not spam other-store cards');
 assert(storageSrc.includes('excludeAdapterId'), 'storage can list cache minus this adapter');

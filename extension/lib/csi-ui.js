@@ -517,19 +517,23 @@
   /**
    * Closest listed items at other supported stores, from the TTL cache only.
    * Chem labels first. Store name is the adapter display name for that URL.
+   * Pro (multiStore): optional store switcher when ≥2 allowlisted destinations.
    * Free plan sees a quiet Pro note, not a wall and not a card form.
    */
   const CROSS_STORE_COPY = {
     title: 'At other stores you shop',
-    lead: 'Closest listed chem from menus you already opened. Not a store switcher.',
+    lead: 'Closest listed chem from menus you already opened. Open a match to jump stores.',
     tooFew: 'No cached matches at other stores yet.',
     locked:
       'Pro matches listed chem at other stores you already shop. Chemistry on this page stays visible.',
     upgrade: 'Upgrade',
     sameItem: 'Same listed item',
-    nearMatch: 'Near match'
+    nearMatch: 'Near match',
+    openOn: 'Open on',
+    switcherLead: 'Cached stores for this item'
   };
 
+  /** http(s) only, and only hosts a built-in adapter already supports. */
   function crossStoreHref(url) {
     if (!url) return '';
     try {
@@ -540,6 +544,59 @@
     } catch {
       return '';
     }
+  }
+
+  /**
+   * One destination per store (best ranked match with an allowlisted URL).
+   * Drop rows without a safe href. Order follows match rank.
+   */
+  function listCrossStoreDestinations(matches) {
+    const list = Array.isArray(matches) ? matches : [];
+    const seen = new Set();
+    const out = [];
+    list.forEach((row) => {
+      if (!row || typeof row !== 'object') return;
+      const href = crossStoreHref(row.url);
+      if (!href) return;
+      const adapterId = String(row.adapterId || CSI.adapterIdFromUrl?.(href) || '').trim();
+      const key = adapterId || href;
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      const storeLabel =
+        String(row.storeLabel || '').trim() ||
+        (adapterId ? CSI.adapterDisplayName?.(adapterId) : '') ||
+        'Store';
+      out.push({ adapterId, storeLabel, url: href });
+    });
+    return out;
+  }
+
+  /**
+   * Compact switcher: which other supported stores have a cached match URL.
+   * Hidden when fewer than two destinations (nothing to switch between).
+   * Links open the store's own product page in a new tab.
+   */
+  function buildCrossStoreSwitcher(destinations) {
+    const list = Array.isArray(destinations) ? destinations : [];
+    if (list.length < 2) return '';
+    const COPY = CROSS_STORE_COPY;
+    const chips = list
+      .map((dest) => {
+        const label = String(dest.storeLabel || '').trim() || 'Store';
+        const href = crossStoreHref(dest.url);
+        if (!href) return '';
+        return `<a class="csi-store-switcher-chip" data-csi-store-switcher-chip="${CSI.escapeHtml(
+          String(dest.adapterId || '')
+        )}" href="${CSI.escapeHtml(href)}" target="_blank" rel="noopener noreferrer">${CSI.escapeHtml(
+          label
+        )}</a>`;
+      })
+      .filter(Boolean)
+      .join('');
+    if (!chips) return '';
+    return `<div class="csi-store-switcher" data-csi-store-switcher="1"><p class="csi-store-switcher-lead">${CSI.escapeHtml(
+      COPY.switcherLead
+    )}</p><div class="csi-store-switcher-chips">${chips}</div></div>`;
   }
 
   function formatListedPerMg(dollarsPerMg) {
@@ -569,19 +626,31 @@
         COPY.title
       )}</p><p class="csi-cross-store-note">${CSI.escapeHtml(block.note)}</p></section>`;
     }
+    const destinations = listCrossStoreDestinations(matches);
+    const switcherHtml = buildCrossStoreSwitcher(destinations);
     const items = matches
       .map((row) => {
         const chem = formatChemLead(row) || COPY.lead;
         const href = crossStoreHref(row.url);
-        const label = href
-          ? `<a class="csi-cross-store-line csi-chem-lead" href="${CSI.escapeHtml(href)}">${CSI.escapeHtml(chem)}</a>`
-          : `<span class="csi-cross-store-line csi-chem-lead">${CSI.escapeHtml(chem)}</span>`;
+        const label = `<span class="csi-cross-store-line csi-chem-lead">${CSI.escapeHtml(chem)}</span>`;
         const store = String(row.storeLabel || '').trim();
         const name = String(row.name || '').trim();
         const secondary = [store, name].filter(Boolean).join(' · ');
         const nameHtml = secondary
           ? `<span class="csi-cross-store-name csi-chem-secondary">${CSI.escapeHtml(secondary)}</span>`
           : '';
+        const openHtml =
+          href && store
+            ? `<a class="csi-cross-store-open" data-csi-cross-store-open="1" href="${CSI.escapeHtml(
+                href
+              )}" target="_blank" rel="noopener noreferrer">${CSI.escapeHtml(COPY.openOn)} ${CSI.escapeHtml(
+                store
+              )}</a>`
+            : href
+              ? `<a class="csi-cross-store-open" data-csi-cross-store-open="1" href="${CSI.escapeHtml(
+                  href
+                )}" target="_blank" rel="noopener noreferrer">${CSI.escapeHtml(COPY.openOn)}</a>`
+              : '';
         const priceNum = formatListedPrice(row.price);
         const price = priceNum ? `$${priceNum}` : '';
         const perMg = formatListedPerMg(row.dollarsPerMg);
@@ -594,14 +663,14 @@
         const reasonHtml = `<p class="csi-cross-store-reason">${CSI.escapeHtml(flag)}: ${CSI.escapeHtml(
           reason
         )}</p>`;
-        return `<li class="csi-cross-store-item">${label}${nameHtml}${valueHtml}${reasonHtml}</li>`;
+        return `<li class="csi-cross-store-item">${label}${nameHtml}${openHtml}${valueHtml}${reasonHtml}</li>`;
       })
       .join('');
     return `<section class="csi-cross-store" data-csi-cross-store="1"><p class="csi-cross-store-title">${CSI.escapeHtml(
       COPY.title
     )}</p><p class="csi-cross-store-lead">${CSI.escapeHtml(
       COPY.lead
-    )}</p><ul class="csi-cross-store-list">${items}</ul></section>`;
+    )}</p>${switcherHtml}<ul class="csi-cross-store-list">${items}</ul></section>`;
   }
 
   function buildPreferenceMatchPanel(product, tasteMap) {
@@ -1108,6 +1177,9 @@
     buildPreferenceMatchPanel,
     buildSimilarByChemPanel,
     buildCrossStoreMatchPanel,
+    crossStoreHref,
+    listCrossStoreDestinations,
+    buildCrossStoreSwitcher,
     formatChemLead,
     formatStatusError,
     buildChemOverStrainHeaderHtml,

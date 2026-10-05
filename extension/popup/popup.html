@@ -88,6 +88,31 @@
       <textarea id="profile-export-out" hidden readonly rows="8"></textarea>
     </section>
 
+    <section id="picks-section">
+      <h2>Picks for you</h2>
+      <p class="hint" id="picks-hint">
+        Pro. Ranks already-cached listings from your home and secondary stores using your local taste
+        profile. Listed chemistry and price only.
+      </p>
+      <p id="picks-status" class="hint" hidden></p>
+      <div id="picks-locked" class="picks-locked" hidden>
+        <p class="hint">
+          Picks for you is a Pro tool. It reads your local taste profile and already-cached menus —
+          no new fetches.
+        </p>
+        <button type="button" id="picks-upgrade" class="primary">Upgrade</button>
+      </div>
+      <div id="picks-empty" class="picks-empty" hidden>
+        <p id="picks-empty-title" class="picks-empty-title">No picks yet</p>
+        <p id="picks-empty-body" class="hint"></p>
+      </div>
+      <ul id="picks-list" class="picks-list" hidden></ul>
+      <p id="picks-disclaimer" class="hint" hidden>Listed, not guaranteed.</p>
+      <div class="actions">
+        <button type="button" id="picks-refresh">Refresh picks</button>
+      </div>
+    </section>
+
     <section id="taste-section">
       <h2>Preferred terpenes</h2>
       <p class="hint">Weights 0–1. Higher = more important for “Map match”. <span id="taste-pro-note"></span></p>
@@ -119,10 +144,16 @@
       CannabisSage displays retailer-published chemistry and aroma notes. It does not provide medical advice.
     </p>
     <script src="../lib/csi-core.js"></script>
+    <script src="../adapters/interface.js"></script>
+    <script src="../adapters/sunnyside.js"></script>
+    <script src="../adapters/zenleaf.js"></script>
+    <script src="../adapters/terravida.js"></script>
+    <script src="../adapters/registry.js"></script>
     <script src="../lib/csi-entitlement.js"></script>
     <script src="../lib/csi-features.js"></script>
     <script src="../lib/csi-storage.js"></script>
     <script src="../lib/csi-profile.js"></script>
+    <script src="../lib/csi-picks.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

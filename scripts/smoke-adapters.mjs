@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.19', 'version bump');
+assert(manifest.version === '1.3.20', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +207,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.19', 'core version 1.3.19');
+assert(CSI.VERSION === '1.3.20', 'core version 1.3.20');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -893,14 +893,14 @@ assert(
     'Listed cannabinoids and primary terpenes on supported menus, side-by-side'
   ) &&
     landingSrc.includes('close matches at your other supported') &&
-    landingSrc.includes('optional on-device taste profile'),
-  'landing Roadmap Now copy includes cross-store match and local profile'
+    landingSrc.includes('optional on-device taste profile') &&
+    landingSrc.includes('Pro picks across nearby'),
+  'landing Roadmap Now copy includes cross-store match, local profile, and Pro picks'
 );
 assert(
-  landingSrc.includes('Picks that match that profile across nearby supported menus') &&
-    landingSrc.includes('restock') &&
-    landingSrc.includes('deal alerts'),
-  'landing Roadmap Next copy'
+  landingSrc.includes('Restock and deal alerts') &&
+    !landingSrc.includes('Picks that match that profile across nearby supported menus, and restock'),
+  'landing Roadmap Next copy is restock/deal alerts after picks shipped'
 );
 assert(
   landingSrc.includes('Ask Sage, a chat guide that') &&
@@ -1500,5 +1500,11 @@ assert(!/product\.tasteProfile/.test(pdpSrc), 'pdp keeps profile in content-scri
 const fetchSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-fetch.js'), 'utf8');
 assert(fetchSrcPref.includes('delete out.tasteProfile') && fetchSrcPref.includes('delete out.tasteMap'), 'host product cache strips prefs');
 assert(fetchSrcPref.includes('omitSensitivePrefs'), 'host cache sanitizes data-csi-product-data');
+
+// Picks for you (v1.3.20) — Pro, popup-only, cached menus
+assert(fs.existsSync(path.join(ext, 'lib/csi-picks.js')), 'csi-picks.js present');
+assert(featuresSrcPref.includes('picksForYou: true'), 'picksForYou is Pro');
+assert(!manifest.content_scripts?.[1]?.js?.includes('lib/csi-picks.js'), 'picks not in content scripts');
+assert(fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8').includes("onSale: !!product.onSale") || fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8').includes('rec.onSale'), 'cache record can keep onSale');
 
 console.log('smoke-adapters: OK');

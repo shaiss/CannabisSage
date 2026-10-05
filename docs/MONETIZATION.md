@@ -49,9 +49,11 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | PDP panel | Filters & sort |
 | Same-menu similar-by-chem (cached listed chem) | CSV / JSON export |
 | Core supported menus | Cross-store soft match + store switcher (cached other-store chem) |
-| Optional local taste profile (opt-in, device-only) | |
+| Optional local taste profile (opt-in, device-only) | Picks for you across nearby supported menus (cached) |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match. The Free **taste profile** (`tasteProfile`) is a separate opt-in local record; it does not unlock Map match.
+
+**Picks for you** (`picksForYou`) is a separate Pro gate. It runs only in the extension popup: reads the local taste profile and already-cached listing/PDP rows for the profile's home and secondary stores, filters by form / size / ratio / THC band / skip brands / never-again, then ranks by listed chem match and net listed price (deal preference + trip budget). No new network calls. Free sees the usual Upgrade deep link, not the ranked list.
 
 Same-menu similar-by-chem is Free. Neighbors use already-cached listed cannabinoids and terpenes on this host. Missing chem or too few neighbors is a quiet note — not an upgrade wall and not a guessed lab number.
 

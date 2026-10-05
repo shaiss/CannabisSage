@@ -155,3 +155,61 @@ fieldset:disabled {
   font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+.picks-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.picks-item {
+  margin: 0 0 10px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.picks-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.picks-item-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.picks-name {
+  font-size: 12px;
+}
+
+.picks-open {
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.picks-meta,
+.picks-listed-note {
+  margin: 2px 0 0;
+  color: #667;
+  font-size: 11px;
+}
+
+.picks-reasons {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: #445;
+  font-size: 11px;
+}
+
+.picks-empty-title {
+  margin: 6px 0 0;
+  font-weight: 600;
+}
+
+.picks-locked {
+  margin-top: 6px;
+}
+

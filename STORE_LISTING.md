@@ -7,7 +7,7 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.19 |
+| **Version** | 1.3.20 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
@@ -33,6 +33,7 @@ Pro features (unlock after purchase on the CannabisSage website):
 • Taste-map match, listing filters & sort
 • CSV/JSON export and deal badges
 • Chem insights across more stores you shop
+• Picks for you across nearby supported menus (from your local profile + cached listings)
 
 Payments:
 • Subscription checkout uses Stripe Checkout on our website — never inside the extension
@@ -90,7 +91,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.19.zip` (CWS **1.3.2** may still be pending review; next upload needs this bump).
+4. Upload `dist/cannabis-sage-1.3.20.zip` (CWS **1.3.2** may still be pending review; next upload needs this bump).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

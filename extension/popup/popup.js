@@ -107,6 +107,7 @@
       deactivateBtn.hidden = true;
     }
     setTasteEnabled(!!CSI.features?.can?.('tasteMap'));
+    await loadPicksUi();
   }
 
   async function loadTaste() {
@@ -284,6 +285,7 @@
         return;
       }
       await loadProfileUi();
+      await loadPicksUi();
       showStatus('Profile off — data kept until Delete');
       return;
     }
@@ -293,6 +295,7 @@
       return;
     }
     await loadProfileUi();
+    await loadPicksUi();
     if (saved.value.enabled) showStatus('Profile saved');
     else if (CSI.profile.isStoredProfile(saved.value)) showStatus('Profile off — data kept until Delete');
     else showStatus('Nothing stored until you turn it on');
@@ -313,7 +316,98 @@
     await CSI.storage.deleteTasteProfile();
     document.getElementById('profile-export-out').hidden = true;
     await loadProfileUi();
+    await loadPicksUi();
     showStatus('Profile deleted');
+  });
+
+  function escapeHtml(value) {
+    return CSI.escapeHtml ? CSI.escapeHtml(value) : String(value ?? '');
+  }
+
+  function renderPicksResult(result) {
+    const lockedEl = document.getElementById('picks-locked');
+    const emptyEl = document.getElementById('picks-empty');
+    const listEl = document.getElementById('picks-list');
+    const disclaimer = document.getElementById('picks-disclaimer');
+    const statusEl = document.getElementById('picks-status');
+    lockedEl.hidden = true;
+    emptyEl.hidden = true;
+    listEl.hidden = true;
+    listEl.innerHTML = '';
+    disclaimer.hidden = true;
+    statusEl.hidden = true;
+
+    if (!result || result.status === 'locked') {
+      lockedEl.hidden = false;
+      return;
+    }
+
+    if (result.status !== 'ok') {
+      emptyEl.hidden = false;
+      document.getElementById('picks-empty-title').textContent =
+        (CSI.picks && CSI.picks.COPY && CSI.picks.COPY.emptyTitle) || 'No picks yet';
+      document.getElementById('picks-empty-body').textContent =
+        (result && result.message) ||
+        (CSI.picks && CSI.picks.COPY && CSI.picks.COPY.profileOff) ||
+        '';
+      return;
+    }
+
+    const picks = Array.isArray(result.picks) ? result.picks : [];
+    if (!picks.length) {
+      emptyEl.hidden = false;
+      document.getElementById('picks-empty-title').textContent =
+        (CSI.picks && CSI.picks.COPY && CSI.picks.COPY.emptyTitle) || 'No picks yet';
+      document.getElementById('picks-empty-body').textContent =
+        (CSI.picks && CSI.picks.COPY && CSI.picks.COPY.noMatches) || '';
+      return;
+    }
+
+    listEl.hidden = false;
+    disclaimer.hidden = false;
+    picks.forEach((pick) => {
+      const li = document.createElement('li');
+      li.className = 'picks-item';
+      const title = escapeHtml(pick.name || 'Listed product');
+      const store = escapeHtml(pick.storeLabel || '');
+      const age = escapeHtml(pick.cacheAgeLabel || '');
+      const href = CSI.picks.allowlistedUrl(pick.url) ? escapeHtml(pick.url) : '';
+      const reasons = (pick.reasons || [])
+        .map((r) => `<li>${escapeHtml(r)}</li>`)
+        .join('');
+      const link = href
+        ? `<a class="picks-open" href="${href}" target="_blank" rel="noopener noreferrer">Open listing</a>`
+        : '';
+      li.innerHTML = `
+        <div class="picks-item-head">
+          <strong class="picks-name">${title}</strong>
+          ${link}
+        </div>
+        <p class="picks-meta">${store}${age ? ` · Cached ${age}` : ''}</p>
+        <ul class="picks-reasons">${reasons}</ul>
+        <p class="picks-listed-note">${escapeHtml(pick.listedNote || CSI.picks.COPY.listedNote)}</p>
+      `;
+      listEl.appendChild(li);
+    });
+  }
+
+  async function loadPicksUi() {
+    if (!CSI.picks) return;
+    const isPro = !!CSI.features?.can?.(CSI.picks.FEATURE_ID);
+    if (!isPro) {
+      renderPicksResult({ status: 'locked' });
+      return;
+    }
+    const result = await CSI.picks.loadAndRank({ isPro: true });
+    renderPicksResult(result);
+  }
+
+  document.getElementById('picks-upgrade').addEventListener('click', () => {
+    CSI.entitlement.openUpgrade();
+  });
+  document.getElementById('picks-refresh').addEventListener('click', async () => {
+    await loadPicksUi();
+    showStatus('Picks refreshed');
   });
 
   document.getElementById('add-pref').addEventListener('click', () => addPrefRow());

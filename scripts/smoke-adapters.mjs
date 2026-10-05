@@ -912,6 +912,28 @@ assert(
   !landingSrc.includes('docs/ROADMAP.md') && !landingSrc.includes('Full roadmap'),
   'landing does not link to docs/ROADMAP.md or say Full roadmap'
 );
+const roadmapSrc = fs.readFileSync(path.join(root, 'docs/ROADMAP.md'), 'utf8');
+const roadmapForbidden = [
+  'Stripe',
+  'acct_',
+  'StrainChain',
+  'Taylor',
+  'Gmail',
+  'Assay',
+  'Cheech',
+  'Web3',
+  'Avalanche',
+  'Blockticity',
+  'Sunnyside',
+  'Zen Leaf',
+  'TerraVida'
+];
+for (const needle of roadmapForbidden) {
+  assert(
+    !new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i').test(roadmapSrc),
+    `docs/ROADMAP.md must not contain ${needle}`
+  );
+}
 const sameChemUnique = CSI.ui.summarizeTerpeneOverlap([
   { name: 'Alpha', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Myrcene: 0.2 } },
   { name: 'Beta', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Pinene: 0.1 } }

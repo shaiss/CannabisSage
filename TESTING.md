@@ -6,6 +6,7 @@ Automated checks:
 
 ```bash
 node scripts/smoke-adapters.mjs
+node scripts/smoke-profile.mjs
 node web/scripts/smoke-monetization.mjs
 ```
 
@@ -223,10 +224,11 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.18.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.19.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
+| `node scripts/smoke-profile.mjs` exits 0 | |
 | `node scripts/smoke-partners.mjs` exits 0 | |
 | `node web/scripts/smoke-monetization.mjs` exits 0 | |
 
@@ -292,6 +294,23 @@ Pro only, same `multiStore` gate. From the cross-store section: each allowlisted
 | Free: soft Pro note + Upgrade; no store switcher / Open chips; chem panel and same-menu neighbors still show; no card form | |
 | Copy does not make medical/effects claims | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
+
+## Local taste profile (v1.3.19+)
+
+Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is written until **Save a local taste profile** is on and the shopper saves. Structured chem fields only (enums, known terpene ids, adapter store ids, brands from listed products). No notes field. Export is JSON in the popup. Delete removes the whole key. Bought-before flags (re-buy / fine / never again) sit on listing cards and the product panel when the profile is on. Pro taste-map match stays Pro; an enabled profile can add liked/avoid terpenes into that map for scoring without unlocking Map match on Free.
+
+| Step | Pass? |
+| --- | --- |
+| Fresh install: popup profile is off; `chrome.storage.local` has no `csi_taste_profile` | |
+| Turn on, pick forms / terpenes / THC band / budget, Save: key appears locally | |
+| Reload popup: fields round-trip; Export JSON shows the same structured object | |
+| Delete profile: key gone; listing/PDP bought-before controls disappear | |
+| With profile on, listing + PDP show Re-buy / Fine / Never again; tap sets, tap again clears | |
+| Free: Map match still hidden; chem, compare, similar-by-chem unchanged | |
+| Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
+| Copy has no medical / effects / dosing language | |
+| `node scripts/smoke-profile.mjs` exits 0 | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.19.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 
@@ -359,7 +378,7 @@ Prereq: `cd web && npm i && npm run dev` with `.env.local` Stripe test keys; `st
 
 ## Explicitly out of scope (do not fail v1.3)
 
-- Wishlist / tried tags beyond taste prefs
+- Wishlist / tried tags beyond bought-before flags
 - Strain lineage deep features
 - Remote / sideloaded community adapters (in-repo PRs only)
 - Live-mode Stripe until human goes live

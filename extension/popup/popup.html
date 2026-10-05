@@ -8,7 +8,7 @@
   <body>
     <header>
       <h1>CannabisSage</h1>
-      <p class="sub">Taste-map preferences · chem-first shopping aid only</p>
+      <p class="sub">Local taste profile · taste-map · license</p>
     </header>
 
     <section id="license-section">
@@ -28,6 +28,63 @@
         Cards are never collected in the extension. Checkout opens on the CannabisSage site (Stripe
         hosted).
       </p>
+    </section>
+
+    <section id="profile-section">
+      <h2>Local taste profile</h2>
+      <p class="hint">
+        Optional and Free. Stored on this device only. Nothing is saved until you turn it on.
+        Structured chem fields — not a notes field.
+      </p>
+      <label class="check">
+        <input type="checkbox" id="profile-enable" />
+        Save a local taste profile
+      </label>
+      <fieldset id="profile-fields" disabled>
+        <p class="hint">Forms</p>
+        <div id="profile-forms" class="chip-grid"></div>
+        <p class="hint">Package sizes</p>
+        <div id="profile-sizes" class="chip-grid"></div>
+        <label>
+          Cannabinoid ratio
+          <select id="profile-ratio"></select>
+        </label>
+        <label>
+          THC band
+          <select id="profile-potency"></select>
+        </label>
+        <p class="hint">Liked terpenes</p>
+        <div id="profile-liked" class="chip-grid chip-grid-terp"></div>
+        <p class="hint">Avoid terpenes</p>
+        <div id="profile-avoid" class="chip-grid chip-grid-terp"></div>
+        <label>
+          Per-trip budget (USD)
+          <input type="number" id="profile-budget" min="1" max="2000" step="1" placeholder="Optional" />
+        </label>
+        <label>
+          Home store
+          <select id="profile-home"></select>
+        </label>
+        <p class="hint">Secondary stores</p>
+        <div id="profile-secondary" class="chip-grid"></div>
+        <p class="hint">Brands to keep</p>
+        <div id="profile-brand-loyal" class="chip-grid"></div>
+        <p class="hint">Brands to skip</p>
+        <div id="profile-brand-avoid" class="chip-grid"></div>
+        <p id="profile-brands-empty" class="hint" hidden>
+          Browse a supported menu first to pick brands from listed products.
+        </p>
+        <label>
+          Deal listing
+          <select id="profile-deal"></select>
+        </label>
+        <div class="actions">
+          <button type="button" id="profile-save" class="primary">Save profile</button>
+          <button type="button" id="profile-export">Export JSON</button>
+          <button type="button" id="profile-delete">Delete profile</button>
+        </div>
+        <textarea id="profile-export-out" hidden readonly rows="8"></textarea>
+      </fieldset>
     </section>
 
     <section id="taste-section">
@@ -63,6 +120,8 @@
     <script src="../lib/csi-core.js"></script>
     <script src="../lib/csi-entitlement.js"></script>
     <script src="../lib/csi-features.js"></script>
+    <script src="../lib/csi-storage.js"></script>
+    <script src="../lib/csi-profile.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

@@ -49,8 +49,9 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | PDP panel | Filters & sort |
 | Same-menu similar-by-chem (cached listed chem) | CSV / JSON export |
 | Core supported menus | Cross-store soft match + store switcher (cached other-store chem) |
+| Optional local taste profile (opt-in, device-only) | |
 
-Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match.
+Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match. The Free **taste profile** (`tasteProfile`) is a separate opt-in local record; it does not unlock Map match.
 
 Same-menu similar-by-chem is Free. Neighbors use already-cached listed cannabinoids and terpenes on this host. Missing chem or too few neighbors is a quiet note — not an upgrade wall and not a guessed lab number.
 

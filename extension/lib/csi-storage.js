@@ -9,6 +9,7 @@
   const KEYS = {
     COMPARE: 'csi_compare',
     TASTE: 'csi_taste_map',
+    PROFILE: 'csi_taste_profile',
     FILTERS: 'csi_listing_filters',
     CACHE_PREFIX: 'csi_pdp:',
     CATEGORY_MEDIANS: 'csi_category_medians',
@@ -334,6 +335,50 @@
     await storageSet({ [KEYS.SOFT_UNLOCK_DISMISS]: true });
   }
 
+  async function loadTasteProfile() {
+    const data = await storageGet([KEYS.PROFILE]);
+    const parsed = CSI.profile?.normalize?.(data[KEYS.PROFILE]);
+    if (!parsed || !parsed.ok || !parsed.value || parsed.value.enabled !== true) {
+      return { enabled: false };
+    }
+    return parsed.value;
+  }
+
+  async function saveTasteProfile(raw) {
+    const parsed = CSI.profile?.normalize?.(raw, { now: Date.now() });
+    if (!parsed || !parsed.ok) {
+      return { ok: false, error: (parsed && parsed.error) || 'invalid profile' };
+    }
+    if (!parsed.value || parsed.value.enabled !== true) {
+      await storageRemove([KEYS.PROFILE]);
+      return { ok: true, value: { enabled: false } };
+    }
+    await storageSet({ [KEYS.PROFILE]: parsed.value });
+    return { ok: true, value: parsed.value };
+  }
+
+  async function deleteTasteProfile() {
+    await storageRemove([KEYS.PROFILE]);
+    return { ok: true, value: { enabled: false } };
+  }
+
+  async function exportTasteProfile() {
+    const profile = await loadTasteProfile();
+    return CSI.profile?.exportJson?.(profile) || { ok: false, error: 'profile module missing' };
+  }
+
+  async function setBoughtBeforeFlag(url, flag) {
+    const profile = await loadTasteProfile();
+    if (!profile.enabled) return { ok: false, error: 'profile is not enabled' };
+    const key = CSI.profile.productKeyFromUrl(url);
+    if (!key) return { ok: false, error: 'unsupported product URL' };
+    const nextFlag = profile.boughtBefore[key] === flag ? null : flag;
+    const boughtBefore = { ...profile.boughtBefore };
+    if (!nextFlag) delete boughtBefore[key];
+    else boughtBefore[key] = nextFlag;
+    return saveTasteProfile({ ...profile, boughtBefore });
+  }
+
   CSI.storage = {
     KEYS,
     DEFAULT_TASTE,
@@ -353,6 +398,11 @@
     loadCategoryMedians,
     saveCategoryMedians,
     loadSoftUnlockDismissed,
-    saveSoftUnlockDismissed
+    saveSoftUnlockDismissed,
+    loadTasteProfile,
+    saveTasteProfile,
+    deleteTasteProfile,
+    exportTasteProfile,
+    setBoughtBeforeFlag
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

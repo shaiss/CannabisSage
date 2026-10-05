@@ -14,7 +14,8 @@
     compareTray: true,
     pdpPanel: true,
     similarByChem: true,
-    sunnysideStore: true
+    sunnysideStore: true,
+    tasteProfile: true
   };
 
   /** Requires Pro (active license) */

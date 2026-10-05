@@ -97,6 +97,7 @@ assert(fulfillmentSrc.includes("CSG-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}"), 'CSG 
 const feat = fs.readFileSync(path.join(extRoot, 'lib/csi-features.js'), 'utf8');
 assert(feat.includes('multiStore: true'), 'ext multiStore pro');
 assert(feat.includes('compareTray: true'), 'ext compare free');
+assert(feat.includes('tasteProfile: true'), 'ext tasteProfile free');
 
 const entitlements = fs.readFileSync(path.join(extRoot, 'lib/csi-entitlement.js'), 'utf8');
 assert(entitlements.includes('/api/license/activate'), 'activate endpoint');
@@ -104,7 +105,7 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.18', 'extension 1.3.18');
+assert(manifest.version === '1.3.19', 'extension 1.3.19');
 assert(manifest.host_permissions.includes('https://cannabissage.app/*'), 'prod API host (custom domain)');
 assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host (vercel fallback)');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');

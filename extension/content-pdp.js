@@ -119,10 +119,12 @@
   async function attachPreferenceMatch(product) {
     product.matchScore = null;
     product.tasteMap = null;
+    const profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    product.tasteProfile = profile.enabled ? profile : { enabled: false };
     if (!CSI.features?.can?.('tasteMap')) return;
     const taste = await CSI.storage.loadTasteMap();
-    product.tasteMap = taste || null;
-    product.matchScore = taste ? CSI.scoreTasteMatch(product, taste) : null;
+    product.tasteMap = CSI.profile?.applyToTasteMap?.(taste, product.tasteProfile) || taste || null;
+    product.matchScore = product.tasteMap ? CSI.scoreTasteMatch(product, product.tasteMap) : null;
   }
 
   /**
@@ -297,6 +299,7 @@
       dealBits.push(`<span class="csi-badge csi-badge-deal">≈ $${product.dollarsPerMg.toFixed(3)}/mg THC*</span>`);
     }
     const prefMatch = CSI.ui.buildPreferenceMatchPanel(product, product.tasteMap) || '';
+    const boughtPanel = CSI.ui.buildBoughtBeforePanel(product, product.tasteProfile) || '';
     let medianStrip = '';
     if (CSI.features?.can?.('dealBadges')) {
       const medianBadge = CSI.ui.buildDealVsMedianBadge(product.belowCategoryMedian);
@@ -308,6 +311,7 @@
       ${CSI.ui.buildPdpHeader({ showClose: true })}
       ${CSI.ui.buildProvenanceStrip(product.provenance)}
       ${prefMatch}
+      ${boughtPanel}
       ${CSI.ui.buildSimilarByChemPanel(product)}
       ${CSI.ui.buildCrossStoreMatchPanel(product)}
       <div class="csi-pdp-deals">${dealBits.join(' ')}</div>
@@ -325,6 +329,16 @@
     panel.querySelector('.csi-pdp-close').addEventListener('click', () => panel.remove());
     panel.querySelector('[data-csi-cross-store-upgrade]')?.addEventListener('click', () => {
       CSI.entitlement?.openUpgrade?.();
+    });
+    panel.querySelector('[data-csi-bought]')?.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-csi-flag]');
+      if (!btn) return;
+      event.preventDefault();
+      const url = panel.querySelector('[data-csi-bought]')?.getAttribute('data-csi-product-url') || product.url;
+      const saved = await CSI.storage.setBoughtBeforeFlag(url, btn.getAttribute('data-csi-flag'));
+      if (!saved?.ok) return;
+      product.tasteProfile = saved.value;
+      renderPanel(product);
     });
     panel.querySelector('.csi-pdp-compare').addEventListener('click', async () => {
       const list = await CSI.storage.loadCompare();

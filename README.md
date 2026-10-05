@@ -14,7 +14,7 @@ Chrome extension (**Manifest V3**, v1.3) that enhances supported dispensary list
 2. Enable **Developer mode**
 3. **Load unpacked** → select the `extension/` folder
 4. Open a supported dispensary listing or product page
-5. Toolbar popup: taste map + **Upgrade / Activate license**
+5. Toolbar popup: local taste profile, taste map, and **Upgrade / Activate license**
 
 ### Pack for Chrome Web Store
 
@@ -26,7 +26,7 @@ Creates `dist/cannabis-sage-<version>.zip`.
 
 ## Features
 
-**Free:** hover tooltips, basic badges, compare tray, PDP panel on supported dispensary menus.
+**Free:** hover tooltips, basic badges, compare tray, PDP panel on supported dispensary menus, optional on-device taste profile.
 
 **Pro (launch promo $9/yr or $4/mo for 30 days after `LAUNCH_DATE`, then $59/yr or $9/mo):** taste-map match, filters/sort, export, deal badges, chem insights across more stores you shop.
 

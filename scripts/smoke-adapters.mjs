@@ -137,7 +137,7 @@ assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.18', 'version bump');
+assert(manifest.version === '1.3.19', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +207,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.18', 'core version 1.3.18');
+assert(CSI.VERSION === '1.3.19', 'core version 1.3.19');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -891,11 +891,15 @@ assert(landingSrc.includes('id="roadmap"'), 'landing has a Roadmap section');
 assert(
   landingSrc.includes(
     'Listed cannabinoids and primary terpenes on supported menus, side-by-side'
-  ) && landingSrc.includes('close matches at your other supported'),
-  'landing Roadmap Now copy includes cross-store match'
+  ) &&
+    landingSrc.includes('close matches at your other supported') &&
+    landingSrc.includes('optional on-device taste profile'),
+  'landing Roadmap Now copy includes cross-store match and local profile'
 );
 assert(
-  landingSrc.includes('A saved taste profile, picks that match it across nearby supported menus'),
+  landingSrc.includes('Picks that match that profile across nearby supported menus') &&
+    landingSrc.includes('restock') &&
+    landingSrc.includes('deal alerts'),
   'landing Roadmap Next copy'
 );
 assert(
@@ -1479,5 +1483,17 @@ assert(!listingSrc.includes('buildCrossStoreMatchPanel'), 'listing does not spam
 assert(storageSrc.includes('excludeAdapterId'), 'storage can list cache minus this adapter');
 assert(storageSrc.includes('opts.merge') || storageSrc.includes('opts && opts.merge'), 'cache merge keeps TTL');
 assert(!/new Function|eval\(/.test(pdpSrc + listingSrc), 'no eval loaders on listing/pdp');
+
+// Local taste profile (v1.3.19) — Free, opt-in, chrome.storage.local only
+assert(fs.existsSync(path.join(ext, 'lib/csi-profile.js')), 'csi-profile.js present');
+assert(manifest.content_scripts?.[1]?.js?.includes('lib/csi-profile.js'), 'profile in content scripts');
+assert(storageSrc.includes("PROFILE: 'csi_taste_profile'"), 'profile storage key');
+assert(storageSrc.includes('loadTasteProfile') && storageSrc.includes('deleteTasteProfile'), 'profile load/delete');
+assert(listingSrc.includes('setBoughtBeforeFlag') && pdpSrc.includes('setBoughtBeforeFlag'), 'bought-before flags on listing and PDP');
+assert(pdpSrc.includes('buildBoughtBeforePanel'), 'PDP mounts bought-before');
+assert(featuresSrcPref.includes('tasteProfile: true'), 'tasteProfile is Free');
+assert(/tasteMap:\s*true/.test(featuresSrcPref), 'taste-map remains Pro');
+assert(pdpSrc.includes('applyToTasteMap'), 'enabled profile can feed Pro taste-map scoring');
+assert(!/chrome\.storage\.sync/.test(storageSrc), 'profile uses local storage only');
 
 console.log('smoke-adapters: OK');

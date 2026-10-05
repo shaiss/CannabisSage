@@ -1,0 +1,112 @@
+name: Chrome Web Store Publish
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: "Upload only, or upload and submit for review"
+        required: true
+        type: choice
+        options:
+          - submit-for-review
+          - upload-only
+        default: submit-for-review
+      dry_run:
+        description: "Auth check only; do not upload or submit"
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cws-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Pack and publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4.2.2
+
+      - name: Verify tag matches manifest version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF_NAME}"
+          VERSION="$(python3 -c "import json; print(json.load(open('extension/manifest.json'))['version'])")"
+          EXPECTED="v${VERSION}"
+          if [[ "${TAG}" != "${EXPECTED}" ]]; then
+            echo "error: git tag '${TAG}' does not match extension/manifest.json version '${EXPECTED}'" >&2
+            exit 1
+          fi
+          echo "Tag ${TAG} matches manifest version ${VERSION}"
+
+      - name: Check required secrets
+        env:
+          CWS_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CWS_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CWS_SERVICE_ACCOUNT_EMAIL: ${{ secrets.CWS_SERVICE_ACCOUNT_EMAIL }}
+          CWS_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          missing=()
+          [[ -n "${CWS_EXTENSION_ID}" ]] || missing+=("CWS_EXTENSION_ID")
+          [[ -n "${CWS_PUBLISHER_ID}" ]] || missing+=("CWS_PUBLISHER_ID")
+          [[ -n "${CWS_SERVICE_ACCOUNT_EMAIL}" ]] || missing+=("CWS_SERVICE_ACCOUNT_EMAIL")
+          [[ -n "${CWS_SERVICE_ACCOUNT_PRIVATE_KEY}" ]] || missing+=("CWS_SERVICE_ACCOUNT_PRIVATE_KEY")
+          if ((${#missing[@]} > 0)); then
+            echo "error: missing required GitHub Actions secrets: ${missing[*]}" >&2
+            echo "See docs/CWS-PUBLISHING.md for one-time owner setup. The workflow is inert until these are set." >&2
+            exit 1
+          fi
+          echo "All required CWS secrets are present"
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4.2.0
+        with:
+          node-version: "22"
+
+      - name: Pack extension
+        run: ./scripts/pack-extension.sh
+
+      - name: Publish to Chrome Web Store
+        env:
+          CHROME_API_VERSION: "v2"
+          CHROME_EXTENSION_ID: ${{ secrets.CWS_EXTENSION_ID }}
+          CHROME_PUBLISHER_ID: ${{ secrets.CWS_PUBLISHER_ID }}
+          CHROME_SERVICE_ACCOUNT_CLIENT_EMAIL: ${{ secrets.CWS_SERVICE_ACCOUNT_EMAIL }}
+          CHROME_SERVICE_ACCOUNT_PRIVATE_KEY: ${{ secrets.CWS_SERVICE_ACCOUNT_PRIVATE_KEY }}
+          MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.mode || 'submit-for-review' }}
+          DRY_RUN_INPUT: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || false }}
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 -c "import json; print(json.load(open('extension/manifest.json'))['version'])")"
+          ZIP="dist/cannabis-sage-${VERSION}.zip"
+          if [[ ! -f "${ZIP}" ]]; then
+            echo "error: expected pack output missing: ${ZIP}" >&2
+            exit 1
+          fi
+          export CHROME_ZIP="${ZIP}"
+
+          if [[ "${MODE}" == "upload-only" ]]; then
+            export CHROME_SKIP_SUBMIT_REVIEW=true
+            echo "Mode: upload-only (skip submit for review)"
+          else
+            echo "Mode: submit-for-review"
+          fi
+
+          if [[ "${DRY_RUN_INPUT}" == "true" ]]; then
+            export DRY_RUN=true
+            echo "Dry run enabled (auth check only)"
+          fi
+
+          # Pin publish-browser-extension to v6.2.0 (CWS API v2 + service-account auth).
+          # Env vars map to CLI flags: CHROME_* / DRY_RUN (see package config reference).
+          npx --yes publish-browser-extension@6.2.0

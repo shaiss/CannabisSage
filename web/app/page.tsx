@@ -177,7 +177,8 @@ export default function HomePage() {
         <ul className="fomo-list">
           <li>
             <strong>Now:</strong> Listed cannabinoids and primary terpenes on supported menus, side-by-side
-            chem comparison, similar picks on the same menu, and value math.
+            chem comparison, similar picks on the same menu, close matches at your other supported
+            stores, and value math.
           </li>
           <li>
             <strong>Next:</strong> A saved taste profile, picks that match it across nearby supported menus,

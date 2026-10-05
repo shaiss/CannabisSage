@@ -21,12 +21,12 @@ An AI guide that knows the shopper's taste, reads the listed chemistry on every 
 - Paid tier stays named Pro. Stripe stays on the cannabissage-stripe account.
 - The shopper decides. The guide proposes and explains; it never places orders.
 
-## Where we are (shipped through v1.3.16, v1.3.17 in review)
+## Where we are (shipped through v1.3.17)
 
 | Vision layer (demo) | MVP today | Status |
 |---|---|---|
 | Chem profile per product | Hover badges, compare, floating PDP chem panel, terpene overlap, chem-first labels | Shipped |
-| Picks based on your profile | Taste map, similar-by-chem on the same menu, cross-store soft match (PR #22, v1.3.17) | Partly shipped |
+| Picks based on your profile | Taste map, similar-by-chem on the same menu, cross-store soft match (v1.3.17) | Partly shipped |
 | Price sense | Deal vs median, $/mg | Shipped |
 | Real-time availability near you | 3 supported menus, cached; no map or hours | Partly shipped |
 | Verified lab results / provenance | Provenance strip, partner registry (`/partners.json`), community vs verified status | Seed shipped |
@@ -128,13 +128,13 @@ Missing:
     1. "What's in stock today that's closest to the batch I liked last time?" (top-terpene overlap + cannabinoid ratio + potency band)
     2. "What's the best $/mg in my form right now at my home store vs my second store, after the deal tier?"
     3. "Which listings match my ratio and terpene picks (e.g. 1:1 CBD:THC, limonene-led, no myrcene-heavy) and are on the menu today?"
-- A(Sage): public roadmap wording is settled below. Only shipped features go under Now. Cross-store soft match moves to Now only after PR #22 merges.
+- A(Sage): public roadmap wording is settled below. Only shipped features go under Now. Cross-store soft match is in Now after PR #22 merged.
 
 ## Draft public roadmap section (landing page)
 
 Short, no dates, no brand names, no medical claims. Sage-approved wording:
 
-- **Now:** Listed cannabinoids and primary terpenes on supported menus, side-by-side chem comparison, similar picks on the same menu, and value math.
+- **Now:** Listed cannabinoids and primary terpenes on supported menus, side-by-side chem comparison, similar picks on the same menu, close matches at your other supported stores, and value math.
 - **Next:** A saved taste profile, picks that match it across nearby supported menus, and restock and deal alerts.
 - **Later:** Verified lab results from partners, and Ask Sage, a chat guide that explains listed chemistry in plain words.
 
@@ -148,3 +148,4 @@ Copy rules for the landing section: no quarter or month anywhere, no "AI budtend
 - 2026-10-05 Cheech: answered Q(Cheech), shopper pass on Phases 2 and 4.
 - 2026-10-05 Assay: answered Q(Assay) (server-only LLM route with input and output filters), order-history import (local-only v1, email and store-account import later with Shai's OK), and changed "price-drop alerts" to "restock and deal alerts" in Phase 2 and the public Next line, per Cheech. Batch ID / test date in the 3 adapters is checked in the repo PR.
 - 2026-10-05: moved into the repo.
+- 2026-10-05 Assay: moved cross-store soft match into public Now after PR #22 merged (v1.3.17).

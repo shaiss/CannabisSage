@@ -891,8 +891,8 @@ assert(landingSrc.includes('id="roadmap"'), 'landing has a Roadmap section');
 assert(
   landingSrc.includes(
     'Listed cannabinoids and primary terpenes on supported menus, side-by-side'
-  ),
-  'landing Roadmap Now copy'
+  ) && landingSrc.includes('close matches at your other supported'),
+  'landing Roadmap Now copy includes cross-store match'
 );
 assert(
   landingSrc.includes('A saved taste profile, picks that match it across nearby supported menus'),

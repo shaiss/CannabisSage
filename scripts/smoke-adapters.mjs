@@ -909,9 +909,8 @@ assert(
 );
 assert(!/AI budtender|Taylor/i.test(landingSrc), 'landing does not name an AI budtender or Taylor');
 assert(
-  !landingSrc.includes('docs/ROADMAP.md') ||
-    landingSrc.includes('https://github.com/shaiss/CannabisSage/blob/main/docs/ROADMAP.md'),
-  'Full roadmap link points at GitHub docs/ROADMAP.md'
+  !landingSrc.includes('docs/ROADMAP.md') && !landingSrc.includes('Full roadmap'),
+  'landing does not link to docs/ROADMAP.md or say Full roadmap'
 );
 const sameChemUnique = CSI.ui.summarizeTerpeneOverlap([
   { name: 'Alpha', status: 'ok', cannabinoids: { THC: 22 }, terpenes: { Limonene: 0.5, Myrcene: 0.2 } },

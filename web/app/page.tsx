@@ -190,8 +190,7 @@ export default function HomePage() {
           </li>
         </ul>
         <p className="fomo-always muted">
-          Plans can change. We ship each piece when it&apos;s solid.{' '}
-          <a href="https://github.com/shaiss/CannabisSage/blob/main/docs/ROADMAP.md">Full roadmap</a>
+          Plans can change. We ship each piece when it&apos;s solid.
         </p>
       </section>
 

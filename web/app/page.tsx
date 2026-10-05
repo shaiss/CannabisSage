@@ -20,6 +20,7 @@ export default function HomePage() {
           <a href="#proof">See it work</a>
           <a href="#supported">Supported</a>
           <a href="#why-pro">Why Pro</a>
+          <a href="#roadmap">Roadmap</a>
           <a href="#pricing">Pricing</a>
           <a href="/account">Activate</a>
         </nav>
@@ -169,6 +170,28 @@ export default function HomePage() {
             </p>
           </article>
         </div>
+      </section>
+
+      <section className="section section-alt" id="roadmap" aria-labelledby="roadmap-heading">
+        <h2 id="roadmap-heading">Roadmap</h2>
+        <ul className="fomo-list">
+          <li>
+            <strong>Now:</strong> Listed cannabinoids and primary terpenes on supported menus, side-by-side
+            chem comparison, similar picks on the same menu, and value math.
+          </li>
+          <li>
+            <strong>Next:</strong> A saved taste profile, picks that match it across nearby supported menus,
+            and restock and deal alerts.
+          </li>
+          <li>
+            <strong>Later:</strong> Verified lab results from partners, and Ask Sage, a chat guide that
+            explains listed chemistry in plain words.
+          </li>
+        </ul>
+        <p className="fomo-always muted">
+          Plans can change. We ship each piece when it&apos;s solid.{' '}
+          <a href="https://github.com/shaiss/CannabisSage/blob/main/docs/ROADMAP.md">Full roadmap</a>
+        </p>
       </section>
 
       <section className="section section-alt" id="whats-next" aria-labelledby="whats-next-heading">

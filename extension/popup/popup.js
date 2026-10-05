@@ -122,6 +122,200 @@
     }
   }
 
+  const STORE_LABELS = {
+    sunnyside: 'Sunnyside',
+    zenleaf: 'Zen Leaf',
+    terravida: 'TerraVida (Zen Leaf Malvern)'
+  };
+
+  function fillSelect(el, entries, selected, includeBlank) {
+    el.innerHTML = '';
+    if (includeBlank) {
+      const opt = document.createElement('option');
+      opt.value = '';
+      opt.textContent = 'Not set';
+      el.appendChild(opt);
+    }
+    entries.forEach(([value, label]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if (value === selected) opt.selected = true;
+      el.appendChild(opt);
+    });
+  }
+
+  function fillChecks(container, items, selected) {
+    const on = new Set(selected || []);
+    container.innerHTML = '';
+    items.forEach(({ id, label }) => {
+      const wrap = document.createElement('label');
+      const input = document.createElement('input');
+      input.type = 'checkbox';
+      input.value = id;
+      if (on.has(id)) input.checked = true;
+      wrap.appendChild(input);
+      wrap.appendChild(document.createTextNode(` ${label}`));
+      container.appendChild(wrap);
+    });
+  }
+
+  function readChecks(container) {
+    return [...container.querySelectorAll('input:checked')].map((el) => el.value);
+  }
+
+  function setProfileEnabled(on) {
+    document.getElementById('profile-enable').checked = !!on;
+    document.getElementById('profile-fields').disabled = !on;
+  }
+
+  async function listedBrands(profile) {
+    const entries = (await CSI.storage.listPdpCache?.()) || [];
+    const fromCache = CSI.profile.brandsFromCacheEntries(entries);
+    const extra = [...(profile.brandLoyal || []), ...(profile.brandAvoid || [])];
+    const seen = new Set(fromCache.map((b) => b.toLowerCase()));
+    extra.forEach((b) => {
+      if (b && !seen.has(b.toLowerCase())) {
+        fromCache.push(b);
+        seen.add(b.toLowerCase());
+      }
+    });
+    return fromCache.sort((a, b) => a.localeCompare(b));
+  }
+
+  function fillProfileForm(profile, brands) {
+    const stored = CSI.profile.isStoredProfile(profile);
+    const enabled = !!(profile && profile.enabled);
+    setProfileEnabled(enabled);
+    // Reload stored fields even when disabled so re-enable is not a blank rewrite.
+    const p = stored ? profile : CSI.profile.emptyEnabled();
+    fillChecks(
+      document.getElementById('profile-forms'),
+      CSI.profile.FORMS.map((id) => ({ id, label: id })),
+      p.forms
+    );
+    fillChecks(
+      document.getElementById('profile-sizes'),
+      CSI.profile.SIZES.map((id) => ({ id, label: id })),
+      p.sizes
+    );
+    fillSelect(
+      document.getElementById('profile-ratio'),
+      CSI.profile.RATIOS.map((id) => [id, CSI.profile.COPY.ratioLabels[id]]),
+      p.cannabinoidRatio,
+      true
+    );
+    fillSelect(
+      document.getElementById('profile-potency'),
+      CSI.profile.POTENCY_BANDS.map((id) => [id, CSI.profile.COPY.potencyLabels[id]]),
+      p.potencyBandThc,
+      true
+    );
+    const terps = CSI.profile.terpeneIds().map((id) => ({ id, label: id }));
+    fillChecks(document.getElementById('profile-liked'), terps, p.likedTerpenes);
+    fillChecks(document.getElementById('profile-avoid'), terps, p.avoidTerpenes);
+    document.getElementById('profile-budget').value = p.tripBudgetUsd || '';
+    fillSelect(
+      document.getElementById('profile-home'),
+      CSI.profile.STORE_IDS.map((id) => [id, STORE_LABELS[id] || id]),
+      p.homeStore,
+      true
+    );
+    fillChecks(
+      document.getElementById('profile-secondary'),
+      CSI.profile.STORE_IDS.map((id) => ({ id, label: STORE_LABELS[id] || id })),
+      p.secondaryStores
+    );
+    const brandItems = brands.map((id) => ({ id, label: id }));
+    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoyal);
+    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoid);
+    document.getElementById('profile-brands-empty').hidden = brands.length > 0;
+    fillSelect(
+      document.getElementById('profile-deal'),
+      CSI.profile.DEAL_TIERS.map((id) => [id, CSI.profile.COPY.dealLabels[id]]),
+      p.dealTier || 'any',
+      false
+    );
+  }
+
+  function readProfileForm() {
+    const enabled = document.getElementById('profile-enable').checked;
+    const budgetRaw = document.getElementById('profile-budget').value;
+    return {
+      enabled,
+      forms: readChecks(document.getElementById('profile-forms')),
+      sizes: readChecks(document.getElementById('profile-sizes')),
+      cannabinoidRatio: document.getElementById('profile-ratio').value || null,
+      potencyBandThc: document.getElementById('profile-potency').value || null,
+      likedTerpenes: readChecks(document.getElementById('profile-liked')),
+      avoidTerpenes: readChecks(document.getElementById('profile-avoid')),
+      tripBudgetUsd: budgetRaw === '' ? null : Number(budgetRaw),
+      homeStore: document.getElementById('profile-home').value || null,
+      secondaryStores: readChecks(document.getElementById('profile-secondary')),
+      brandLoyal: readChecks(document.getElementById('profile-brand-loyal')),
+      brandAvoid: readChecks(document.getElementById('profile-brand-avoid')),
+      dealTier: document.getElementById('profile-deal').value || 'any'
+    };
+  }
+
+  async function loadProfileUi() {
+    const profile = await CSI.storage.loadTasteProfile();
+    const brandSource = CSI.profile.isStoredProfile(profile)
+      ? profile
+      : { brandLoyal: [], brandAvoid: [] };
+    const brands = await listedBrands(brandSource);
+    fillProfileForm(profile, brands);
+  }
+
+  document.getElementById('profile-enable').addEventListener('change', (e) => {
+    document.getElementById('profile-fields').disabled = !e.target.checked;
+  });
+  document.getElementById('profile-save').addEventListener('click', async () => {
+    const raw = readProfileForm();
+    const existing = await CSI.storage.loadTasteProfile();
+    if (CSI.profile.isStoredProfile(existing) && existing.boughtBefore) {
+      raw.boughtBefore = existing.boughtBefore;
+    }
+    // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
+    if (!raw.enabled && CSI.profile.isStoredProfile(existing)) {
+      const saved = await CSI.storage.saveTasteProfile({ ...existing, enabled: false });
+      if (!saved.ok) {
+        showStatus(saved.error || 'Invalid profile');
+        return;
+      }
+      await loadProfileUi();
+      showStatus('Profile off — data kept until Delete');
+      return;
+    }
+    const saved = await CSI.storage.saveTasteProfile(raw);
+    if (!saved.ok) {
+      showStatus(saved.error || 'Invalid profile');
+      return;
+    }
+    await loadProfileUi();
+    if (saved.value.enabled) showStatus('Profile saved');
+    else if (CSI.profile.isStoredProfile(saved.value)) showStatus('Profile off — data kept until Delete');
+    else showStatus('Nothing stored until you turn it on');
+  });
+  document.getElementById('profile-export').addEventListener('click', async () => {
+    const dumped = await CSI.storage.exportTasteProfile();
+    const out = document.getElementById('profile-export-out');
+    if (!dumped.ok) {
+      out.hidden = true;
+      showStatus(dumped.error || 'Nothing to export');
+      return;
+    }
+    out.hidden = false;
+    out.value = dumped.json;
+    showStatus('Exported below');
+  });
+  document.getElementById('profile-delete').addEventListener('click', async () => {
+    await CSI.storage.deleteTasteProfile();
+    document.getElementById('profile-export-out').hidden = true;
+    await loadProfileUi();
+    showStatus('Profile deleted');
+  });
+
   document.getElementById('add-pref').addEventListener('click', () => addPrefRow());
   document.getElementById('save').addEventListener('click', async () => {
     await chrome.storage.local.set({ csi_taste_map: readForm() });
@@ -144,7 +338,7 @@
       showStatus(e.message || 'Activation failed');
     }
   });
-  deactivateBtn.addEventListener('click', async () => {
+  document.getElementById('deactivate').addEventListener('click', async () => {
     await CSI.entitlement.clearStored();
     licenseKeyInput.value = '';
     showStatus('License removed');
@@ -152,5 +346,6 @@
   });
 
   await loadTaste();
+  await loadProfileUi();
   await refreshLicenseUi();
 })();

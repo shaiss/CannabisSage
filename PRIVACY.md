@@ -1,6 +1,6 @@
 # Privacy Policy — CannabisSage
 
-**Last updated:** September 20, 2026  
+**Last updated:** October 5, 2026  
 **Extension version covered:** 1.3.x
 
 CannabisSage is a Chrome extension that helps shoppers view cannabinoid and terpene information on supported retailer product listing and detail pages, compare a small number of products, filter/sort visible cards, and score products against a local taste preference map. Optional **Pro** features unlock after a subscription purchased on the CannabisSage website via **Stripe Checkout** (not inside the extension).
@@ -15,7 +15,7 @@ When you use CannabisSage on a supported store page:
 
 1. **Page content (local):** Product card and detail-page information already present in the page.
 2. **Product detail pages (network):** Same-site HTTPS fetches to retailer hosts when chemistry details are missing.
-3. **Local extension storage (`chrome.storage.local`):** Compare selections, taste-map preferences, filters, TTL product cache, remote denylist cache, remote partner-registry cache, and (if you activate Pro) license key + entitlement expiry.
+3. **Local extension storage (`chrome.storage.local`):** Compare selections, taste-map preferences, an optional **taste profile** (only after you turn it on: forms, package sizes, cannabinoid ratio, THC band, liked/avoid terpenes, bought-before flags, per-trip budget, home/secondary stores, brand keep/skip lists, deal-listing preference), filters, TTL product cache, remote denylist cache, remote partner-registry cache, and (if you activate Pro) license key + entitlement expiry. The taste profile never leaves the browser: it is not synced, not sent to CannabisSage servers, and not included in entitlement or denylist/partners requests.
 4. **Bundled JSON:** Default taste-map seeds, terpene glossary, and API base URL config.
 5. **CannabisSage site (network):** Entitlement APIs, a small HTTPS **denylist JSON** (`/denylist.json`), and a public **partners JSON** (`/partners.json`) — configuration only, never executable code. See [`docs/DENYLIST.md`](docs/DENYLIST.md) and [`docs/PARTNERS.md`](docs/PARTNERS.md).
 
@@ -44,7 +44,7 @@ CannabisSage does **not**:
 | `https://cannabissage.vercel.app/*` | Vercel deployment fallback for the same APIs, deep links, denylist, and partners JSON. |
 | `http://localhost:3000/*` (unpacked local/dev only) | Same entitlement APIs / denylist / partners JSON when running `web/` locally; keep for unpacked testing. Override via `chrome.storage.local.csi_api_base` or edit `data/config.json`. |
 | Optional `https://*.vercel.app/*` | Optional preview deployments when you grant them. |
-| `storage` | Persist compare, prefs, filters, cache, denylist cache, partners cache, and license entitlement on device. |
+| `storage` | Persist compare, prefs, optional local taste profile, filters, cache, denylist cache, partners cache, and license entitlement on device. |
 
 **Not declared:** `terravidahc.com` (not an ecommerce catalog).
 

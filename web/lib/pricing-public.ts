@@ -46,6 +46,7 @@ export const FEATURE_GATES = {
     'Compare tray (up to 3)',
     'Product detail panel',
     'Same-menu nearby chem',
+    'Optional on-device taste profile',
     'Core supported dispensary menus'
   ],
   /** Pro bullets lead with money-savers: match, multi-store coverage, $/mg. */

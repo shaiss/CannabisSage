@@ -12,6 +12,7 @@
   const state = {
     selection: [],
     tasteMap: null,
+    profile: { enabled: false },
     filters: { ...CSI.storage.DEFAULT_FILTERS },
     cardMeta: new WeakMap()
   };
@@ -64,6 +65,15 @@
     return row;
   }
 
+  async function refreshTasteMap() {
+    if (!CSI.features?.can?.('tasteMap')) {
+      state.tasteMap = null;
+      return;
+    }
+    const taste = await CSI.storage.loadTasteMap();
+    state.tasteMap = CSI.profile?.applyToTasteMap?.(taste, state.profile) || taste;
+  }
+
   function renderBadges(cardEl, product, status) {
     const row = ensureBadgeRow(cardEl);
     const adapter = CSI.registry?.getActiveAdapter?.();
@@ -74,12 +84,35 @@
       cardEl,
       adapter,
       tasteMap: state.tasteMap,
-      minMatch
+      minMatch,
+      tasteProfile: state.profile
     });
     row.innerHTML = chips.join('');
     const note = CSI.ui.buildProvenanceListingNote?.(product?.provenance);
     if (note) row.insertAdjacentHTML('beforeend', note);
     CSI.glossary?.wireTerpeneClicks(row);
+    wireBoughtBefore(row);
+  }
+
+  function wireBoughtBefore(row) {
+    const wrap = row.querySelector('[data-csi-bought]');
+    if (!wrap) return;
+    wrap.addEventListener('click', async (event) => {
+      const btn = event.target.closest('[data-csi-flag]');
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const url = wrap.getAttribute('data-csi-product-url');
+      const flag = btn.getAttribute('data-csi-flag');
+      const saved = await CSI.storage.setBoughtBeforeFlag(url, flag);
+      if (!saved?.ok) return;
+      state.profile = saved.value;
+      document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
+        const p = CSI.getElementProduct(card);
+        if (!p) return;
+        renderBadges(card, p, p.status || 'ok');
+      });
+    });
   }
 
   async function enrichCard(cardEl, opts = {}) {
@@ -152,6 +185,7 @@
     if (CSI.features?.can?.('tasteMap') && state.tasteMap) {
       product.matchScore = CSI.scoreTasteMatch(product, state.tasteMap);
     }
+    if (url) product.url = product.url || url;
     if (CSI.features?.can?.('dealBadges')) {
       product.dollarsPerMg = weightGrams
         ? CSI.dollarsPerMgThc(product.price, product.cannabinoids, weightGrams)
@@ -724,7 +758,8 @@
 
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();
-    state.tasteMap = CSI.features?.can?.('tasteMap') ? await CSI.storage.loadTasteMap() : null;
+    state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    await refreshTasteMap();
     state.filters = await CSI.storage.loadFilters();
     await CSI.glossary.ensureGlossary();
 
@@ -754,13 +789,14 @@
     if (!storageListener) {
       storageListener = (changes, area) => {
         if (area !== 'local' || !active) return;
-        if (changes.csi_taste_map) {
-          CSI.storage.loadTasteMap().then((m) => {
-            state.tasteMap = m;
+        if (changes.csi_taste_map || changes.csi_taste_profile) {
+          CSI.storage.loadTasteProfile().then(async (profile) => {
+            state.profile = profile || { enabled: false };
+            await refreshTasteMap();
             document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
               const p = CSI.getElementProduct(card);
               if (!p) return;
-              p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
+              if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
               CSI.storeElementProduct(card, p);
               renderBadges(card, p, p.status || 'ok');
             });

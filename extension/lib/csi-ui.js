@@ -196,7 +196,7 @@
    * Listing card chips (terp-only when retail already shows THC/CBD on-card).
    * Explainer chip is NOT repeated here — once per listing, in the filter bar.
    */
-  function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35 }) {
+  function buildListingBadgeChips({ product, status, cardEl, adapter, tasteMap, minMatch = 0.35, tasteProfile } = {}) {
     const chips = [];
     const thcLead = formatListedThcLead(product?.cannabinoids);
     const cbd = CSI.parsePercent(product?.cannabinoids?.CBD ?? product?.cannabinoids?.cbd);
@@ -247,7 +247,41 @@
       const medianBadge = buildDealVsMedianBadge(product?.belowCategoryMedian);
       if (medianBadge) chips.push(medianBadge);
     }
+    const bought = buildBoughtBeforeControl(product, tasteProfile);
+    if (bought) chips.push(bought);
     return chips;
+  }
+
+  const BOUGHT_FLAG_LABELS = {
+    rebuy: 'Re-buy',
+    fine: 'Fine',
+    never: 'Never again'
+  };
+
+  function buildBoughtBeforeControl(product, profile) {
+    const p = profile;
+    if (!p || p.enabled !== true) return '';
+    const url = product && product.url;
+    const key = CSI.profile?.productKeyFromUrl?.(url);
+    if (!key) return '';
+    const current = CSI.profile.flagForProduct(p, url);
+    const buttons = CSI.profile.FLAGS.map((flag) => {
+      const on = current === flag ? ' is-on' : '';
+      return `<button type="button" class="csi-bought-btn${on}" data-csi-flag="${flag}">${CSI.escapeHtml(
+        BOUGHT_FLAG_LABELS[flag]
+      )}</button>`;
+    }).join('');
+    return `<span class="csi-bought" data-csi-bought="1" data-csi-product-url="${CSI.escapeHtml(
+      key
+    )}" title="${CSI.escapeHtml(CSI.profile.COPY.boughtTitle)}">${buttons}</span>`;
+  }
+
+  function buildBoughtBeforePanel(product, profile) {
+    const html = buildBoughtBeforeControl(product, profile);
+    if (!html) return '';
+    return `<div class="csi-bought-panel"><div class="csi-pref-kicker">${CSI.escapeHtml(
+      CSI.profile.COPY.boughtTitle
+    )}</div>${html}</div>`;
   }
 
   function buildTooltipContent(insights, extra = {}) {
@@ -1185,6 +1219,8 @@
     buildChemOverStrainHeaderHtml,
     fillChemOverStrainHeader,
     buildListingBadgeChips,
+    buildBoughtBeforeControl,
+    buildBoughtBeforePanel,
     buildTooltipContent,
     showTooltip,
     hideTooltip,

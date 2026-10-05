@@ -213,6 +213,38 @@
   border-color: #1f883d;
 }
 
+.csi-bought {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  align-items: center;
+}
+
+.csi-bought-btn {
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 3px;
+  border: 1px solid #c5c0b8;
+  background: #fff;
+  color: #2c3e50;
+  cursor: pointer;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.csi-bought-btn.is-on {
+  background: #ff6b35;
+  border-color: #ff6b35;
+  color: #fff;
+}
+
+.csi-bought-panel {
+  margin: 8px 0;
+  padding: 8px 8px 6px;
+  border: 1px solid #eee;
+  border-radius: 6px;
+}
+
 .csi-badge-row {
   display: flex;
   flex-wrap: wrap;

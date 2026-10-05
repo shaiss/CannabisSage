@@ -429,6 +429,64 @@ assert(
   'below-median without other-host medians drops unverified hosts'
 );
 
+// Per-host medians under csi_category_medians: store B must not wipe store A
+await CSI.storage.saveCategoryMedians({
+  host: 'www.sunnyside.shop',
+  adapterId: 'sunnyside',
+  categories: { flower: { median: 40, sampleCount: 8 } }
+});
+await CSI.storage.saveCategoryMedians({
+  host: 'zenleafdispensaries.com',
+  adapterId: 'zenleaf',
+  categories: { flower: { median: 45, sampleCount: 5 } }
+});
+const sunMedian = await CSI.storage.loadCategoryMedians('sunnyside.shop');
+const zlMedian = await CSI.storage.loadCategoryMedians('www.zenleafdispensaries.com');
+assert(sunMedian && sunMedian.categories.flower.median === 40, 'sunnyside median retained after other host save');
+assert(zlMedian && zlMedian.categories.flower.median === 45, 'zenleaf median stored independently');
+assert(sunMedian.host === 'sunnyside.shop', 'median host is www-normalized');
+assert(
+  store.csi_category_medians?.byHost?.['sunnyside.shop'] &&
+    store.csi_category_medians?.byHost?.['zenleafdispensaries.com'],
+  'both hosts nest under csi_category_medians.byHost'
+);
+
+// loadAndRank resolves each cache host's median independently for below-median
+for (const row of cacheEntries) {
+  store[`csi_pdp:${row.url}`] = { fetchedAt: row.fetchedAt, data: row.data };
+}
+store.csi_taste_profile = {
+  ...baseProfile,
+  dealTier: 'below-median',
+  tripBudgetUsd: 100,
+  boughtBefore: {}
+};
+const multiHostBelow = await CSI.picks.loadAndRank({ isPro: true, now });
+assert(multiHostBelow.status === 'ok', 'below-median loadAndRank ok with multi-host medians');
+assert(
+  multiHostBelow.picks.some((p) => p.url === otherStoreUrl),
+  'secondary-store pick kept when its host median is present'
+);
+assert(
+  multiHostBelow.picks.every((p) => {
+    if (/sunnyside\.shop/i.test(p.url)) return p.price != null && p.price < 40;
+    if (/zenleafdispensaries\.com/i.test(p.url)) return p.price != null && p.price < 45;
+    return false;
+  }),
+  'each pick is below its own host median'
+);
+
+// Legacy flat snapshot still loads (migrates on read)
+store.csi_category_medians = {
+  host: 'sunnyside.shop',
+  adapterId: 'sunnyside',
+  savedAt: now,
+  categories: { flower: { median: 41, sampleCount: 4 } },
+  products: []
+};
+const legacyMedian = await CSI.storage.loadCategoryMedians('www.sunnyside.shop');
+assert(legacyMedian && legacyMedian.categories.flower.median === 41, 'legacy flat median snapshot still loads');
+
 // Budget preference alone
 const budgeted = CSI.picks.rankPicks({
   profile: { ...baseProfile, tripBudgetUsd: 39, dealTier: 'any', boughtBefore: {} },

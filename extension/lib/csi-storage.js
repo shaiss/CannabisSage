@@ -271,27 +271,90 @@
   }
 
   /**
-   * Menu medians computed from scraped listing prices.
+   * Menu medians from scraped listing prices, keyed by host under csi_category_medians.
+   * Shape: { byHost: { [normalizedHost]: { host, adapterId, savedAt, categories, products } } }
+   * Legacy flat snapshots ({ host, categories, ... }) migrate on read.
    * Same host merges categories; a category seen again replaces its previous median.
-   * Expired or other-host snapshots are not returned (other-host is left in place).
+   * Expired host entries are dropped; other hosts stay.
    */
+  function isLegacyMedianSnap(raw) {
+    return !!(
+      raw &&
+      typeof raw === 'object' &&
+      !raw.byHost &&
+      typeof raw.host === 'string' &&
+      raw.categories &&
+      typeof raw.categories === 'object'
+    );
+  }
+
+  function readMedianStore(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const out = {};
+    if (raw.byHost && typeof raw.byHost === 'object') {
+      Object.entries(raw.byHost).forEach(([k, snap]) => {
+        if (!snap || typeof snap !== 'object') return;
+        const host = normalizeHostName(snap.host || k);
+        if (!host) return;
+        out[host] = { ...snap, host };
+      });
+      return out;
+    }
+    if (isLegacyMedianSnap(raw)) {
+      const host = normalizeHostName(raw.host);
+      if (host) out[host] = { ...raw, host };
+    }
+    return out;
+  }
+
+  async function writeMedianStore(byHost) {
+    const hosts = Object.keys(byHost || {});
+    if (!hosts.length) {
+      await storageRemove([KEYS.CATEGORY_MEDIANS]);
+      return;
+    }
+    await storageSet({
+      [KEYS.CATEGORY_MEDIANS]: { byHost }
+    });
+  }
+
   async function loadCategoryMedians(host) {
+    const key = normalizeHostName(host);
+    if (!key) return null;
     const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
-    const snap = data[KEYS.CATEGORY_MEDIANS];
-    if (!snap || typeof snap !== 'object') return null;
-    if (host && normalizeHostName(snap.host) !== normalizeHostName(host)) return null;
+    const byHost = readMedianStore(data[KEYS.CATEGORY_MEDIANS]);
+    const snap = byHost[key];
+    if (!snap) return null;
     const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
     if (!snap.savedAt || Date.now() - snap.savedAt > ttl) {
-      await storageRemove([KEYS.CATEGORY_MEDIANS]);
+      delete byHost[key];
+      await writeMedianStore(byHost);
       return null;
     }
+    // Host key is www-insensitive; keep snap.host normalized for callers.
+    if (normalizeHostName(snap.host) !== key) return null;
     return snap;
   }
 
   async function saveCategoryMedians(snapshot) {
     if (!snapshot || !snapshot.host) return;
-    const existing = await loadCategoryMedians(snapshot.host);
-    const categories = { ...(existing && existing.categories ? existing.categories : {}) };
+    const host = normalizeHostName(snapshot.host);
+    if (!host) return;
+
+    const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
+    const byHost = readMedianStore(data[KEYS.CATEGORY_MEDIANS]);
+    const existing = byHost[host] || null;
+    const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
+    const existingFresh =
+      existing &&
+      existing.savedAt &&
+      Date.now() - existing.savedAt <= ttl
+        ? existing
+        : null;
+
+    const categories = {
+      ...(existingFresh && existingFresh.categories ? existingFresh.categories : {})
+    };
     const replaceKeys = Array.isArray(snapshot.replaceKeys) ? snapshot.replaceKeys : [];
     replaceKeys.forEach((key) => {
       if (key) delete categories[key];
@@ -306,24 +369,27 @@
     });
 
     const byUrl = new Map();
-    (existing && Array.isArray(existing.products) ? existing.products : []).forEach((row) => {
-      if (row && row.url && row.categoryKey) byUrl.set(row.url, { url: row.url, categoryKey: row.categoryKey });
-    });
+    (existingFresh && Array.isArray(existingFresh.products) ? existingFresh.products : []).forEach(
+      (row) => {
+        if (row && row.url && row.categoryKey) {
+          byUrl.set(row.url, { url: row.url, categoryKey: row.categoryKey });
+        }
+      }
+    );
     (Array.isArray(snapshot.products) ? snapshot.products : []).forEach((row) => {
       if (!row || !row.url || !row.categoryKey) return;
       byUrl.set(String(row.url), { url: String(row.url), categoryKey: String(row.categoryKey) });
     });
     const products = Array.from(byUrl.values()).slice(-400);
 
-    await storageSet({
-      [KEYS.CATEGORY_MEDIANS]: {
-        host: snapshot.host,
-        adapterId: snapshot.adapterId || '',
-        savedAt: Date.now(),
-        categories,
-        products
-      }
-    });
+    byHost[host] = {
+      host,
+      adapterId: snapshot.adapterId || '',
+      savedAt: Date.now(),
+      categories,
+      products
+    };
+    await writeMedianStore(byHost);
   }
 
   async function loadSoftUnlockDismissed() {

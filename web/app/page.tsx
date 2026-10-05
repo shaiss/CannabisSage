@@ -197,15 +197,10 @@ export default function HomePage() {
       <section className="section section-alt" id="whats-next" aria-labelledby="whats-next-heading">
         <h2 id="whats-next-heading">Coming soon</h2>
         <p>
-          Listing and product-page labels now lead with listed chemistry. Next: a store switcher
-          with polish, and $/mg compare across supported menus. No ship-date guarantees; we ship
-          when each piece is solid.
+          Listing and product-page labels now lead with listed chemistry. Next: $/mg compare
+          across supported menus. No ship-date guarantees; we ship when each piece is solid.
         </p>
         <ul className="fomo-list">
-          <li>
-            <strong>Store switcher + polish</strong> — Move between supported menus without losing
-            chem context.
-          </li>
           <li>
             <strong>$/mg multi-store compare</strong> — Side-by-side value across supported menus.
           </li>

@@ -30,6 +30,7 @@ required=(
   "${EXT_DIR}/lib/csi-core.js"
   "${EXT_DIR}/lib/csi-storage.js"
   "${EXT_DIR}/lib/csi-profile.js"
+  "${EXT_DIR}/lib/csi-picks.js"
   "${EXT_DIR}/lib/csi-fetch.js"
   "${EXT_DIR}/lib/csi-glossary.js"
   "${EXT_DIR}/lib/csi-ui.js"

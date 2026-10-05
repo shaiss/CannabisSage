@@ -271,27 +271,98 @@
   }
 
   /**
-   * Menu medians computed from scraped listing prices.
+   * Menu medians from scraped listing prices, one chrome.storage.local key per host
+   * (`csi_category_medians:<normalizedHost>`). Distinct keys so two menu tabs saving
+   * different stores cannot clobber each other. The legacy shared key
+   * `csi_category_medians` (flat snapshot or `{ byHost }`) still migrates on read.
    * Same host merges categories; a category seen again replaces its previous median.
-   * Expired or other-host snapshots are not returned (other-host is left in place).
+   * Expired host keys are dropped; other hosts stay.
    */
+  function categoryMediansKey(host) {
+    return KEYS.CATEGORY_MEDIANS + ':' + host;
+  }
+
+  function isLegacyMedianSnap(raw) {
+    return !!(
+      raw &&
+      typeof raw === 'object' &&
+      !raw.byHost &&
+      typeof raw.host === 'string' &&
+      raw.categories &&
+      typeof raw.categories === 'object'
+    );
+  }
+
+  function readMedianStore(raw) {
+    if (!raw || typeof raw !== 'object') return {};
+    const out = {};
+    if (raw.byHost && typeof raw.byHost === 'object') {
+      Object.entries(raw.byHost).forEach(([k, snap]) => {
+        if (!snap || typeof snap !== 'object') return;
+        const host = normalizeHostName(snap.host || k);
+        if (!host) return;
+        out[host] = { ...snap, host };
+      });
+      return out;
+    }
+    if (isLegacyMedianSnap(raw)) {
+      const host = normalizeHostName(raw.host);
+      if (host) out[host] = { ...raw, host };
+    }
+    return out;
+  }
+
+  function hostMedianSnap(raw, key) {
+    if (raw && typeof raw === 'object' && raw.categories && typeof raw.categories === 'object') {
+      return { ...raw, host: key };
+    }
+    return null;
+  }
+
   async function loadCategoryMedians(host) {
-    const data = await storageGet([KEYS.CATEGORY_MEDIANS]);
-    const snap = data[KEYS.CATEGORY_MEDIANS];
-    if (!snap || typeof snap !== 'object') return null;
-    if (host && normalizeHostName(snap.host) !== normalizeHostName(host)) return null;
+    const key = normalizeHostName(host);
+    if (!key) return null;
+    const hostKey = categoryMediansKey(key);
+    const data = await storageGet([hostKey, KEYS.CATEGORY_MEDIANS]);
+    const fromHostKey = hostMedianSnap(data[hostKey], key);
+    const fromLegacy = readMedianStore(data[KEYS.CATEGORY_MEDIANS])[key] || null;
+    // Prefer the per-host key once present so an expired write is not resurrected
+    // from a leftover shared blob.
+    const snap = fromHostKey || fromLegacy;
+    if (!snap) return null;
     const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
     if (!snap.savedAt || Date.now() - snap.savedAt > ttl) {
-      await storageRemove([KEYS.CATEGORY_MEDIANS]);
+      await storageRemove([hostKey]);
       return null;
     }
-    return snap;
+    // Host key is www-insensitive; keep snap.host normalized for callers.
+    if (normalizeHostName(snap.host) !== key) return null;
+    if (!fromHostKey) {
+      await storageSet({ [hostKey]: { ...snap, host: key } });
+    }
+    return { ...snap, host: key };
   }
 
   async function saveCategoryMedians(snapshot) {
     if (!snapshot || !snapshot.host) return;
-    const existing = await loadCategoryMedians(snapshot.host);
-    const categories = { ...(existing && existing.categories ? existing.categories : {}) };
+    const host = normalizeHostName(snapshot.host);
+    if (!host) return;
+    const hostKey = categoryMediansKey(host);
+
+    const data = await storageGet([hostKey, KEYS.CATEGORY_MEDIANS]);
+    const existing =
+      hostMedianSnap(data[hostKey], host) || readMedianStore(data[KEYS.CATEGORY_MEDIANS])[host] || null;
+    const ttl = CSI.DEAL_MEDIAN_TTL_MS || 0;
+    const existingFresh =
+      existing &&
+      existing.savedAt &&
+      Date.now() - existing.savedAt <= ttl
+        ? existing
+        : null;
+
+    const categories = {
+      ...(existingFresh && existingFresh.categories ? existingFresh.categories : {})
+    };
     const replaceKeys = Array.isArray(snapshot.replaceKeys) ? snapshot.replaceKeys : [];
     replaceKeys.forEach((key) => {
       if (key) delete categories[key];
@@ -306,9 +377,13 @@
     });
 
     const byUrl = new Map();
-    (existing && Array.isArray(existing.products) ? existing.products : []).forEach((row) => {
-      if (row && row.url && row.categoryKey) byUrl.set(row.url, { url: row.url, categoryKey: row.categoryKey });
-    });
+    (existingFresh && Array.isArray(existingFresh.products) ? existingFresh.products : []).forEach(
+      (row) => {
+        if (row && row.url && row.categoryKey) {
+          byUrl.set(row.url, { url: row.url, categoryKey: row.categoryKey });
+        }
+      }
+    );
     (Array.isArray(snapshot.products) ? snapshot.products : []).forEach((row) => {
       if (!row || !row.url || !row.categoryKey) return;
       byUrl.set(String(row.url), { url: String(row.url), categoryKey: String(row.categoryKey) });
@@ -316,8 +391,8 @@
     const products = Array.from(byUrl.values()).slice(-400);
 
     await storageSet({
-      [KEYS.CATEGORY_MEDIANS]: {
-        host: snapshot.host,
+      [hostKey]: {
+        host,
         adapterId: snapshot.adapterId || '',
         savedAt: Date.now(),
         categories,

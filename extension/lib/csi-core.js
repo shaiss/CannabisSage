@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.19';
+  const VERSION = '1.3.20';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -749,6 +749,7 @@
     };
     if (product.price != null) rec.price = product.price;
     if (product.weightText) rec.weightText = product.weightText;
+    if (product.onSale != null) rec.onSale = !!product.onSale;
     const categoryKey = extra.categoryKey || product.categoryKey || null;
     if (categoryKey) rec.categoryKey = categoryKey;
     if (adapterId) rec.adapterId = adapterId;

@@ -25,7 +25,8 @@
     sort: true,
     exportCompare: true,
     multiStore: true,
-    dealBadges: true
+    dealBadges: true,
+    picksForYou: true
   };
 
   function hasPro() {

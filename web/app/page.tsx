@@ -178,11 +178,11 @@ export default function HomePage() {
           <li>
             <strong>Now:</strong> Listed cannabinoids and primary terpenes on supported menus, side-by-side
             chem comparison, similar picks on the same menu, close matches at your other supported
-            stores, value math, and an optional on-device taste profile.
+            stores, value math, an optional on-device taste profile, and Pro picks across nearby
+            supported menus from that profile and cached listings.
           </li>
           <li>
-            <strong>Next:</strong> Picks that match that profile across nearby supported menus, and restock
-            and deal alerts.
+            <strong>Next:</strong> Restock and deal alerts.
           </li>
           <li>
             <strong>Later:</strong> Verified lab results from partners, and Ask Sage, a chat guide that

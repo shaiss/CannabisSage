@@ -55,6 +55,7 @@ export const FEATURE_GATES = {
     'More stores you shop (multi-store, including cached PDP matches + store switcher)',
     '$/mg and deal badges',
     'Listing filters & sort',
-    'CSV / JSON export'
+    'CSV / JSON export',
+    'Picks for you across nearby supported menus (cached)'
   ]
 };

@@ -9,6 +9,9 @@
 
   const FEATURE_ID = 'picksForYou';
   const MAX_PICKS = 8;
+  /** Soft rank add-ons after chem match; must not outrank a clearly stronger chem. */
+  const RANK_REBUY_BOOST = 0.1;
+  const RANK_LOYAL_BRAND_BOOST = 0.05;
   const SIZE_GRAMS = Object.freeze({
     '1g': 1,
     '3.5g': 3.5,
@@ -301,7 +304,8 @@
 
   /**
    * Filter by form / size / ratio / band / skip brands / never-again / deal / budget,
-   * then rank by chem match and net listed price. Explainable reasons on each pick.
+   * then rank by chem match with re-buy / keep-brand as soft boosts, then net listed
+   * price. Explainable reasons on each pick.
    */
   function rankPicks(input) {
     const opts = input || {};
@@ -406,11 +410,15 @@
     }
 
     scored.sort((a, b) => {
-      if (Number(b.rebuy) !== Number(a.rebuy)) return Number(b.rebuy) - Number(a.rebuy);
-      if (b.chemScore !== a.chemScore) return b.chemScore - a.chemScore;
-      if (Number(b.loyalBrand) !== Number(a.loyalBrand)) {
-        return Number(b.loyalBrand) - Number(a.loyalBrand);
-      }
+      const as =
+        a.chemScore +
+        (a.rebuy ? RANK_REBUY_BOOST : 0) +
+        (a.loyalBrand ? RANK_LOYAL_BRAND_BOOST : 0);
+      const bs =
+        b.chemScore +
+        (b.rebuy ? RANK_REBUY_BOOST : 0) +
+        (b.loyalBrand ? RANK_LOYAL_BRAND_BOOST : 0);
+      if (bs !== as) return bs - as;
       const ap = a.price == null ? Number.POSITIVE_INFINITY : a.price;
       const bp = b.price == null ? Number.POSITIVE_INFINITY : b.price;
       if (ap !== bp) return ap - bp;

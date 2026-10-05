@@ -312,14 +312,61 @@ assert(!urls.includes('https://www.sunnyside.shop/product/pricey'), 'over budget
 assert(urls.includes(flowerA), 'matching flower included');
 assert(urls.includes(otherStoreUrl), 'secondary store cache included');
 
-// Chem match: limonene-heavy rebuy should beat pinene-only when both pass filters
+// Chem match: limonene-heavy listing should beat pinene-only when both pass filters
 const idxA = urls.indexOf(flowerA);
 const idxB = urls.indexOf(flowerB);
 assert(idxA >= 0 && idxB >= 0, 'both chem candidates present');
-assert(idxA < idxB, 'higher chem match (and rebuy) ranks first');
+assert(idxA < idxB, 'higher chem match ranks first');
 assert(
   ranked.picks[idxA].reasons.some((r) => /Limonene|Chem match|Re-buy|re-buy/i.test(r)),
   'pick explains chem / rebuy reasons'
+);
+
+function boostFlower(url, name, limonenePct, extra = {}) {
+  return cacheRow(url, {
+    name,
+    brand: extra.brand || 'Boost Brand',
+    categoryKey: 'flower',
+    weightText: '3.5g',
+    price: extra.price ?? 40,
+    onSale: false,
+    cannabinoids: { THC: 20, CBD: 0.1 },
+    terpenes: [{ name: 'Limonene', percentage: limonenePct }]
+  });
+}
+
+const strongChemUrl = 'https://www.sunnyside.shop/product/strong-chem';
+const weakRebuyUrl = 'https://www.sunnyside.shop/product/weak-rebuy';
+const nearTiePlainUrl = 'https://www.sunnyside.shop/product/near-tie-plain';
+const nearTieBoostUrl = 'https://www.sunnyside.shop/product/near-tie-boost';
+const boostProfile = CSI.profile.normalize({
+  ...baseProfile,
+  brandLoyal: [],
+  boughtBefore: {
+    [weakRebuyUrl]: 'rebuy',
+    [nearTieBoostUrl]: 'rebuy'
+  }
+}).value;
+const boostRanked = CSI.picks.rankPicks({
+  profile: boostProfile,
+  cacheEntries: [
+    boostFlower(strongChemUrl, 'Strong Chem', 0.8),
+    boostFlower(weakRebuyUrl, 'Weak Rebuy', 0.1),
+    boostFlower(nearTiePlainUrl, 'Near Tie Plain', 0.25),
+    boostFlower(nearTieBoostUrl, 'Near Tie Boost', 0.22)
+  ],
+  isPro: true,
+  now
+});
+assert(boostRanked.status === 'ok', 'soft-boost ranking ok');
+const boostUrls = boostRanked.picks.map((p) => p.url);
+assert(
+  boostUrls.indexOf(strongChemUrl) < boostUrls.indexOf(weakRebuyUrl),
+  'stronger chem match outranks a re-buy with weaker chem'
+);
+assert(
+  boostUrls.indexOf(nearTieBoostUrl) < boostUrls.indexOf(nearTiePlainUrl),
+  're-buy soft boost decides a near-tie chem match'
 );
 assert(
   ranked.picks.every((p) => p.listedNote === 'Listed, not guaranteed.'),
@@ -440,6 +487,7 @@ assert(popupHtml.includes('id="picks-section"'), 'popup has picks section');
 
 const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
 assert(popupJs.includes('loadPicksUi'), 'popup wires picks UI');
+assert(popupJs.includes('picksLoadVersion'), 'popup ignores stale picks loads');
 assert(popupJs.includes('picks-upgrade') && popupJs.includes('openUpgrade'), 'Free upsell uses Upgrade');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));

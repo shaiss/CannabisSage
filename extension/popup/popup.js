@@ -391,7 +391,10 @@
     });
   }
 
+  let picksLoadVersion = 0;
+
   async function loadPicksUi() {
+    const requestVersion = ++picksLoadVersion;
     if (!CSI.picks) return;
     const isPro = !!CSI.features?.can?.(CSI.picks.FEATURE_ID);
     if (!isPro) {
@@ -399,6 +402,7 @@
       return;
     }
     const result = await CSI.picks.loadAndRank({ isPro: true });
+    if (requestVersion !== picksLoadVersion) return;
     renderPicksResult(result);
   }
 

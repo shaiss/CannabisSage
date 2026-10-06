@@ -36,8 +36,9 @@ desktop.ini
 node_modules/
 yarn.lock
 
-# Keep web lockfile for reproducible deploys
+# Keep committed lockfiles for reproducible installs
 !web/package-lock.json
+!.github/cws-publish/package-lock.json
 
 # Environment files
 .env

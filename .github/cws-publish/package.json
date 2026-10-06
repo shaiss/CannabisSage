@@ -1,0 +1,8 @@
+{
+  "name": "cannabissage-cws-publish",
+  "private": true,
+  "description": "Pinned tooling for the Chrome Web Store publish GitHub Actions workflow",
+  "dependencies": {
+    "publish-browser-extension": "6.2.0"
+  }
+}

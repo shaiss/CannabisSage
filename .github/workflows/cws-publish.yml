@@ -76,6 +76,14 @@ jobs:
         uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: .github/cws-publish/package-lock.json
+
+      - name: Install publish-browser-extension
+        # Integrity-verified install from committed lockfile (not bare npx).
+        # See docs/CWS-PUBLISHING.md § Tooling pin.
+        working-directory: .github/cws-publish
+        run: npm ci
 
       - name: Pack extension
         run: ./scripts/pack-extension.sh
@@ -111,6 +119,6 @@ jobs:
             echo "Dry run enabled (auth check only)"
           fi
 
-          # Pin publish-browser-extension to v6.2.0 (CWS API v2 + service-account auth).
+          # Run the locally installed binary from .github/cws-publish (npm ci above).
           # Env vars map to CLI flags: CHROME_* / DRY_RUN (see package config reference).
-          npx --yes publish-browser-extension@6.2.0
+          ".github/cws-publish/node_modules/.bin/publish-extension"

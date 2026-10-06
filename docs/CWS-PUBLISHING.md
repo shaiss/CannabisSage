@@ -9,6 +9,10 @@ Official references:
 
 The workflow is **inert** until the repo secrets below are set.
 
+### Manifest `description` is listing copy
+
+The extension manifest `description` field is what Chrome surfaces as the Chrome Web Store listing **summary**. Keep it retailer-free (no dispensary or retailer names), and review it as store listing copy whenever it changes — same bar as [`STORE_LISTING.md`](../STORE_LISTING.md).
+
 ---
 
 ## One-time owner setup
@@ -89,3 +93,15 @@ API publishing updates the **package** only. Still manage in the Developer Dashb
 - Visibility, distribution, and age / category settings  
 
 See also [`CWS-UPLOAD-CHECKLIST.md`](CWS-UPLOAD-CHECKLIST.md) and [`STORE_LISTING.md`](../STORE_LISTING.md).
+
+---
+
+## Tooling pin
+
+CI does **not** use bare `npx publish-browser-extension@…` (version pin without content pin). Instead:
+
+1. [`.github/cws-publish/package.json`](../.github/cws-publish/package.json) depends on exact `publish-browser-extension@6.2.0`.
+2. [`.github/cws-publish/package-lock.json`](../.github/cws-publish/package-lock.json) records npm `integrity` (sha512) for that package and its transitive deps.
+3. The workflow runs `npm ci` in that directory, then invokes the local binary `.github/cws-publish/node_modules/.bin/publish-extension`.
+
+To bump the publisher CLI: change the version in that `package.json`, regenerate the lockfile with `npm install` in `.github/cws-publish/`, commit both, and confirm the new binary still supports CWS API v2 + service-account auth.

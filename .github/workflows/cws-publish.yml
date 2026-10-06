@@ -33,7 +33,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4.2.2
+        # Pin to actions/checkout@v4.2.2
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
 
       - name: Verify tag matches manifest version
         if: startsWith(github.ref, 'refs/tags/')
@@ -69,7 +72,8 @@ jobs:
           echo "All required CWS secrets are present"
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4.2.0
+        # Pin to actions/setup-node@v4.2.0
+        uses: actions/setup-node@1d0ff469b7ec7b3cb9d8673fde0c81c44821de2a
         with:
           node-version: "22"
 

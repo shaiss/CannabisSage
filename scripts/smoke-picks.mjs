@@ -595,9 +595,18 @@ assert(popupJs.includes('picks-upgrade') && popupJs.includes('openUpgrade'), 'Fr
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.22', 'manifest 1.3.22');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
-const contentJs = manifest.content_scripts?.[1]?.js || [];
-assert(!contentJs.includes('lib/csi-picks.js'), 'picks not injected into host pages');
-assert(contentJs.includes('lib/csi-profile.js'), 'profile still available to content scripts');
+const isolatedJs =
+  (manifest.content_scripts || []).find(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-profile.js')
+  )?.js || [];
+assert(!isolatedJs.includes('lib/csi-picks.js'), 'picks not injected into host pages');
+assert(isolatedJs.includes('lib/csi-profile.js'), 'profile still available to content scripts');
+assert(
+  !(manifest.content_scripts || []).some(
+    (cs) => cs.all_frames === true && (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis/.test(m))
+  ),
+  'all_frames scoped to Dutchie embedded-menu only'
+);
 
 // Simulate host-page product data sanitizer still strips profile
 loadScripts(['lib/csi-fetch.js'], sandbox);

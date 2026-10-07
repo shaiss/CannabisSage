@@ -31,10 +31,17 @@
         "https://www.zenleafdispensaries.com/locations/*",
         "https://risecannabis.com/dispensaries/*",
         "https://www.risecannabis.com/dispensaries/*",
-        "https://dutchie.com/embedded-menu/*",
-        "https://www.dutchie.com/embedded-menu/*",
         "https://libertycannabis.com/shop/*",
         "https://www.libertycannabis.com/shop/*"
+      ],
+      "js": ["bridge.js"],
+      "run_at": "document_idle",
+      "world": "MAIN"
+    },
+    {
+      "matches": [
+        "https://dutchie.com/embedded-menu/*",
+        "https://www.dutchie.com/embedded-menu/*"
       ],
       "js": ["bridge.js"],
       "run_at": "document_idle",
@@ -51,10 +58,39 @@
         "https://www.zenleafdispensaries.com/locations/*",
         "https://risecannabis.com/dispensaries/*",
         "https://www.risecannabis.com/dispensaries/*",
-        "https://dutchie.com/embedded-menu/*",
-        "https://www.dutchie.com/embedded-menu/*",
         "https://libertycannabis.com/shop/*",
         "https://www.libertycannabis.com/shop/*"
+      ],
+      "js": [
+        "lib/csi-core.js",
+        "adapters/interface.js",
+        "adapters/sunnyside.js",
+        "adapters/zenleaf.js",
+        "adapters/terravida.js",
+        "adapters/iheartjane.js",
+        "adapters/dutchie.js",
+        "adapters/registry.js",
+        "lib/csi-storage.js",
+        "lib/csi-profile.js",
+        "lib/csi-fetch.js",
+        "lib/csi-glossary.js",
+        "lib/csi-entitlement.js",
+        "lib/csi-features.js",
+        "lib/csi-denylist.js",
+        "lib/csi-ui.js",
+        "lib/csi-partners.js",
+        "content-listing.js",
+        "content-pdp.js",
+        "content-router.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle",
+      "world": "ISOLATED"
+    },
+    {
+      "matches": [
+        "https://dutchie.com/embedded-menu/*",
+        "https://www.dutchie.com/embedded-menu/*"
       ],
       "js": [
         "lib/csi-core.js",

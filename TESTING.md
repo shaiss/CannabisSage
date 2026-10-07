@@ -58,8 +58,8 @@ Checks per listing:
 
 | Step | URL / action | Pass? |
 | --- | --- | --- |
-| Liberty parent shop (thin WP + Dutchie iframe) | https://libertycannabis.com/shop/norristown/ | |
-| Flower listing inside embed | https://dutchie.com/embedded-menu/liberty-norristown/products/flower | |
+| Liberty parent shop (thin WP shell; top-frame only) | https://libertycannabis.com/shop/norristown/ | |
+| Flower listing inside embed (`all_frames` only on dutchie.com/embedded-menu) | https://dutchie.com/embedded-menu/liberty-norristown/products/flower | |
 | Filter bar shows **Liberty Norristown** | | |
 | Cards show on-card THC + TERPS (listing bar-ready); named terps optional | | |
 | Open a PDP; panel shows named cannabinoids + named terpene % | e.g. `/product/swampwater-fumez-3-5g` | |

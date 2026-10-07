@@ -96,9 +96,10 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 
 - Hosts: `dutchie.com` / `www.dutchie.com` (embedded menu iframe) plus retailer entry shells when verified
 - First verified tenant: **Liberty Norristown**
-  - Entry: `https://libertycannabis.com/shop/norristown/` (thin WordPress + `dutchie--embed__script`)
-  - Live menu: `https://dutchie.com/embedded-menu/liberty-norristown/products/…`
+  - Entry: `https://libertycannabis.com/shop/norristown/` (thin WordPress + `dutchie--embed__script`; **top-frame only**)
+  - Live menu: `https://dutchie.com/embedded-menu/liberty-norristown/products/…` (**`all_frames: true` only here**)
   - PDP: `https://dutchie.com/embedded-menu/liberty-norristown/product/:slug`
+  - Manifest split: Sunnyside / Zen Leaf / RISE / Liberty stay top-frame; only Dutchie `/embedded-menu/*` uses `all_frames`
 - Cards: `[data-testid="product-list-item"]` with on-card `THC:` / `TERPS:` (CBD when present)
 - Listing chem is **filter-bar ready** for THC and total terpenes; **named terpene %** appear on PDP panels (listing GraphQL `terpenes` / `terpenesV2` are null)
 - Bridge: `dutchie` (live DOM scrape; background HTML fetch may hit Cloudflare)

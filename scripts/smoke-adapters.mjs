@@ -379,16 +379,46 @@ assert(
   manifest.host_permissions.includes('https://libertycannabis.com/*'),
   'liberty host perm'
 );
+const contentScripts = manifest.content_scripts || [];
+const isolatedScripts = contentScripts.filter((cs) => cs.world === 'ISOLATED' || !cs.world);
+const mainScripts = contentScripts.filter((cs) => cs.world === 'MAIN');
+const dutchieFrameScripts = contentScripts.filter(
+  (cs) =>
+    cs.all_frames === true &&
+    (cs.matches || []).every((m) => /dutchie\.com\/embedded-menu\//.test(m))
+);
+const topFrameScripts = contentScripts.filter((cs) => cs.all_frames !== true);
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('adapters/dutchie.js'),
+  isolatedScripts.some((cs) => (cs.js || []).includes('adapters/dutchie.js')),
   'dutchie content script listed'
 );
+assert(dutchieFrameScripts.length === 2, 'exactly two all_frames blocks (MAIN + ISOLATED)');
 assert(
-  manifest.content_scripts?.every((cs) => cs.all_frames === true),
-  'all_frames for Dutchie iframe embed'
+  dutchieFrameScripts.every((cs) =>
+    (cs.matches || []).every((m) => /^https:\/\/(www\.)?dutchie\.com\/embedded-menu\//.test(m))
+  ),
+  'all_frames only matches dutchie embedded-menu'
 );
 assert(
-  manifest.content_scripts?.[0]?.matches?.some((m) => m.includes('dutchie.com/embedded-menu')),
+  !topFrameScripts.some((cs) => (cs.matches || []).some((m) => /dutchie\.com\/embedded-menu\//.test(m))),
+  'top-frame blocks omit dutchie embedded-menu (served via all_frames blocks)'
+);
+assert(
+  topFrameScripts.some((cs) =>
+    (cs.matches || []).some((m) => /libertycannabis\.com\/shop\//.test(m))
+  ),
+  'Liberty shop shell is top-frame only'
+);
+assert(
+  !contentScripts.some(
+    (cs) =>
+      cs.all_frames === true &&
+      (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis/.test(m))
+  ),
+  'Sunnyside/Zenleaf/RISE/Liberty never use all_frames'
+);
+assert(
+  mainScripts.some((cs) => (cs.matches || []).some((m) => m.includes('dutchie.com/embedded-menu'))),
   'bridge matches dutchie embedded-menu'
 );
 assert(
@@ -414,7 +444,9 @@ assert(
   'csi-denylist.js present'
 );
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('lib/csi-denylist.js'),
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-denylist.js')
+  ),
   'denylist content script listed'
 );
 const cfg = JSON.parse(fs.readFileSync(path.join(ext, 'data/config.json'), 'utf8'));
@@ -438,7 +470,9 @@ assert(
   'csi-partners.js present'
 );
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-partners.js')
+  ),
   'partners content script listed'
 );
 
@@ -1315,12 +1349,19 @@ assert(
   'host permissions include RISE + Dutchie + Liberty + prior retailers'
 );
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('adapters/iheartjane.js'),
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('adapters/iheartjane.js')
+  ),
   'iheartjane content script listed'
 );
 assert(
-  manifest.content_scripts?.[0]?.matches?.some((m) => /risecannabis\.com\/dispensaries\//.test(m)),
-  'bridge matches RISE dispensaries'
+  (manifest.content_scripts || []).some(
+    (cs) =>
+      cs.world === 'MAIN' &&
+      cs.all_frames !== true &&
+      (cs.matches || []).some((m) => /risecannabis\.com\/dispensaries\//.test(m))
+  ),
+  'bridge matches RISE dispensaries (top-frame)'
 );
 assert(
   manifest.web_accessible_resources?.[0]?.matches?.includes('https://risecannabis.com/*'),
@@ -1747,7 +1788,12 @@ assert(!/new Function|eval\(/.test(pdpSrc + listingSrc), 'no eval loaders on lis
 
 // Local taste profile (v1.3.19) — Free, opt-in, chrome.storage.local only
 assert(fs.existsSync(path.join(ext, 'lib/csi-profile.js')), 'csi-profile.js present');
-assert(manifest.content_scripts?.[1]?.js?.includes('lib/csi-profile.js'), 'profile in content scripts');
+assert(
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-profile.js')
+  ),
+  'profile in content scripts'
+);
 assert(storageSrc.includes("PROFILE: 'csi_taste_profile'"), 'profile storage key');
 assert(storageSrc.includes('loadTasteProfile') && storageSrc.includes('deleteTasteProfile'), 'profile load/delete');
 assert(listingSrc.includes('setBoughtBeforeFlag') && pdpSrc.includes('setBoughtBeforeFlag'), 'bought-before flags on listing and PDP');
@@ -1765,7 +1811,10 @@ assert(fetchSrcPref.includes('omitSensitivePrefs'), 'host cache sanitizes data-c
 // Picks for you (v1.3.20) — Pro, popup-only, cached menus
 assert(fs.existsSync(path.join(ext, 'lib/csi-picks.js')), 'csi-picks.js present');
 assert(featuresSrcPref.includes('picksForYou: true'), 'picksForYou is Pro');
-assert(!manifest.content_scripts?.[1]?.js?.includes('lib/csi-picks.js'), 'picks not in content scripts');
+assert(
+  !(manifest.content_scripts || []).some((cs) => (cs.js || []).includes('lib/csi-picks.js')),
+  'picks not in content scripts'
+);
 assert(fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8').includes("onSale: !!product.onSale") || fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8').includes('rec.onSale'), 'cache record can keep onSale');
 
 console.log('smoke-adapters: OK');

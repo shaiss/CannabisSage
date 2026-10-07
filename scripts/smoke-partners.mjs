@@ -142,7 +142,9 @@ const ext = path.join(root, 'extension');
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.22', 'extension 1.3.22');
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-partners.js')
+  ),
   'csi-partners.js in content scripts'
 );
 assert(

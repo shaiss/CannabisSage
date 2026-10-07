@@ -310,6 +310,11 @@ assert(popupJs.includes("iheartjane: 'RISE'"), 'RISE label in popup');
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.22', 'manifest 1.3.22');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
-assert(manifest.content_scripts[1].js.includes('lib/csi-profile.js'), 'profile content script');
+assert(
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-profile.js')
+  ),
+  'profile content script'
+);
 
 console.log('smoke-profile: OK');

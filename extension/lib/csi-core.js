@@ -5,7 +5,7 @@
 (function (global) {
   'use strict';
 
-  const VERSION = '1.3.20';
+  const VERSION = '1.3.21';
   const MAX_COMPARE = 3;
   const CACHE_TTL_MS = 6 * 60 * 60 * 1000; // 6 hours
   const ACCENT_ORANGE = '#FF6B35';
@@ -1054,7 +1054,8 @@
    *
    * Retailer names are not a menu source or a lab. Never invent one.
    */
-  const PROVENANCE_RETAILER = /^(sunnyside|zen\s*leaf|zenleaf|terravida(?:\s*\([^)]*\))?)$/i;
+  const PROVENANCE_RETAILER =
+    /^(sunnyside|zen\s*leaf|zenleaf|terravida(?:\s*\([^)]*\))?|rise(?:\s*cannabis)?|iheartjane|i\s*heart\s*jane)$/i;
   const PROVENANCE_NOT_LAB = new Set([
     'thc',
     'thca',

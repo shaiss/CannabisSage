@@ -38,6 +38,7 @@ required=(
   "${EXT_DIR}/adapters/sunnyside.js"
   "${EXT_DIR}/adapters/zenleaf.js"
   "${EXT_DIR}/adapters/terravida.js"
+  "${EXT_DIR}/adapters/iheartjane.js"
   "${EXT_DIR}/adapters/registry.js"
   "${EXT_DIR}/lib/csi-entitlement.js"
   "${EXT_DIR}/lib/csi-features.js"

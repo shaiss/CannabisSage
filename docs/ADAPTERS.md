@@ -15,9 +15,10 @@ Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only)
 | `extension/adapters/sunnyside.js` | Primary adapter |
 | `extension/adapters/zenleaf.js` | Zen Leaf Dispensaries (`zenleafdispensaries.com`) |
 | `extension/adapters/terravida.js` | TerraVida alias for Zen Leaf **Malvern** only |
+| `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (first host: RISE / `risecannabis.com`) |
 | `extension/adapters/_template.js` | Copy-paste starter (not registered) |
 
-Registry order (first match wins): `terravida` → `zenleaf` → `sunnyside`.
+Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `sunnyside`.
 
 ## Adapter interface
 
@@ -36,7 +37,7 @@ Each adapter is a plain object with at least:
 | `parseProductHtml(html, url)` | Chem scrape from fetched PDP HTML |
 | `parseListingHints(cardEl)` *(optional)* | On-card price/sale/THC |
 | `isAllowedFetchUrl(url)` | Background fetch allowlist mirror |
-| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'none'` |
+| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
 
 ### Provenance
 
@@ -76,6 +77,19 @@ Listing cards repeat that line only when a lab label or a date is present, as qu
 | Zen Leaf Malvern | Live ecommerce: `https://zenleafdispensaries.com/locations/malvern/...` |
 
 The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (display name `TerraVida (Zen Leaf Malvern)`), reusing Zen Leaf DOM/HTML parsers. No invented hostnames.
+
+### iHeartJane (RISE first host) — verified findings
+
+| Item | Result |
+| --- | --- |
+| Host | `risecannabis.com` / `www.risecannabis.com` (Next.js storefront; Jane-powered menu) |
+| Listing | `/dispensaries/:state/:slug/:storeId/(medical\|recreational)-menu/` |
+| PDP | `.../medical-menu/product/:productId/:slug/` |
+| Cards | `article[data-testid^="product-card-"]` with `product-card-potency-*` = `Total THC XX.XX%` |
+| Chem source | Same-origin PDP HTML / Next.js flight payload: `percentThc`, `inventoryPotencies[].thc_potency`, terpene percents in `productDescription` (`Name: 0.418% \| ...`) |
+| Bridge | `none` (HTML parse; no React fiber strategy) |
+| First store | RISE King of Prussia medical menu (`.../king-of-prussia/1552/medical-menu/`). Sibling PA RISE location paths match the same patterns. |
+| Follow-up | Beyond Hello is a later Wave 1 host — extend `HOSTS` / labels, do not hard-code KoP only. |
 
 ## How to add a store (community PR)
 

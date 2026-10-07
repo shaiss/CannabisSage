@@ -1,6 +1,7 @@
 /**
  * MAIN-world bridge: store-specific product extraction + SPA route notify.
- * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints).
+ * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints),
+ * none (HTML-parse adapters such as iHeartJane / RISE — bridge returns null).
  */
 (function () {
   'use strict';
@@ -269,15 +270,18 @@
     const host = location.hostname.replace(/^www\./, '');
     if (host === 'sunnyside.shop') return 'sunnyside';
     if (host === 'zenleafdispensaries.com') return 'zenleaf';
+    if (host === 'risecannabis.com') return 'none';
     return 'sunnyside';
   }
 
   function summarize(product, hostEl, strategy) {
+    if (strategy === 'none') return null;
     if (strategy === 'zenleaf') return summarizeZenleaf(product, hostEl);
     return summarizeSunnyside(product, hostEl);
   }
 
   function extractListing(marker, strategy) {
+    if (strategy === 'none') return null;
     const safeMarker = marker
       ? typeof CSS !== 'undefined' && CSS.escape
         ? CSS.escape(marker)
@@ -294,6 +298,7 @@
   }
 
   function extractPdp(strategy) {
+    if (strategy === 'none') return null;
     const roots =
       strategy === 'zenleaf'
         ? [

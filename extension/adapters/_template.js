@@ -8,7 +8,7 @@
  * [ ] listingSelectors + findProductCards / isLikelyProductCard / cardHost
  * [ ] resolveProductUrlFromDom + buildProductUrl + isAllowedFetchUrl
  * [ ] parseProductHtml (and optional parseListingHints for on-card chem)
- * [ ] bridgeStrategy: reuse 'sunnyside' | 'zenleaf' or extend bridge.js
+ * [ ] bridgeStrategy: reuse 'sunnyside' | 'zenleaf' | 'none' or extend bridge.js
  * [ ] Register in adapters/registry.js BUILTIN_ORDER (specificity matters)
  * [ ] Add host_permissions + content_scripts matches + web_accessible_resources
  *     matches in extension/manifest.json (CWS: new hosts need an extension update;

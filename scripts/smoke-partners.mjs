@@ -31,11 +31,12 @@ assert(Array.isArray(partnersDoc.partners) && partnersDoc.partners.length >= 1, 
 
 const parsed = parsePartnersDocument(partnersDoc);
 assert(parsed, 'partners payload parses');
-assert(parsed.partners.length === 2, 'two unique seeded hosts');
+assert(parsed.partners.length === 3, 'three unique seeded hosts');
 
 const hosts = parsed.partners.map((p) => p.host);
 assert(hosts.includes('sunnyside.shop'), 'sunnyside.shop seeded');
 assert(hosts.includes('zenleafdispensaries.com'), 'zenleafdispensaries.com seeded');
+assert(hosts.includes('risecannabis.com'), 'risecannabis.com seeded');
 assert(!hosts.includes('www.sunnyside.shop'), 'www. stripped in parse');
 assert(!hosts.some((h) => /terravidahc|terravida\.com/.test(h)), 'no invented TerraVida host');
 
@@ -66,6 +67,10 @@ assert(
 assert(
   afterDeny.some((p) => p.host === 'zenleafdispensaries.com'),
   'other hosts still listed'
+);
+assert(
+  afterDeny.some((p) => p.host === 'risecannabis.com'),
+  'RISE still listed after sunnyside deny'
 );
 
 const withDeniedStatus = {
@@ -133,7 +138,7 @@ assert(cfg.denylistPath === '/denylist.json', 'denylistPath unchanged');
 
 const ext = path.join(root, 'extension');
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.20', 'extension 1.3.20');
+assert(manifest.version === '1.3.21', 'extension 1.3.21');
 assert(
   manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
   'csi-partners.js in content scripts'

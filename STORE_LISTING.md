@@ -7,7 +7,7 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.21 |
+| **Version** | 1.3.22 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
@@ -66,6 +66,14 @@ Inject UI and fetch same-origin product HTML on Zen Leaf location menus/PDPs (in
 
 Inject UI and fetch same-origin product HTML on RISE iHeartJane medical/recreational menu listings and PDPs under `/dispensaries/...`.
 
+### Host permission: Dutchie embedded menu
+
+Inject UI into verified Dutchie `/embedded-menu/*` iframe documents (first tenant: Liberty Norristown) and allowlisted same-origin PDP HTML fetches when Cloudflare permits.
+
+### Host permission: Liberty Cannabis
+
+Inject on Liberty shop entry URLs that host the Dutchie embed script (`/shop/norristown/`). The live product grid runs inside the Dutchie iframe.
+
 ### Host permission: CannabisSage site (`https://cannabissage.app/*`, `https://cannabissage.vercel.app/*`)
 
 Call entitlement activate/validate APIs and open Upgrade / Manage links on the production landing origin (`cannabissage.app`; `cannabissage.vercel.app` kept as Vercel fallback). Cards are never entered in the extension.
@@ -95,7 +103,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.21.zip` (CWS **1.3.2** may still be pending review; next upload needs this bump).
+4. Upload `dist/cannabis-sage-1.3.22.zip` (includes iHeartJane 1.3.21 + Dutchie Liberty).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

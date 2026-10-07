@@ -16,9 +16,10 @@ Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only)
 | `extension/adapters/zenleaf.js` | Zen Leaf Dispensaries (`zenleafdispensaries.com`) |
 | `extension/adapters/terravida.js` | TerraVida alias for Zen Leaf **Malvern** only |
 | `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (first host: RISE / `risecannabis.com`) |
+| `extension/adapters/dutchie.js` | Multi-tenant Dutchie embed (`dutchie.com/embedded-menu/…`) |
 | `extension/adapters/_template.js` | Copy-paste starter (not registered) |
 
-Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `sunnyside`.
+Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `dutchie` → `sunnyside`.
 
 ## Adapter interface
 
@@ -37,7 +38,7 @@ Each adapter is a plain object with at least:
 | `parseProductHtml(html, url)` | Chem scrape from fetched PDP HTML |
 | `parseListingHints(cardEl)` *(optional)* | On-card price/sale/THC |
 | `isAllowedFetchUrl(url)` | Background fetch allowlist mirror |
-| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
+| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'dutchie'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
 
 ### Provenance
 
@@ -90,6 +91,18 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 | Bridge | `none` (HTML parse; no React fiber strategy) |
 | First store | RISE King of Prussia medical menu (`.../king-of-prussia/1552/medical-menu/`). Sibling PA RISE location paths match the same patterns. |
 | Follow-up | Beyond Hello is a later Wave 1 host — extend `HOSTS` / labels, do not hard-code KoP only. |
+
+### Dutchie (multi-tenant)
+
+- Hosts: `dutchie.com` / `www.dutchie.com` (embedded menu iframe) plus retailer entry shells when verified
+- First verified tenant: **Liberty Norristown**
+  - Entry: `https://libertycannabis.com/shop/norristown/` (thin WordPress + `dutchie--embed__script`)
+  - Live menu: `https://dutchie.com/embedded-menu/liberty-norristown/products/…`
+  - PDP: `https://dutchie.com/embedded-menu/liberty-norristown/product/:slug`
+- Cards: `[data-testid="product-list-item"]` with on-card `THC:` / `TERPS:` (CBD when present)
+- Listing chem is **filter-bar ready** for THC and total terpenes; **named terpene %** appear on PDP panels (listing GraphQL `terpenes` / `terpenesV2` are null)
+- Bridge: `dutchie` (live DOM scrape; background HTML fetch may hit Cloudflare)
+- New tenants: add slug → display name in `VERIFIED_SLUGS` (and optional retailer shop path map). Do not open all of `dutchie.com`.
 
 ## How to add a store (community PR)
 

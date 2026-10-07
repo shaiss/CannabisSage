@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-04T00:00:00.000Z",
+  "updatedAt": "2026-10-07T00:00:00.000Z",
   "partners": [
     {
       "host": "sunnyside.shop",
@@ -18,6 +18,18 @@
       "status": "community",
       "displayName": "RISE",
       "notes": "iHeartJane-powered medical menus under /dispensaries/.../(medical|recreational)-menu/."
+    },
+    {
+      "host": "dutchie.com",
+      "status": "community",
+      "displayName": "Liberty Norristown",
+      "notes": "Dutchie embedded-menu host. First verified slug: liberty-norristown. Content scripts are path-scoped to /embedded-menu/*."
+    },
+    {
+      "host": "libertycannabis.com",
+      "status": "community",
+      "displayName": "Liberty Cannabis",
+      "notes": "Thin WordPress shop shell for the Dutchie Norristown embed (/shop/norristown/)."
     }
   ]
 }

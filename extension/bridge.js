@@ -1,6 +1,7 @@
 /**
  * MAIN-world bridge: store-specific product extraction + SPA route notify.
  * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints),
+ * dutchie (live DOM potency chips + named terpene rows; Cloudflare often blocks HTML fetch),
  * none (HTML-parse adapters such as iHeartJane / RISE — bridge returns null).
  */
 (function () {
@@ -266,16 +267,118 @@
     return summary;
   }
 
+  function parseDutchiePotencyLabel(text, label) {
+    const re = new RegExp(`\\b${label}\\s*:\\s*(\\d+(?:\\.\\d+)?)\\s*%`, 'i');
+    const m = String(text || '').match(re);
+    return m ? parseFloat(m[1]) : null;
+  }
+
+  function dutchieNamedTerpenes(text) {
+    const canon = [
+      ['Beta-Caryophyllene', /beta[\s-]?caryophyllene|caryophyllene/i],
+      ['Limonene', /limonene/i],
+      ['Humulene', /humulene/i],
+      ['Linalool', /linalool/i],
+      ['Beta-Myrcene', /beta[\s-]?myrcene|myrcene/i],
+      ['Beta-Pinene', /beta[\s-]?pinene/i],
+      ['Alpha-Pinene', /alpha[\s-]?pinene|(?<![a-z])pinene/i],
+      ['Ocimene', /ocimene/i],
+      ['Terpinolene', /terpinolene/i],
+      ['Bisabolol', /bisabolol/i],
+      ['Guaiol', /guaiol/i]
+    ];
+    const out = [];
+    const src = String(text || '');
+    canon.forEach(([name, nameRe]) => {
+      const re = new RegExp(
+        `(?:${nameRe.source})[^0-9%]{0,16}([0-9]+(?:\\.[0-9]+)?)\\s*%`,
+        'gi'
+      );
+      let m;
+      while ((m = re.exec(src)) !== null) {
+        const pct = parseFloat(m[1]);
+        if (Number.isNaN(pct) || pct <= 0 || pct > 100) continue;
+        const existing = out.find((t) => t.name === name);
+        if (!existing) out.push({ name, percentage: pct });
+        else if (pct > existing.percentage) existing.percentage = pct;
+      }
+    });
+    return out;
+  }
+
+  function summarizeDutchieFromDom(hostEl) {
+    const host = hostEl || document.body;
+    if (!host) return null;
+    const text = host.textContent || '';
+    const cannabinoids = {};
+    const thc = parseDutchiePotencyLabel(text, 'THC');
+    const cbd = parseDutchiePotencyLabel(text, 'CBD');
+    if (thc != null) cannabinoids.THC = thc;
+    if (cbd != null) cannabinoids.CBD = cbd;
+    ['THCA', 'CBGA', 'CBG', 'CBN', 'CBC', 'CBDV'].forEach((key) => {
+      const v = parseDutchiePotencyLabel(text, key);
+      if (v != null) cannabinoids[key] = v;
+    });
+
+    const named = dutchieNamedTerpenes(text);
+    const totalTerps =
+      parseDutchiePotencyLabel(text, 'TERPS?') ?? parseDutchiePotencyLabel(text, 'TERPENES?');
+    let terpenes = named.length ? named : undefined;
+    if (!named.length && totalTerps != null) terpenes = { 'Total Terpenes': totalTerps };
+    else if (named.length && totalTerps != null) {
+      terpenes = [...named, { name: 'Total Terpenes', percentage: totalTerps }];
+    }
+
+    const prices = [...String(text).matchAll(/\$\s*([0-9]+(?:\.[0-9]+)?)/g)].map((m) =>
+      parseFloat(m[1])
+    );
+    const price = prices.length ? Math.min(...prices) : parsePrice(text);
+    const weightText = (text.match(/(\d+(?:\.\d+)?\s*(?:g|mg|oz)\b)/i) || [])[1] || null;
+    const name =
+      host.querySelector?.('h1')?.textContent?.trim() ||
+      host.querySelector?.('[data-testid="card-strain"]')?.textContent?.trim() ||
+      host.querySelector?.('[class*="card-name"]')?.textContent?.trim() ||
+      undefined;
+
+    let slug;
+    const link =
+      host.querySelector?.('a[href*="/embedded-menu/"][href*="/product/"]') ||
+      (location.pathname.includes('/product/') ? location.pathname : null);
+    if (typeof link === 'string') slug = link;
+    else if (link) {
+      const href = link.getAttribute('href') || link.href;
+      if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
+    } else if (/\/product\//i.test(location.pathname)) {
+      slug = location.pathname;
+    }
+
+    if (!Object.keys(cannabinoids).length && !terpenes) return null;
+
+    return {
+      id: slug || undefined,
+      slug: slug || undefined,
+      name,
+      cannabinoids: Object.keys(cannabinoids).length ? cannabinoids : undefined,
+      terpenes,
+      price: price || undefined,
+      weightText: weightText ? String(weightText) : undefined,
+      onSale: /\d+\s*%\s*off/i.test(text),
+      strategy: 'dutchie'
+    };
+  }
+
   function detectStrategy() {
     const host = location.hostname.replace(/^www\./, '');
     if (host === 'sunnyside.shop') return 'sunnyside';
     if (host === 'zenleafdispensaries.com') return 'zenleaf';
     if (host === 'risecannabis.com') return 'none';
+    if (host === 'dutchie.com') return 'dutchie';
     return 'sunnyside';
   }
 
   function summarize(product, hostEl, strategy) {
     if (strategy === 'none') return null;
+    if (strategy === 'dutchie') return summarizeDutchieFromDom(hostEl) || summarizeZenleaf(product, hostEl);
     if (strategy === 'zenleaf') return summarizeZenleaf(product, hostEl);
     return summarizeSunnyside(product, hostEl);
   }
@@ -289,6 +392,10 @@
       : '';
     const el = safeMarker ? document.querySelector(`[data-csi-bridge-id="${safeMarker}"]`) : null;
     let host = el;
+    if (strategy === 'dutchie') {
+      host = el?.closest('[data-testid="product-list-item"]') || el;
+      return summarizeDutchieFromDom(host);
+    }
     if (strategy === 'zenleaf') {
       host = el?.closest('[data-testid="product-card"]') || el?.closest('[role="listitem"]') || el;
     } else {
@@ -299,6 +406,19 @@
 
   function extractPdp(strategy) {
     if (strategy === 'none') return null;
+    if (strategy === 'dutchie') {
+      const roots = [
+        document.querySelector('[data-testid="product-details"]'),
+        document.querySelector('main'),
+        document.body
+      ].filter(Boolean);
+      for (const root of roots) {
+        const summary = summarizeDutchieFromDom(root);
+        if (summary && (summary.cannabinoids || summary.terpenes)) return summary;
+      }
+      return null;
+    }
+
     const roots =
       strategy === 'zenleaf'
         ? [

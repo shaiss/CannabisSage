@@ -9,7 +9,7 @@
   if (!CSI) throw new Error('CSI core missing');
 
   /** @type {string[]} */
-  const BUILTIN_ORDER = ['terravida', 'zenleaf', 'iheartjane', 'sunnyside'];
+  const BUILTIN_ORDER = ['terravida', 'zenleaf', 'iheartjane', 'dutchie', 'sunnyside'];
 
   function listAdapters() {
     return BUILTIN_ORDER.map((id) => CSI.adapters?.[id]).filter(Boolean);

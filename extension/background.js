@@ -18,6 +18,11 @@ const ALLOWED_FETCH_RULES = [
   {
     hosts: ['risecannabis.com', 'www.risecannabis.com'],
     path: /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/product\/\d+\/[^/]+\/?$/i
+  },
+  {
+    // Dutchie embedded-menu PDPs (verified slugs only; mirrors adapters/dutchie.js)
+    hosts: ['dutchie.com', 'www.dutchie.com'],
+    path: /^\/embedded-menu\/(?:liberty-norristown)\/product\/[^/]+\/?$/i
   }
 ];
 

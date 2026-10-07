@@ -302,11 +302,13 @@ assert(listingSrc.includes('tasteProfile: state.profile'), 'listing badges recei
 
 const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
 assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');
+assert(popupJs.includes("dutchie: 'Liberty Norristown'"), 'dutchie store label in popup');
+assert(CSI.profile.STORE_IDS.includes('dutchie'), 'dutchie in profile store ids');
 assert(popupJs.includes("zenleaf: 'Zen Leaf'"), 'Zen Leaf label in popup');
 assert(popupJs.includes("iheartjane: 'RISE'"), 'RISE label in popup');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.21', 'manifest 1.3.21');
+assert(manifest.version === '1.3.22', 'manifest 1.3.22');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
 assert(manifest.content_scripts[1].js.includes('lib/csi-profile.js'), 'profile content script');
 

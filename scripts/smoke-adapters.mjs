@@ -53,6 +53,7 @@ loadScripts(
     'adapters/zenleaf.js',
     'adapters/terravida.js',
     'adapters/iheartjane.js',
+    'adapters/dutchie.js',
     'adapters/registry.js'
   ],
   vm.createContext(sandbox)
@@ -71,6 +72,11 @@ assert(CSI.adapters.iheartjane, 'iheartjane registered');
 assert(
   CSI.registry.BUILTIN_ORDER.indexOf('iheartjane') > CSI.registry.BUILTIN_ORDER.indexOf('zenleaf'),
   'iheartjane after zenleaf'
+);
+assert(CSI.adapters.dutchie, 'dutchie registered');
+assert(
+  CSI.registry.BUILTIN_ORDER.indexOf('dutchie') > CSI.registry.BUILTIN_ORDER.indexOf('iheartjane'),
+  'dutchie after iheartjane'
 );
 
 const sy = CSI.registry.resolveAdapter('https://www.sunnyside.shop/products/flower');
@@ -149,6 +155,123 @@ const janeSibling = CSI.registry.resolveAdapter(
   'https://www.risecannabis.com/dispensaries/pennsylvania/philadelphia/5383/medical-menu/'
 );
 assert(janeSibling?.id === 'iheartjane', 'sibling RISE store uses iheartjane');
+// Dutchie / Liberty Norristown
+const dutchieListing = CSI.registry.resolveAdapter(
+  'https://dutchie.com/embedded-menu/liberty-norristown/products/flower'
+);
+assert(dutchieListing?.id === 'dutchie', `expected dutchie got ${dutchieListing?.id}`);
+assert(
+  dutchieListing.routeMode('/embedded-menu/liberty-norristown/products/flower') === 'listing',
+  'dutchie listing route'
+);
+assert(
+  dutchieListing.routeMode('/embedded-menu/liberty-norristown/product/swampwater-fumez-3-5g') ===
+    'pdp',
+  'dutchie pdp route'
+);
+assert(
+  dutchieListing.isAllowedFetchUrl(
+    'https://dutchie.com/embedded-menu/liberty-norristown/product/frosted-jungle-3-5g-92815'
+  ),
+  'dutchie fetch ok for verified slug'
+);
+assert(
+  !dutchieListing.isAllowedFetchUrl(
+    'https://dutchie.com/embedded-menu/other-dispensary/product/foo'
+  ),
+  'dutchie fetch blocks unverified slug'
+);
+assert(
+  !CSI.registry.resolveAdapter('https://dutchie.com/embedded-menu/random-shop/products'),
+  'unverified dutchie slug does not resolve'
+);
+const libertyParent = CSI.registry.resolveAdapter('https://libertycannabis.com/shop/norristown/');
+assert(libertyParent?.id === 'dutchie', 'liberty parent shell resolves dutchie');
+// Parent is thin — routeMode null when hostname is retailer (simulated via direct call with path only is listing-agnostic; matchesUrl is enough)
+assert(
+  CSI.adapters.dutchie.buildProductUrl(
+    '/embedded-menu/liberty-norristown/product/frosted-jungle-3-5g-92815'
+  ),
+  'dutchie accepts embed PDP path'
+);
+assert(
+  !CSI.adapters.dutchie.buildProductUrl('/embedded-menu/other/product/x'),
+  'dutchie rejects unverified PDP path'
+);
+
+const dutchieCardHtml = `
+<div data-testid="product-list-item">
+  <div data-testid="card-brand">Strane Reserve</div>
+  <a href="/embedded-menu/liberty-norristown/product/frosted-jungle-3-5g-92815">
+    <span class="card-potency__PotencyItem">THC: 30.77%</span>
+    <span class="card-potency__PotencyItem">TERPS: 1.51%</span>
+  </a>
+  <b>$26.00</b><span>$40.00</span><div>35% off</div>
+</div>`;
+const dutchieParsed = CSI.adapters.dutchie.parseProductHtml(
+  dutchieCardHtml,
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/frosted-jungle-3-5g-92815'
+);
+assert(dutchieParsed.cannabinoids?.THC === 30.77, `dutchie thc ${dutchieParsed.cannabinoids?.THC}`);
+assert(
+  dutchieParsed.terpenes?.['Total Terpenes'] === 1.51 ||
+    (Array.isArray(dutchieParsed.terpenes) &&
+      dutchieParsed.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 1.51)),
+  'dutchie listing total terps'
+);
+assert(dutchieParsed.onSale === true, 'dutchie sale from % off');
+
+const dutchiePdpHtml = `
+<html><body>
+<span data-testid="info-chip"><b>THC:</b> 32.09%</span>
+<span data-testid="info-chip"><b>TERPS:</b> 1.69%</span>
+<div>THCA: 32.09%</div><div>CBGA: 1.62%</div>
+<div>Linalool 0.57%</div><div>Beta Caryophyllene 0.51%</div>
+<div>Limonene 0.38%</div><div>Humulene 0.16%</div>
+</body></html>`;
+const dutchiePdp = CSI.adapters.dutchie.parseProductHtml(
+  dutchiePdpHtml,
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/swampwater-fumez-3-5g'
+);
+assert(dutchiePdp.cannabinoids?.THC === 32.09, 'dutchie pdp thc');
+assert(dutchiePdp.cannabinoids?.THCA === 32.09, 'dutchie pdp thca');
+assert(
+  Array.isArray(dutchiePdp.terpenes) &&
+    dutchiePdp.terpenes.some((t) => t.name === 'Linalool' && t.percentage === 0.57),
+  'dutchie pdp named terpene'
+);
+assert(
+  Array.isArray(dutchiePdp.terpenes) &&
+    dutchiePdp.terpenes.some((t) => /caryophyllene/i.test(t.name)),
+  'dutchie pdp caryophyllene'
+);
+
+const dutchieMockCard = {
+  textContent: 'Frosted Jungle THC: 30.77% TERPS: 1.51% $26.00',
+  querySelector: (sel) => {
+    if (String(sel).includes('card-potency') || String(sel).includes('Potency')) {
+      return { textContent: 'THC: 30.77% TERPS: 1.51%' };
+    }
+    return null;
+  },
+  querySelectorAll: (sel) => {
+    if (String(sel).includes('potency') || String(sel).includes('Potency')) {
+      return [{ textContent: 'THC: 30.77%' }, { textContent: 'TERPS: 1.51%' }];
+    }
+    return [];
+  },
+  closest: () => dutchieMockCard,
+  matches: () => true,
+  parentElement: null
+};
+const dutchieHints = CSI.adapters.dutchie.parseListingHints(dutchieMockCard);
+assert(dutchieHints.cannabinoids?.THC === 30.77, 'dutchie listing hint thc');
+assert(dutchieHints.terpenes?.['Total Terpenes'] === 1.51, 'dutchie listing hint terps');
+assert(
+  CSI.adapters.dutchie.shouldSuppressListingCannabinoidBadges(dutchieMockCard) === true,
+  'dutchie suppresses duplicate THC badge'
+);
+assert(CSI.adapters.dutchie.bridgeStrategy === 'dutchie', 'dutchie bridge strategy');
 
 // Parse sample labTests-ish HTML
 const sampleHtml = `
@@ -227,7 +350,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.21', 'version bump');
+assert(manifest.version === '1.3.22', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -247,6 +370,30 @@ assert(sy.pdpChemSurface === 'floating-panel', 'sunnyside PDP chem is floating p
 assert(
   manifest.host_permissions.includes('https://zenleafdispensaries.com/*'),
   'zenleaf host perm'
+);
+assert(
+  manifest.host_permissions.includes('https://dutchie.com/*'),
+  'dutchie host perm'
+);
+assert(
+  manifest.host_permissions.includes('https://libertycannabis.com/*'),
+  'liberty host perm'
+);
+assert(
+  manifest.content_scripts?.[1]?.js?.includes('adapters/dutchie.js'),
+  'dutchie content script listed'
+);
+assert(
+  manifest.content_scripts?.every((cs) => cs.all_frames === true),
+  'all_frames for Dutchie iframe embed'
+);
+assert(
+  manifest.content_scripts?.[0]?.matches?.some((m) => m.includes('dutchie.com/embedded-menu')),
+  'bridge matches dutchie embedded-menu'
+);
+assert(
+  manifest.web_accessible_resources?.[0]?.matches?.some((m) => m.includes('dutchie.com')),
+  'WAR matches dutchie'
 );
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),
@@ -297,7 +444,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.21', 'core version 1.3.21');
+assert(CSI.VERSION === '1.3.22', 'core version 1.3.22');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -305,7 +452,10 @@ assert(/cannabinoids/i.test(addsCopy) && /primary terps/i.test(addsCopy), 'chip 
 assert(!/\bstrain\b/i.test(addsCopy), 'chip does not frame by strain name');
 assert(!/hover profile/i.test(addsCopy), 'chip does not call hover a product profile');
 assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
-assert(!/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane/i.test(addsCopy), 'no retailer brand in chip copy');
+assert(
+  !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane|dutchie|liberty/i.test(addsCopy),
+  'no retailer brand in chip copy'
+);
 assert(
   !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(addsCopy),
   'no medical or effects claims in chip copy'
@@ -1153,12 +1303,16 @@ assert(
       'https://www.zenleafdispensaries.com/*',
       'https://risecannabis.com/*',
       'https://www.risecannabis.com/*',
+      'https://dutchie.com/*',
+      'https://www.dutchie.com/*',
+      'https://libertycannabis.com/*',
+      'https://www.libertycannabis.com/*',
       'https://cannabissage.app/*',
       'https://cannabissage.vercel.app/*',
       'http://localhost:3000/*',
       'https://localhost:3000/*'
     ]),
-  'host permissions include RISE + prior retailers'
+  'host permissions include RISE + Dutchie + Liberty + prior retailers'
 );
 assert(
   manifest.content_scripts?.[1]?.js?.includes('adapters/iheartjane.js'),

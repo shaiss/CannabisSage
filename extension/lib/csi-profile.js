@@ -19,7 +19,7 @@
   const POTENCY_BANDS = Object.freeze(['under-15', '15-25', '25-plus']);
   const FLAGS = Object.freeze(['rebuy', 'fine', 'never']);
   const DEAL_TIERS = Object.freeze(['any', 'sale', 'below-median']);
-  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane']);
+  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane', 'dutchie']);
   const ALLOWED_KEYS = Object.freeze([
     'schemaVersion',
     'enabled',

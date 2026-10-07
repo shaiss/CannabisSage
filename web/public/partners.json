@@ -12,6 +12,12 @@
       "status": "community",
       "displayName": "Zen Leaf",
       "notes": "TerraVida Holistic Centers (Malvern) is a path alias on this host, not a separate ecommerce hostname."
+    },
+    {
+      "host": "risecannabis.com",
+      "status": "community",
+      "displayName": "RISE",
+      "notes": "iHeartJane-powered medical menus under /dispensaries/.../(medical|recreational)-menu/."
     }
   ]
 }

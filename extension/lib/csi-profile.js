@@ -19,7 +19,7 @@
   const POTENCY_BANDS = Object.freeze(['under-15', '15-25', '25-plus']);
   const FLAGS = Object.freeze(['rebuy', 'fine', 'never']);
   const DEAL_TIERS = Object.freeze(['any', 'sale', 'below-median']);
-  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida']);
+  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane']);
   const ALLOWED_KEYS = Object.freeze([
     'schemaVersion',
     'enabled',
@@ -39,7 +39,8 @@
     'boughtBefore'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
-  const HOST_OK = /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$/i;
+  const HOST_OK =
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$/i;
 
   const COPY = Object.freeze({
     title: 'Local taste profile',

@@ -14,6 +14,10 @@
     return new Promise((resolve) => {
       const requestId = `csi-pdp-${Date.now()}`;
       const strategy = CSI.registry?.getActiveAdapter?.()?.bridgeStrategy || 'sunnyside';
+      if (strategy === 'none') {
+        resolve(null);
+        return;
+      }
       const onMessage = (event) => {
         if (event.source !== window) return;
         const data = event.data;

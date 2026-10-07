@@ -73,6 +73,19 @@ Checks per listing:
 | Extension does **not** inject on `terravidahc.com` (no host permission; not a catalog) | |
 | Shopping Malvern on Zen Leaf host activates TerraVida alias adapter | |
 
+## iHeartJane / RISE — smoke (v1.3.21+)
+
+| Step | URL / action | Pass? |
+| --- | --- | --- |
+| RISE King of Prussia medical menu listing | https://risecannabis.com/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/ | |
+| Filter bar shows **RISE** | | |
+| Cards enhance; on-card `Total THC` present (duplicate THC badge suppressed) | | |
+| Compare Select + hover tooltip | | |
+| Open a product PDP (`.../medical-menu/product/<id>/<slug>/`) | | |
+| PDP panel shows THC + named terp percents when `productDescription` lists them | | |
+| Sibling PA RISE medical-menu path still activates iHeartJane adapter | e.g. `.../philadelphia/5383/medical-menu/` | |
+| `node scripts/smoke-adapters.mjs` includes iHeartJane parse fixture | | |
+
 ## Compare tray persistence
 
 | Step | Pass? |
@@ -224,7 +237,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.20.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -312,7 +325,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.20.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -330,7 +343,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.20.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

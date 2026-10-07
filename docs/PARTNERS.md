@@ -70,6 +70,7 @@ Seeded hosts match real in-repo adapter hosts (normalized, no `www.`):
 | --- | --- | --- | --- |
 | `sunnyside.shop` | Sunnyside | `community` | Adapter hosts: `www.sunnyside.shop`, `sunnyside.shop` |
 | `zenleafdispensaries.com` | Zen Leaf | `community` | Adapter hosts: `zenleafdispensaries.com`, `www.zenleafdispensaries.com`. TerraVida/Malvern is a **path alias** on this host (`/locations/malvern/…`), not a separate ecommerce hostname. Do not add `terravidahc.com` or `terravida.com`. |
+| `risecannabis.com` | RISE | `community` | iHeartJane-powered menus under `/dispensaries/.../(medical\|recreational)-menu/`. Adapter id `iheartjane`. |
 
 Do not invent partner verification proofs. GitHub release tags (after an adapter is vendored into the zip) are community **adapter** provenance, not brand proof by themselves. Seeds stay `community` until ops flips a host after a human check.
 

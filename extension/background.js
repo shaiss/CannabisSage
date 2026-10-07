@@ -14,6 +14,10 @@ const ALLOWED_FETCH_RULES = [
   {
     hosts: ['zenleafdispensaries.com', 'www.zenleafdispensaries.com'],
     path: /^\/locations\/[^/]+\/(?:(?:medical|recreational)-menu\/)?menu\/[^/]+\/[^/]+\/?$/i
+  },
+  {
+    hosts: ['risecannabis.com', 'www.risecannabis.com'],
+    path: /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/product\/\d+\/[^/]+\/?$/i
   }
 ];
 

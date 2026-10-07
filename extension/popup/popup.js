@@ -126,7 +126,8 @@
   const STORE_LABELS = {
     sunnyside: 'Sunnyside',
     zenleaf: 'Zen Leaf',
-    terravida: 'TerraVida (Zen Leaf Malvern)'
+    terravida: 'TerraVida (Zen Leaf Malvern)',
+    iheartjane: 'RISE'
   };
 
   function fillSelect(el, entries, selected, includeBlank) {

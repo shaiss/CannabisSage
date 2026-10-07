@@ -52,6 +52,7 @@ loadScripts(
     'adapters/sunnyside.js',
     'adapters/zenleaf.js',
     'adapters/terravida.js',
+    'adapters/iheartjane.js',
     'adapters/registry.js'
   ],
   vm.createContext(sandbox)
@@ -66,6 +67,11 @@ const assert = (cond, msg) => {
 assert(CSI.adapters.sunnyside, 'sunnyside registered');
 assert(CSI.adapters.zenleaf, 'zenleaf registered');
 assert(CSI.adapters.terravida, 'terravida registered');
+assert(CSI.adapters.iheartjane, 'iheartjane registered');
+assert(
+  CSI.registry.BUILTIN_ORDER.indexOf('iheartjane') > CSI.registry.BUILTIN_ORDER.indexOf('zenleaf'),
+  'iheartjane after zenleaf'
+);
 
 const sy = CSI.registry.resolveAdapter('https://www.sunnyside.shop/products/flower');
 assert(sy?.id === 'sunnyside', `expected sunnyside got ${sy?.id}`);
@@ -106,6 +112,44 @@ assert(
   'zenleaf accepts full path'
 );
 
+const janeListing =
+  'https://risecannabis.com/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/';
+const jane = CSI.registry.resolveAdapter(janeListing);
+assert(jane?.id === 'iheartjane', `expected iheartjane got ${jane?.id}`);
+assert(jane.displayName === 'RISE', `rise displayName ${jane.displayName}`);
+assert(
+  jane.routeMode('/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/') === 'listing',
+  'jane listing route'
+);
+assert(
+  jane.routeMode(
+    '/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/product/2778500/modern-flower-skunk-hero/'
+  ) === 'pdp',
+  'jane pdp route'
+);
+assert(
+  jane.isAllowedFetchUrl(
+    'https://risecannabis.com/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/product/2778500/modern-flower-skunk-hero/'
+  ),
+  'jane fetch ok'
+);
+assert(!jane.isAllowedFetchUrl('https://risecannabis.com/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/'), 'jane listing not fetchable');
+assert(!jane.isAllowedFetchUrl('https://evil.example/product/1'), 'jane fetch block');
+assert(
+  !jane.buildProductUrl('2778500'),
+  'jane must not invent URL from bare id'
+);
+assert(
+  jane.buildProductUrl(
+    '/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/product/2778500/modern-flower-skunk-hero/'
+  ),
+  'jane accepts full path'
+);
+const janeSibling = CSI.registry.resolveAdapter(
+  'https://www.risecannabis.com/dispensaries/pennsylvania/philadelphia/5383/medical-menu/'
+);
+assert(janeSibling?.id === 'iheartjane', 'sibling RISE store uses iheartjane');
+
 // Parse sample labTests-ish HTML
 const sampleHtml = `
 <script>self.__next_f.push([1,"labTests\\":{\\"thc\\":{\\"value\\":[20.1,22.4],\\"unitAbbr\\":\\"%\\"},\\"cbd\\":null,\\"displayThc\\":{\\"value\\":[20.1,22.4],\\"unitAbbr\\":\\"%\\",\\"label\\":\\"THC\\"},\\"terpenes\\":{\\"value\\":[1.2,1.8],\\"unitAbbr\\":\\"%\\"},\\"tac\\":null},\\"saleType\\":\\"Both\\",\\"price\\":45,\\"promoPrice\\":32.5"])</script>
@@ -135,9 +179,55 @@ assert(
 );
 assert(!syParsed.provenance, 'sunnyside chem html has no provenance');
 
+// iHeartJane / RISE flight-payload sample (verified shape from live KoP PDP HTML)
+const janeHtml = `
+<script>self.__next_f.push([1,"7:[\\"$\",\\"div\\",null,{\\"percentThc\\":28.48,\\"inventoryPotencies\\":[{\\"price_id\\":\\"quarter_ounce\\",\\"cbd_potency\\":0,\\"tac_potency\\":0,\\"thc_potency\\":28.48,\\"thca_potency\\":0}],\\"productSizes\\":[{\\"label\\":\\"7g\\",\\"name\\":\\"quarter_ounce\\",\\"value\\":2778500}],\\"productDescription\\":\\"Caryophyllene: 0.418% | Humulene: 0.123% | Limonene\\\\u00a0: 0.48% | Ocimene\\\\u00a0: 0.0% | Linalool\\\\u00a0: 0.311% | Myrcene\\\\u00a0: 0.313% | Terpinolene\\\\u00a0: 0.006% | Bisabolol\\\\u00a0: 0.061% | Pinene\\\\u00a0: 0.038% | b-Pinene\\\\u00a0: 0.07% | \\\\\\\\r\\\\\\\\n--\\\\\\\\r\\\\\\\\nAll Modern Flower Cannabis products start with flower.\\",\\"price\\":28,\\"originalPrice\\":40,\\"offerText\\":\\"30% off - Storewide!\\",\\"name\\":\\"Skunk Hero\\",\\"offerTextForSegmentEvent\\":\\"30% off - Storewide!\\",\\"productId\\":2778500,\\"storeId\\":1552}]"])</script>
+<span data-testid="product-card-potency-2778500">Total THC 28.48%</span>
+`;
+const janeParsed = CSI.adapters.iheartjane.parseProductHtml(
+  janeHtml,
+  'https://risecannabis.com/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/product/2778500/modern-flower-skunk-hero/'
+);
+assert(janeParsed.cannabinoids?.THC === 28.48, `jane thc ${janeParsed.cannabinoids?.THC}`);
+assert(janeParsed.price === 28, `jane price ${janeParsed.price}`);
+assert(janeParsed.onSale === true, 'jane sale from offer/original');
+assert(janeParsed.weightText === '7g', `jane weight ${janeParsed.weightText}`);
+assert(janeParsed.name === 'Skunk Hero', `jane name ${janeParsed.name}`);
+assert(
+  Array.isArray(janeParsed.terpenes) &&
+    janeParsed.terpenes.some((t) => t.name === 'Beta-Caryophyllene' && t.percentage === 0.418),
+  'jane caryophyllene percent'
+);
+assert(
+  janeParsed.terpenes.some((t) => t.name === 'Beta-Myrcene' && t.percentage === 0.313),
+  'jane myrcene percent'
+);
+assert(
+  janeParsed.terpenes.some((t) => t.name === 'Beta-Pinene' && t.percentage === 0.07),
+  'jane b-pinene percent'
+);
+assert(
+  !janeParsed.terpenes.some((t) => t.name === 'Ocimene'),
+  'jane skips zero-percent ocimene'
+);
+assert(janeParsed.provenance?.source === '2778500', 'jane menu source is product id');
+assert(jane.bridgeStrategy === 'none', 'jane bridge is none');
+assert(jane.pdpChemSurface === 'floating-panel', 'jane PDP chem is floating panel');
+assert(
+  jane.shouldSuppressListingCannabinoidBadges({
+    textContent: 'Black Maple Total THC 46.24% $45.50/ea',
+    querySelector: (sel) =>
+      String(sel).includes('product-card-potency')
+        ? { textContent: 'Total THC 46.24%' }
+        : null,
+    closest: () => null
+  }) === true,
+  'jane suppresses duplicate THC listing badge'
+);
+
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.20', 'version bump');
+assert(manifest.version === '1.3.21', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -207,7 +297,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.20', 'core version 1.3.20');
+assert(CSI.VERSION === '1.3.21', 'core version 1.3.21');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -215,7 +305,7 @@ assert(/cannabinoids/i.test(addsCopy) && /primary terps/i.test(addsCopy), 'chip 
 assert(!/\bstrain\b/i.test(addsCopy), 'chip does not frame by strain name');
 assert(!/hover profile/i.test(addsCopy), 'chip does not call hover a product profile');
 assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
-assert(!/sunnyside|zen\s*leaf|zenleaf|terravida/i.test(addsCopy), 'no retailer brand in chip copy');
+assert(!/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane/i.test(addsCopy), 'no retailer brand in chip copy');
 assert(
   !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(addsCopy),
   'no medical or effects claims in chip copy'
@@ -1061,12 +1151,26 @@ assert(
       'https://sunnyside.shop/*',
       'https://zenleafdispensaries.com/*',
       'https://www.zenleafdispensaries.com/*',
+      'https://risecannabis.com/*',
+      'https://www.risecannabis.com/*',
       'https://cannabissage.app/*',
       'https://cannabissage.vercel.app/*',
       'http://localhost:3000/*',
       'https://localhost:3000/*'
     ]),
-  'host permissions unchanged'
+  'host permissions include RISE + prior retailers'
+);
+assert(
+  manifest.content_scripts?.[1]?.js?.includes('adapters/iheartjane.js'),
+  'iheartjane content script listed'
+);
+assert(
+  manifest.content_scripts?.[0]?.matches?.some((m) => /risecannabis\.com\/dispensaries\//.test(m)),
+  'bridge matches RISE dispensaries'
+);
+assert(
+  manifest.web_accessible_resources?.[0]?.matches?.includes('https://risecannabis.com/*'),
+  'WAR matches RISE'
 );
 
 const zlFlower = {

@@ -1,6 +1,6 @@
 # Privacy Policy — CannabisSage
 
-**Last updated:** October 5, 2026  
+**Last updated:** October 6, 2026  
 **Extension version covered:** 1.3.x
 
 CannabisSage is a Chrome extension that helps shoppers view cannabinoid and terpene information on supported retailer product listing and detail pages, compare a small number of products, filter/sort visible cards, and score products against a local taste preference map. Optional **Pro** features unlock after a subscription purchased on the CannabisSage website via **Stripe Checkout** (not inside the extension).
@@ -40,6 +40,7 @@ CannabisSage does **not**:
 | --- | --- |
 | `https://www.sunnyside.shop/*`, `https://sunnyside.shop/*` | Supported retailer listings/PDPs and same-site product HTML on this host. |
 | `https://zenleafdispensaries.com/*`, `https://www.zenleafdispensaries.com/*` | Supported retailer menus/PDPs and same-site product HTML on this host (including location path aliases). |
+| `https://risecannabis.com/*`, `https://www.risecannabis.com/*` | Supported retailer menus/PDPs and same-site product HTML on this host (iHeartJane-powered RISE medical menus). |
 | `https://cannabissage.app/*` | Primary production origin: entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep links; remote denylist JSON; public partners JSON. |
 | `https://cannabissage.vercel.app/*` | Vercel deployment fallback for the same APIs, deep links, denylist, and partners JSON. |
 | `http://localhost:3000/*` (unpacked local/dev only) | Same entitlement APIs / denylist / partners JSON when running `web/` locally; keep for unpacked testing. Override via `chrome.storage.local.csi_api_base` or edit `data/config.json`. |
@@ -50,7 +51,7 @@ CannabisSage does **not**:
 
 ## Third parties
 
-- Retailer hosts you already browse (`sunnyside.shop`, `zenleafdispensaries.com`)
+- Retailer hosts you already browse (`sunnyside.shop`, `zenleafdispensaries.com`, `risecannabis.com`)
 - **Stripe** (Checkout, Billing, Customer Portal) when you purchase or manage Pro — see [Stripe Privacy Policy](https://stripe.com/privacy)
 
 ## Children

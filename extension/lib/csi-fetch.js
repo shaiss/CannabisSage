@@ -94,6 +94,10 @@
       cardEl.dataset.csiBridgeId = marker;
       const adapter = CSI.registry?.getActiveAdapter?.();
       const strategy = adapter?.bridgeStrategy || 'sunnyside';
+      if (strategy === 'none') {
+        resolve(null);
+        return;
+      }
 
       const onMessage = (event) => {
         if (event.source !== window) return;

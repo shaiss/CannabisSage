@@ -315,6 +315,16 @@ const libertyWww =
 assert(CSI.profile.productKeyFromUrl(libertyPdp), 'dutchie liberty PDP key accepted');
 assert(CSI.profile.productKeyFromUrl(libertyWww), 'www.dutchie.com liberty PDP key accepted');
 assert(
+  !CSI.profile.productKeyFromUrl('https://www.www.dutchie.com/anything'),
+  'www.www.dutchie.com rejected (one-prefix strip must not leave www.dutchie.com)'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://www.www.dutchie.com/embedded-menu/liberty-norristown/product/foo'
+  ),
+  'www.www.dutchie.com liberty-looking PDP rejected'
+);
+assert(
   !CSI.profile.productKeyFromUrl(
     'https://dutchie.com/embedded-menu/other-dispensary/product/foo'
   ),
@@ -329,6 +339,38 @@ assert(
 assert(
   !CSI.profile.productKeyFromUrl('http://dutchie.com/embedded-menu/liberty-norristown/product/x'),
   'non-https dutchie rejected'
+);
+// HOST_OK: Dutchie apex/www only — reject arbitrary *.dutchie.com and lookalike hosts
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://evil.dutchie.com/embedded-menu/liberty-norristown/product/foo'
+  ),
+  'evil.dutchie.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://evil.dutchie.com/anything'),
+  'evil.dutchie.com arbitrary path rejected (must not skip Liberty PDP check)'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://shop.dutchie.com/embedded-menu/liberty-norristown/product/foo'
+  ),
+  'shop.dutchie.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://dutchie.com.evil.net/embedded-menu/liberty-norristown/product/foo'
+  ),
+  'dutchie.com.evil.net lookalike host rejected'
+);
+// Other partner hosts unchanged (subdomains still allowed where previously allowed)
+assert(
+  CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/abc-1'),
+  'sunnyside product key still accepted'
+);
+assert(
+  CSI.profile.productKeyFromUrl('https://menu.sunnyside.shop/product/abc-1'),
+  'sunnyside subdomain product key still accepted'
 );
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));

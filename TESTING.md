@@ -249,7 +249,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -324,6 +324,8 @@ Pro only, same `multiStore` gate. From the cross-store section: each allowlisted
 
 Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is written until **Save a local taste profile** is on and the shopper saves. Structured chem fields only (enums, known terpene ids, adapter store ids, brands from listed products). No notes field. Turning the opt-in off and saving keeps the key with `enabled: false` (all fields including bought-before retained); the popup reloads those fields so re-enable is not a blank rewrite. **Delete** removes the whole key. Export stays available while data exists. Deal-listing preference and per-trip budget are stored only — they do not influence Free similar-by-chem or ranking. Bought-before flags (re-buy / fine / never again) sit on listing cards and the product panel when the profile is on. Pro taste-map match stays Pro; an enabled profile can add liked/avoid terpenes into that map for scoring without unlocking Map match on Free.
 
+**v1.3.23:** Dutchie taste-profile product keys accept only `dutchie.com` / `www.dutchie.com` (apex after one `www.` strip). `evil.dutchie.com`, `shop.dutchie.com`, and `www.www.dutchie.com` must not yield a product key (`smoke-profile.mjs`).
+
 | Step | Pass? |
 | --- | --- |
 | Fresh install: popup profile is off; `chrome.storage.local` has no `csi_taste_profile` | |
@@ -337,7 +339,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -355,7 +357,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

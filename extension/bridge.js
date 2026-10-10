@@ -281,8 +281,9 @@
       ['Linalool', /linalool/i],
       ['Beta-Myrcene', /beta[\s-]?myrcene|myrcene/i],
       ['Beta-Pinene', /beta[\s-]?pinene/i],
-      // Bare "pinene" must not match Beta-Pinene (hyphen/letter lookbehind).
-      ['Alpha-Pinene', /alpha[\s-]?pinene|(?<![a-z-])pinene/i],
+      // Bare "pinene" must not match Beta-Pinene / "Beta Pinene" (beta prefix or hyphen/letter).
+      // Do not ban whitespace before pinene — that would reject legit "Pinene 1%" / "Terpenes: Pinene 0.5%".
+      ['Alpha-Pinene', /alpha[\s-]?pinene|(?<!beta[\s-]?)(?<![a-z-])pinene/i],
       ['Ocimene', /ocimene/i],
       ['Terpinolene', /terpinolene/i],
       ['Bisabolol', /bisabolol/i],

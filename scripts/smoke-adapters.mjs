@@ -315,6 +315,44 @@ assert(
   'dutchie bare pinene does not steal beta-pinene %'
 );
 
+// bridge.js dutchieNamedTerpenes: space-separated Beta Pinene must not also yield Alpha-Pinene;
+// bare Pinene (space/newline/start) and Alpha Pinene must still map to Alpha-Pinene.
+function bridgeDutchieNamedTerpenes(text) {
+  const canon = [
+    ['Beta-Pinene', /beta[\s-]?pinene/i],
+    ['Alpha-Pinene', /alpha[\s-]?pinene|(?<!beta[\s-]?)(?<![a-z-])pinene/i]
+  ];
+  const out = [];
+  const src = String(text || '');
+  canon.forEach(([name, nameRe]) => {
+    const re = new RegExp(`(?:${nameRe.source})\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
+    let m;
+    while ((m = re.exec(src)) !== null) {
+      const pct = parseFloat(m[1]);
+      if (Number.isNaN(pct) || pct <= 0 || pct > 100) continue;
+      const existing = out.find((t) => t.name === name);
+      if (!existing) out.push({ name, percentage: pct });
+      else if (pct > existing.percentage) existing.percentage = pct;
+    }
+  });
+  return out;
+}
+for (const text of ['Beta Pinene: 1%', 'Beta-Pinene 1%']) {
+  const named = bridgeDutchieNamedTerpenes(text);
+  assert(
+    named.length === 1 && named[0].name === 'Beta-Pinene' && named[0].percentage === 1,
+    `bridge only Beta-Pinene for ${JSON.stringify(text)}`
+  );
+}
+for (const text of ['Alpha Pinene: 1%', 'alpha-pinene 1%', 'Pinene 1%', ' Terpenes: Pinene 0.5%', '\nPinene 1%']) {
+  const named = bridgeDutchieNamedTerpenes(text);
+  const expectPct = text.includes('0.5') ? 0.5 : 1;
+  assert(
+    named.length === 1 && named[0].name === 'Alpha-Pinene' && named[0].percentage === expectPct,
+    `bridge Alpha-Pinene for ${JSON.stringify(text)}`
+  );
+}
+
 // Presence-only marketing badge must not borrow nearby THC/TERPS %
 const dutchieBadgeHtml = `<body><div>High Limonene</div><span>THC: 31.86%</span><span>TERPS: 1.89%</span></body>`;
 const dutchieBadge = CSI.adapters.dutchie.parseProductHtml(
@@ -336,8 +374,12 @@ assert(
 
 const bridgeSrcDutchie = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
 assert(
-  bridgeSrcDutchie.includes('(?<![a-z-])pinene'),
-  'bridge Alpha-Pinene lookbehind excludes hyphen (no beta double-count)'
+  bridgeSrcDutchie.includes('(?<!beta[\\s-]?)(?<![a-z-])pinene'),
+  'bridge Alpha-Pinene lookbehind excludes beta prefix and hyphen (no beta double-count)'
+);
+assert(
+  !bridgeSrcDutchie.includes('(?<![a-z\\s-])pinene'),
+  'bridge does not ban whitespace before bare pinene (keeps "Pinene 1%")'
 );
 assert(
   !/nameRe\.source\)\[\^0-9%\]\{0,16\}/.test(bridgeSrcDutchie),

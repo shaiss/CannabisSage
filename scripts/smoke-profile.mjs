@@ -302,12 +302,43 @@ assert(listingSrc.includes('tasteProfile: state.profile'), 'listing badges recei
 
 const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
 assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');
+assert(popupJs.includes("dutchie: 'Liberty Norristown'"), 'dutchie store label in popup');
+assert(CSI.profile.STORE_IDS.includes('dutchie'), 'dutchie in profile store ids');
 assert(popupJs.includes("zenleaf: 'Zen Leaf'"), 'Zen Leaf label in popup');
 assert(popupJs.includes("iheartjane: 'RISE'"), 'RISE label in popup');
 
+// Dutchie embedded-menu product URLs must be accepted for bought-before / picks keys
+const libertyPdp =
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/frosted-jungle-3-5g-92815';
+const libertyWww =
+  'https://www.dutchie.com/embedded-menu/liberty-norristown/product/swampwater-fumez-3-5g';
+assert(CSI.profile.productKeyFromUrl(libertyPdp), 'dutchie liberty PDP key accepted');
+assert(CSI.profile.productKeyFromUrl(libertyWww), 'www.dutchie.com liberty PDP key accepted');
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://dutchie.com/embedded-menu/other-dispensary/product/foo'
+  ),
+  'unverified dutchie slug rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://dutchie.com/embedded-menu/liberty-norristown/products/flower'
+  ),
+  'dutchie listing path rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('http://dutchie.com/embedded-menu/liberty-norristown/product/x'),
+  'non-https dutchie rejected'
+);
+
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.21', 'manifest 1.3.21');
+assert(manifest.version === '1.3.22', 'manifest 1.3.22');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
-assert(manifest.content_scripts[1].js.includes('lib/csi-profile.js'), 'profile content script');
+assert(
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-profile.js')
+  ),
+  'profile content script'
+);
 
 console.log('smoke-profile: OK');

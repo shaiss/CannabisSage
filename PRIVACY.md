@@ -41,6 +41,8 @@ CannabisSage does **not**:
 | `https://www.sunnyside.shop/*`, `https://sunnyside.shop/*` | Supported retailer listings/PDPs and same-site product HTML on this host. |
 | `https://zenleafdispensaries.com/*`, `https://www.zenleafdispensaries.com/*` | Supported retailer menus/PDPs and same-site product HTML on this host (including location path aliases). |
 | `https://risecannabis.com/*`, `https://www.risecannabis.com/*` | Supported retailer menus/PDPs and same-site product HTML on this host (iHeartJane-powered RISE medical menus). |
+| `https://dutchie.com/*`, `https://www.dutchie.com/*` | Dutchie embedded-menu iframe documents for verified tenants (content scripts path-scoped to `/embedded-menu/*`; PDP HTML fetch allowlisted per verified slug). |
+| `https://libertycannabis.com/*`, `https://www.libertycannabis.com/*` | Liberty Cannabis shop entry pages that host the Dutchie embed for Norristown (thin parent shell). |
 | `https://cannabissage.app/*` | Primary production origin: entitlement activate/validate against the CannabisSage API; Upgrade/Manage deep links; remote denylist JSON; public partners JSON. |
 | `https://cannabissage.vercel.app/*` | Vercel deployment fallback for the same APIs, deep links, denylist, and partners JSON. |
 | `http://localhost:3000/*` (unpacked local/dev only) | Same entitlement APIs / denylist / partners JSON when running `web/` locally; keep for unpacked testing. Override via `chrome.storage.local.csi_api_base` or edit `data/config.json`. |
@@ -51,7 +53,7 @@ CannabisSage does **not**:
 
 ## Third parties
 
-- Retailer hosts you already browse (`sunnyside.shop`, `zenleafdispensaries.com`, `risecannabis.com`)
+- Retailer hosts you already browse (`sunnyside.shop`, `zenleafdispensaries.com`, `risecannabis.com`, `dutchie.com` embedded menus, `libertycannabis.com`)
 - **Stripe** (Checkout, Billing, Customer Portal) when you purchase or manage Pro — see [Stripe Privacy Policy](https://stripe.com/privacy)
 
 ## Children

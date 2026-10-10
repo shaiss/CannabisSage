@@ -54,6 +54,18 @@ Checks per listing:
 | Tap a terpene → glossary note + disclaimer | |
 | **Add to compare** updates persistent tray | |
 
+## Dutchie / Liberty Norristown — smoke
+
+| Step | URL / action | Pass? |
+| --- | --- | --- |
+| Liberty parent shop (thin WP shell; top-frame only) | https://libertycannabis.com/shop/norristown/ | |
+| Flower listing inside embed (`all_frames` only on dutchie.com/embedded-menu) | https://dutchie.com/embedded-menu/liberty-norristown/products/flower | |
+| Filter bar shows **Liberty Norristown** | | |
+| Cards show on-card THC + TERPS (listing bar-ready); named terps optional | | |
+| Open a PDP; panel shows named cannabinoids + named terpene % | e.g. `/product/swampwater-fumez-3-5g` | |
+| Unverified Dutchie slug does not activate | | |
+| `node scripts/smoke-adapters.mjs` covers dutchie parse + slug allowlist | | |
+
 ## Zen Leaf — smoke
 
 | Step | URL / action | Pass? |
@@ -237,7 +249,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -325,7 +337,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -343,7 +355,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.21.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.22.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

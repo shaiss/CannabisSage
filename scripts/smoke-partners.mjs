@@ -31,12 +31,14 @@ assert(Array.isArray(partnersDoc.partners) && partnersDoc.partners.length >= 1, 
 
 const parsed = parsePartnersDocument(partnersDoc);
 assert(parsed, 'partners payload parses');
-assert(parsed.partners.length === 3, 'three unique seeded hosts');
+assert(parsed.partners.length === 5, 'five unique seeded hosts');
 
 const hosts = parsed.partners.map((p) => p.host);
 assert(hosts.includes('sunnyside.shop'), 'sunnyside.shop seeded');
 assert(hosts.includes('zenleafdispensaries.com'), 'zenleafdispensaries.com seeded');
 assert(hosts.includes('risecannabis.com'), 'risecannabis.com seeded');
+assert(hosts.includes('dutchie.com'), 'dutchie.com seeded');
+assert(hosts.includes('libertycannabis.com'), 'libertycannabis.com seeded');
 assert(!hosts.includes('www.sunnyside.shop'), 'www. stripped in parse');
 assert(!hosts.some((h) => /terravidahc|terravida\.com/.test(h)), 'no invented TerraVida host');
 
@@ -138,9 +140,11 @@ assert(cfg.denylistPath === '/denylist.json', 'denylistPath unchanged');
 
 const ext = path.join(root, 'extension');
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.21', 'extension 1.3.21');
+assert(manifest.version === '1.3.22', 'extension 1.3.22');
 assert(
-  manifest.content_scripts?.[1]?.js?.includes('lib/csi-partners.js'),
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-partners.js')
+  ),
   'csi-partners.js in content scripts'
 );
 assert(

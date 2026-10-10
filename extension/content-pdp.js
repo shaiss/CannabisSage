@@ -71,29 +71,74 @@
 
     if (needsFetch) {
       const data = await CSI.fetchProductDetails(url);
-      if (data.error) {
-        const failed = { ...product, url, status: 'error', error: data.error };
-        failed.price = failed.price ?? CSI.parsePrice(document.body?.innerText || '');
-        await attachDealVsMedian(failed);
-        await attachPreferenceMatch(failed);
-        await attachSimilarByChem(failed);
-        await attachCrossStoreSoftMatch(failed);
-        return failed;
+      const adapter = CSI.registry?.getActiveAdapter?.() || CSI.registry?.resolveAdapter?.(url);
+      let parsed = data && !data.error ? data : null;
+      // SPA embeds (e.g. Dutchie) often block background HTML fetch — scrape live DOM.
+      const stillNeedsChem =
+        !parsed ||
+        !CSI.hasCannabinoidInfo(parsed.cannabinoids) ||
+        !CSI.hasDetailedTerpeneBreakdown(parsed.terpenes);
+      if (stillNeedsChem && adapter?.parseProductHtml && document.documentElement) {
+        try {
+          const live = adapter.parseProductHtml(document.documentElement.outerHTML, url);
+          if (live && (CSI.hasCannabinoidInfo(live.cannabinoids) || CSI.hasTerpeneInfo(live.terpenes))) {
+            parsed = {
+              ...(parsed || {}),
+              ...live,
+              cannabinoids: { ...(parsed?.cannabinoids || {}), ...(live.cannabinoids || {}) },
+              terpenes: CSI.hasDetailedTerpeneBreakdown(live.terpenes)
+                ? live.terpenes
+                : live.terpenes || parsed?.terpenes,
+              url: live.url || parsed?.url || url,
+              status: 'ok'
+            };
+          }
+        } catch {
+          /* ignore live scrape errors */
+        }
       }
-      product = {
-        ...product,
-        url: data.url || url,
-        name: data.name || product.name || document.querySelector('h1')?.textContent?.trim(),
-        weightText: data.weightText || product.weightText,
-        brand: data.brand || product.brand,
-        adapterId: data.adapterId || product.adapterId,
-        cannabinoids: { ...(product.cannabinoids || {}), ...(data.cannabinoids || {}) },
-        terpenes: data.terpenes || product.terpenes,
-        price: data.price ?? product.price ?? CSI.parsePrice(document.body.innerText),
-        status: data.status || 'ok'
-      };
-      const mergedProvenance = CSI.mergeProvenance?.(product.provenance, data.provenance);
-      if (mergedProvenance) product.provenance = mergedProvenance;
+      if (!parsed) {
+        const hasChem =
+          CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes);
+        if (!hasChem) {
+          const failed = {
+            ...product,
+            url,
+            status: 'error',
+            error: (data && data.error) || 'Failed to load chem'
+          };
+          failed.price = failed.price ?? CSI.parsePrice(document.body?.innerText || '');
+          await attachDealVsMedian(failed);
+          await attachPreferenceMatch(failed);
+          await attachSimilarByChem(failed);
+          await attachCrossStoreSoftMatch(failed);
+          return failed;
+        }
+        // Keep bridge / listing chem when PDP HTML fetch fails (Cloudflare on Dutchie).
+        product = { ...product, url, status: 'ok' };
+      } else {
+        const parsedTerpenes = CSI.hasTerpeneInfo(parsed.terpenes) ? parsed.terpenes : null;
+        product = {
+          ...product,
+          url: parsed.url || url,
+          name: parsed.name || product.name || document.querySelector('h1')?.textContent?.trim(),
+          weightText: parsed.weightText || product.weightText,
+          brand: parsed.brand || product.brand,
+          adapterId: parsed.adapterId || product.adapterId || adapter?.id,
+          cannabinoids: { ...(product.cannabinoids || {}), ...(parsed.cannabinoids || {}) },
+          terpenes: CSI.hasDetailedTerpeneBreakdown(parsedTerpenes)
+            ? parsedTerpenes
+            : parsedTerpenes || product.terpenes,
+          price: parsed.price ?? product.price ?? CSI.parsePrice(document.body.innerText),
+          status:
+            parsed.status === 'empty' &&
+            (CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes))
+              ? 'ok'
+              : parsed.status || 'ok'
+        };
+        const mergedProvenance = CSI.mergeProvenance?.(product.provenance, parsed.provenance);
+        if (mergedProvenance) product.provenance = mergedProvenance;
+      }
     }
 
     const empty =

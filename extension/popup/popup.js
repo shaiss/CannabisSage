@@ -127,7 +127,8 @@
     sunnyside: 'Sunnyside',
     zenleaf: 'Zen Leaf',
     terravida: 'TerraVida (Zen Leaf Malvern)',
-    iheartjane: 'RISE'
+    iheartjane: 'RISE',
+    dutchie: 'Liberty Norristown'
   };
 
   function fillSelect(el, entries, selected, includeBlank) {

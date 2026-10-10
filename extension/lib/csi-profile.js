@@ -19,7 +19,7 @@
   const POTENCY_BANDS = Object.freeze(['under-15', '15-25', '25-plus']);
   const FLAGS = Object.freeze(['rebuy', 'fine', 'never']);
   const DEAL_TIERS = Object.freeze(['any', 'sale', 'below-median']);
-  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane']);
+  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane', 'dutchie']);
   const ALLOWED_KEYS = Object.freeze([
     'schemaVersion',
     'enabled',
@@ -40,7 +40,10 @@
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
   const HOST_OK =
-    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$/i;
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|(^|\.)dutchie\.com$/i;
+  /** Fallback when Dutchie adapter is not loaded (e.g. minimal smoke harness). */
+  const DUTCHIE_VERIFIED_PRODUCT_RE =
+    /^\/embedded-menu\/liberty-norristown\/product\/[^/]+\/?$/i;
 
   const COPY = Object.freeze({
     title: 'Local taste profile',
@@ -216,8 +219,18 @@
       return null;
     }
     if (parsed.protocol !== 'https:') return null;
-    if (!HOST_OK.test(parsed.hostname.replace(/^www\./i, '')) && !HOST_OK.test(parsed.hostname)) return null;
+    const bareHost = parsed.hostname.replace(/^www\./i, '');
+    if (!HOST_OK.test(bareHost) && !HOST_OK.test(parsed.hostname)) return null;
     if (parsed.username || parsed.password || parsed.hash) return null;
+    // Dutchie: only verified Liberty embedded-menu product PDPs (adapter allowlist when present).
+    if (/^dutchie\.com$/i.test(bareHost)) {
+      if (CSI.adapters?.dutchie?.buildProductUrl) {
+        const built = CSI.adapters.dutchie.buildProductUrl(parsed.href);
+        if (!built) return null;
+        return built.replace(/\/$/, '');
+      }
+      if (!DUTCHIE_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
+    }
     return parsed.href.replace(/\/$/, '');
   }
 

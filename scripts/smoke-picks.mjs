@@ -96,6 +96,7 @@ loadScripts(
     'adapters/zenleaf.js',
     'adapters/terravida.js',
     'adapters/iheartjane.js',
+    'adapters/dutchie.js',
     'adapters/registry.js',
     'lib/csi-entitlement.js',
     'lib/csi-features.js',
@@ -111,7 +112,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.21', 'core version 1.3.21');
+assert(CSI.VERSION === '1.3.22', 'core version 1.3.22');
 assert(CSI.picks, 'picks module');
 assert(CSI.picks.FEATURE_ID === 'picksForYou', 'feature id');
 assert(CSI.features.PRO_FEATURES.picksForYou === true, 'picksForYou is Pro');
@@ -592,11 +593,20 @@ assert(popupJs.includes('picksLoadVersion'), 'popup ignores stale picks loads');
 assert(popupJs.includes('picks-upgrade') && popupJs.includes('openUpgrade'), 'Free upsell uses Upgrade');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.21', 'manifest 1.3.21');
+assert(manifest.version === '1.3.22', 'manifest 1.3.22');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
-const contentJs = manifest.content_scripts?.[1]?.js || [];
-assert(!contentJs.includes('lib/csi-picks.js'), 'picks not injected into host pages');
-assert(contentJs.includes('lib/csi-profile.js'), 'profile still available to content scripts');
+const isolatedJs =
+  (manifest.content_scripts || []).find(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('lib/csi-profile.js')
+  )?.js || [];
+assert(!isolatedJs.includes('lib/csi-picks.js'), 'picks not injected into host pages');
+assert(isolatedJs.includes('lib/csi-profile.js'), 'profile still available to content scripts');
+assert(
+  !(manifest.content_scripts || []).some(
+    (cs) => cs.all_frames === true && (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis/.test(m))
+  ),
+  'all_frames scoped to Dutchie embedded-menu only'
+);
 
 // Simulate host-page product data sanitizer still strips profile
 loadScripts(['lib/csi-fetch.js'], sandbox);

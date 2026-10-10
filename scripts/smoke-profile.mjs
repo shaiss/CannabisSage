@@ -315,6 +315,16 @@ const libertyWww =
 assert(CSI.profile.productKeyFromUrl(libertyPdp), 'dutchie liberty PDP key accepted');
 assert(CSI.profile.productKeyFromUrl(libertyWww), 'www.dutchie.com liberty PDP key accepted');
 assert(
+  !CSI.profile.productKeyFromUrl('https://www.www.dutchie.com/anything'),
+  'www.www.dutchie.com rejected (one-prefix strip must not leave www.dutchie.com)'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://www.www.dutchie.com/embedded-menu/liberty-norristown/product/foo'
+  ),
+  'www.www.dutchie.com liberty-looking PDP rejected'
+);
+assert(
   !CSI.profile.productKeyFromUrl(
     'https://dutchie.com/embedded-menu/other-dispensary/product/foo'
   ),

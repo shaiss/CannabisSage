@@ -7,10 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.22 |
+| **Version** | 1.3.23 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
+
+## Release notes (v1.3.23)
+
+Security: taste-profile `HOST_OK` in `csi-profile` now accepts only `dutchie.com` apex and `www.dutchie.com` (after a single `www.` strip). Arbitrary `*.dutchie.com` subdomains and repeated-`www` hosts are rejected so they cannot bypass the Liberty Norristown embedded-menu PDP path check. No new hosts, permissions, or adapter behavior.
 
 ## Short description (≤ 132 characters)
 
@@ -103,7 +107,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.22.zip` (includes iHeartJane 1.3.21 + Dutchie Liberty).
+4. Upload `dist/cannabis-sage-1.3.23.zip` (includes iHeartJane + Dutchie Liberty; v1.3.23 tightens taste-profile `HOST_OK` to dutchie.com apex/www only).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

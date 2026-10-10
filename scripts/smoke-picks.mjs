@@ -112,7 +112,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.22', 'core version 1.3.22');
+assert(CSI.VERSION === '1.3.23', 'core version 1.3.23');
 assert(CSI.picks, 'picks module');
 assert(CSI.picks.FEATURE_ID === 'picksForYou', 'feature id');
 assert(CSI.features.PRO_FEATURES.picksForYou === true, 'picksForYou is Pro');
@@ -593,7 +593,7 @@ assert(popupJs.includes('picksLoadVersion'), 'popup ignores stale picks loads');
 assert(popupJs.includes('picks-upgrade') && popupJs.includes('openUpgrade'), 'Free upsell uses Upgrade');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.22', 'manifest 1.3.22');
+assert(manifest.version === '1.3.23', 'manifest 1.3.23');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
 const isolatedJs =
   (manifest.content_scripts || []).find(

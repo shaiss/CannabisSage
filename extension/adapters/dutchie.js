@@ -270,13 +270,14 @@
     const compact = head.replace(/\s+/g, '').toUpperCase();
     if (/^THCA/.test(compact)) return 'THCA';
     if (/^THC/.test(compact)) return 'THC';
+    // Longer CBD* prefixes before bare CBD (CBDV/CBDA must not collapse to CBD).
     if (/^CBDA/.test(compact)) return 'CBDA';
+    if (/^CBDV/.test(compact)) return 'CBDV';
     if (/^CBD/.test(compact)) return 'CBD';
     if (/^CBGA/.test(compact)) return 'CBGA';
     if (/^CBG/.test(compact)) return 'CBG';
     if (/^CBN/.test(compact)) return 'CBN';
     if (/^CBC/.test(compact)) return 'CBC';
-    if (/^CBDV/.test(compact)) return 'CBDV';
     return null;
   }
 
@@ -301,11 +302,22 @@
     return out;
   }
 
+  function terpeneKeyPattern(rawKey) {
+    const escaped = CSI.escapeRegExp(rawKey);
+    const lower = String(rawKey).toLowerCase();
+    // Bare "pinene" must not match inside "beta-pinene" / "Alpha-Pinene".
+    if (lower === 'pinene') return `(?<![a-z-])${escaped}`;
+    // "a-pinene" must not match the suffix of "Beta-Pinene".
+    if (lower === 'a-pinene' || lower === 'b-pinene') return `(?<![a-z])${escaped}`;
+    return escaped;
+  }
+
   function parseNamedTerpenesFromText(text) {
     const results = [];
     CSI.TERPENE_CANON.forEach(({ name, keys }) => {
-      const syn = keys.map((s) => CSI.escapeRegExp(s)).join('|');
-      const re = new RegExp(`(?:${syn})[^0-9%]{0,16}([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
+      const syn = keys.map((s) => terpeneKeyPattern(s)).join('|');
+      // Require name → optional :/- → % with no other letters between (blocks "High Limonene" + nearby THC%).
+      const re = new RegExp(`(?:${syn})\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
       let m;
       while ((m = re.exec(text)) !== null) {
         const pct = parseFloat(m[1]);
@@ -321,23 +333,25 @@
   function parseProductHtml(html, url) {
     const cannabinoids = {};
     const terpenes = [];
-    const text = String(html || '').replace(/<script[\s\S]*?<\/script>/gi, ' ');
+    // Keep raw HTML for GraphQL-ish JSON that lives inside <script>; strip scripts for visible labels.
+    const raw = String(html || '');
+    const text = raw.replace(/<script[\s\S]*?<\/script>/gi, ' ');
 
-    // GraphQL-ish embedded fields
-    const thcRange = text.match(/"THCContent"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
+    // GraphQL-ish embedded fields (serialized in page scripts / JSON payloads)
+    const thcRange = raw.match(/"THCContent"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
     if (thcRange) {
       const v = midRange(thcRange[1].split(',').map((s) => parseFloat(s.trim())));
       if (v != null) cannabinoids.THC = v;
     }
-    const cbdRange = text.match(/"CBDContent"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
+    const cbdRange = raw.match(/"CBDContent"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
     if (cbdRange) {
       const v = midRange(cbdRange[1].split(',').map((s) => parseFloat(s.trim())));
       if (v != null) cannabinoids.CBD = v;
     }
-    Object.assign(cannabinoids, parseCannabinoidsV2(text));
+    Object.assign(cannabinoids, parseCannabinoidsV2(raw));
 
     let totalTerpenes = null;
-    const terpRange = text.match(/"totalTerpenes"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
+    const terpRange = raw.match(/"totalTerpenes"\s*:\s*\{[^}]*"range"\s*:\s*\[([0-9.,\s]+)\]/);
     if (terpRange) {
       totalTerpenes = midRange(terpRange[1].split(',').map((s) => parseFloat(s.trim())));
     }
@@ -379,8 +393,8 @@
     let name;
     const nameMatch =
       plain.match(/\b([A-Z][A-Za-z0-9'’\-\s|]+?\|\s*\d+(?:\.\d+)?g)\b/) ||
-      text.match(/property="og:title"\s+content="([^"]+)"/i) ||
-      text.match(/"Name"\s*:\s*"([^"]+)"/);
+      raw.match(/property="og:title"\s+content="([^"]+)"/i) ||
+      raw.match(/"Name"\s*:\s*"([^"]+)"/);
     if (nameMatch) name = nameMatch[1].trim();
     else {
       try {

@@ -158,28 +158,47 @@
 
     if (url && needsFetch) {
       const data = await CSI.fetchProductDetails(url);
+      const hasListingChem =
+        CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes);
       if (data.error) {
-        product = { ...product, url, error: data.error, status: 'error' };
+        // Cloudflare / empty PDP fetch must not wipe on-card listing chem (Dutchie THC/TERPS).
+        if (hasListingChem) {
+          product = { ...product, url, status: 'ok' };
+        } else {
+          product = { ...product, url, error: data.error, status: 'error' };
+          CSI.storeElementProduct(cardEl, product);
+          renderBadges(cardEl, product, 'error');
+          return product;
+        }
+      } else {
+        const fetchTerpenes = CSI.hasTerpeneInfo(data.terpenes) ? data.terpenes : null;
+        const fetchHasDetailed = CSI.hasDetailedTerpeneBreakdown(fetchTerpenes);
+        product = {
+          ...product,
+          url: data.url || url,
+          name: data.name || product.name,
+          cannabinoids: { ...(product.cannabinoids || {}), ...(data.cannabinoids || {}) },
+          // Prefer detailed PDP terps; otherwise keep listing totals (do not replace with []).
+          terpenes: fetchHasDetailed
+            ? fetchTerpenes
+            : fetchTerpenes || product.terpenes,
+          price: data.price ?? product.price,
+          status: data.status === 'empty' && hasListingChem ? 'ok' : data.status || 'ok'
+        };
+        const mergedProvenance = CSI.mergeProvenance?.(product.provenance, data.provenance);
+        if (mergedProvenance) product.provenance = mergedProvenance;
+      }
+    } else if (!url) {
+      const hasListingChem =
+        CSI.hasCannabinoidInfo(product.cannabinoids) || CSI.hasTerpeneInfo(product.terpenes);
+      if (hasListingChem) {
+        product = { ...product, status: 'ok' };
+      } else {
+        product = { ...product, status: 'error', error: 'Unable to find product URL' };
         CSI.storeElementProduct(cardEl, product);
         renderBadges(cardEl, product, 'error');
         return product;
       }
-      product = {
-        ...product,
-        url: data.url || url,
-        name: data.name || product.name,
-        cannabinoids: { ...(product.cannabinoids || {}), ...(data.cannabinoids || {}) },
-        terpenes: data.terpenes || product.terpenes,
-        price: data.price ?? product.price,
-        status: data.status || 'ok'
-      };
-      const mergedProvenance = CSI.mergeProvenance?.(product.provenance, data.provenance);
-      if (mergedProvenance) product.provenance = mergedProvenance;
-    } else if (!url) {
-      product = { ...product, status: 'error', error: 'Unable to find product URL' };
-      CSI.storeElementProduct(cardEl, product);
-      renderBadges(cardEl, product, 'error');
-      return product;
     }
 
     if (CSI.features?.can?.('tasteMap') && state.tasteMap) {

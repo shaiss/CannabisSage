@@ -273,6 +273,78 @@ assert(
 );
 assert(CSI.adapters.dutchie.bridgeStrategy === 'dutchie', 'dutchie bridge strategy');
 
+// CBDV must not collapse to CBD (prefix order)
+const dutchieCbdvHtml = `
+<script type="application/json">
+{"cannabinoidsV2":[{"cannabinoid":{"name":"CBDV"},"value":0.42},{"cannabinoid":{"name":"CBD"},"value":1.1}],
+"THCContent":{"range":[22.0]},"CBDContent":{"range":[1.1]},"totalTerpenes":{"range":[1.2]}}
+</script>
+<body><p>No visible potency chips</p></body>`;
+const dutchieCbdv = CSI.adapters.dutchie.parseProductHtml(
+  dutchieCbdvHtml,
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/cbdv-test'
+);
+assert(dutchieCbdv.cannabinoids?.CBDV === 0.42, `dutchie CBDV mapped ${dutchieCbdv.cannabinoids?.CBDV}`);
+assert(dutchieCbdv.cannabinoids?.CBD === 1.1, 'dutchie real CBD preserved alongside CBDV');
+assert(dutchieCbdv.cannabinoids?.THC === 22, 'dutchie GraphQL THCContent from script');
+assert(
+  dutchieCbdv.terpenes?.['Total Terpenes'] === 1.2 ||
+    (Array.isArray(dutchieCbdv.terpenes) &&
+      dutchieCbdv.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 1.2)),
+  'dutchie GraphQL totalTerpenes from script'
+);
+
+// Beta-Pinene must not also register as Alpha-Pinene
+const dutchiePineneHtml = `<body><div>Beta-Pinene 0.44%</div><div>Alpha-Pinene 0.21%</div></body>`;
+const dutchiePinene = CSI.adapters.dutchie.parseProductHtml(
+  dutchiePineneHtml,
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/pinene-test'
+);
+assert(
+  Array.isArray(dutchiePinene.terpenes) &&
+    dutchiePinene.terpenes.some((t) => t.name === 'Beta-Pinene' && t.percentage === 0.44),
+  'dutchie beta-pinene'
+);
+assert(
+  Array.isArray(dutchiePinene.terpenes) &&
+    dutchiePinene.terpenes.some((t) => t.name === 'Alpha-Pinene' && t.percentage === 0.21),
+  'dutchie alpha-pinene own value'
+);
+assert(
+  !dutchiePinene.terpenes.some((t) => t.name === 'Alpha-Pinene' && t.percentage === 0.44),
+  'dutchie bare pinene does not steal beta-pinene %'
+);
+
+// Presence-only marketing badge must not borrow nearby THC/TERPS %
+const dutchieBadgeHtml = `<body><div>High Limonene</div><span>THC: 31.86%</span><span>TERPS: 1.89%</span></body>`;
+const dutchieBadge = CSI.adapters.dutchie.parseProductHtml(
+  dutchieBadgeHtml,
+  'https://dutchie.com/embedded-menu/liberty-norristown/product/badge-test'
+);
+assert(dutchieBadge.cannabinoids?.THC === 31.86, 'badge card keeps THC');
+assert(
+  !Array.isArray(dutchieBadge.terpenes) ||
+    !dutchieBadge.terpenes.some((t) => t.name === 'Limonene'),
+  'High Limonene badge produces no named-terpene value'
+);
+assert(
+  dutchieBadge.terpenes?.['Total Terpenes'] === 1.89 ||
+    (Array.isArray(dutchieBadge.terpenes) &&
+      dutchieBadge.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 1.89)),
+  'badge card keeps total terps'
+);
+
+const bridgeSrcDutchie = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
+assert(
+  bridgeSrcDutchie.includes('(?<![a-z-])pinene'),
+  'bridge Alpha-Pinene lookbehind excludes hyphen (no beta double-count)'
+);
+assert(
+  !/nameRe\.source\)\[\^0-9%\]\{0,16\}/.test(bridgeSrcDutchie),
+  'bridge named-terp matcher no longer uses loose 16-char window'
+);
+assert(bridgeSrcDutchie.includes('[:\\\\-]?'), 'bridge named-terp matcher requires value next to name');
+
 // Parse sample labTests-ish HTML
 const sampleHtml = `
 <script>self.__next_f.push([1,"labTests\\":{\\"thc\\":{\\"value\\":[20.1,22.4],\\"unitAbbr\\":\\"%\\"},\\"cbd\\":null,\\"displayThc\\":{\\"value\\":[20.1,22.4],\\"unitAbbr\\":\\"%\\",\\"label\\":\\"THC\\"},\\"terpenes\\":{\\"value\\":[1.2,1.8],\\"unitAbbr\\":\\"%\\"},\\"tac\\":null},\\"saleType\\":\\"Both\\",\\"price\\":45,\\"promoPrice\\":32.5"])</script>
@@ -1292,6 +1364,16 @@ const enrichSrc = listingSrc.slice(
   listingSrc.indexOf('function cardCategoryKey')
 );
 assert(!/openUpgrade|buildSoftUnlockPrompt|csi-soft-unlock/.test(enrichSrc), 'chem enrich is not an upgrade wall');
+assert(enrichSrc.includes('hasListingChem'), 'listing enrich preserves on-card chem when PDP fetch fails');
+assert(
+  enrichSrc.includes("data.status === 'empty' && hasListingChem") ||
+    enrichSrc.includes("data.status === 'empty' && hasListingChem ? 'ok'"),
+  'empty PDP fetch does not mark card empty when listing chem exists'
+);
+assert(
+  pdpSrc.includes('Keep bridge / listing chem') || pdpSrc.includes('hasChem'),
+  'PDP keeps bridge chem when HTML fetch fails'
+);
 assert(!pdpSrc.includes('buildSoftUnlockPrompt'), 'product page does not mount the mid-browse prompt');
 const gateAt = listingSrc.indexOf('if (!CSI.features?.canUseActiveStore');
 const gateBlock = listingSrc.slice(gateAt, gateAt + 160);

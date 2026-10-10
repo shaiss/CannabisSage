@@ -281,7 +281,8 @@
       ['Linalool', /linalool/i],
       ['Beta-Myrcene', /beta[\s-]?myrcene|myrcene/i],
       ['Beta-Pinene', /beta[\s-]?pinene/i],
-      ['Alpha-Pinene', /alpha[\s-]?pinene|(?<![a-z])pinene/i],
+      // Bare "pinene" must not match Beta-Pinene (hyphen/letter lookbehind).
+      ['Alpha-Pinene', /alpha[\s-]?pinene|(?<![a-z-])pinene/i],
       ['Ocimene', /ocimene/i],
       ['Terpinolene', /terpinolene/i],
       ['Bisabolol', /bisabolol/i],
@@ -290,10 +291,8 @@
     const out = [];
     const src = String(text || '');
     canon.forEach(([name, nameRe]) => {
-      const re = new RegExp(
-        `(?:${nameRe.source})[^0-9%]{0,16}([0-9]+(?:\\.[0-9]+)?)\\s*%`,
-        'gi'
-      );
+      // Name → optional :/- → % only; no other letters between (blocks "High Limonene" + nearby THC/TERPS %).
+      const re = new RegExp(`(?:${nameRe.source})\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
       let m;
       while ((m = re.exec(src)) !== null) {
         const pct = parseFloat(m[1]);

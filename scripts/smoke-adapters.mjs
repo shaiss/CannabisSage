@@ -233,6 +233,14 @@ assert(
   'shopd fetch blocks PDP without store_id query'
 );
 assert(
+  !shopdListing.isAllowedFetchUrl(`${shopdPdpBare}?store_id=109&x=1`),
+  'shopd fetch blocks PDP with extra query params'
+);
+assert(
+  !shopdListing.isAllowedFetchUrl(`${shopdPdpBare}?store_id=109&store_id=999`),
+  'shopd fetch blocks PDP with duplicate store_id'
+);
+assert(
   !shopdListing.isAllowedFetchUrl(`${shopdPdpBare}?store_id=999`),
   'shopd fetch blocks PDP with non-109 store_id'
 );
@@ -2023,34 +2031,39 @@ const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
 assert(bgSrc.includes("hosts: ['trulieve.com', 'www.trulieve.com']"), 'SW fetch allowlists trulieve');
 assert(/shopd\\\/product\\\//.test(bgSrc), 'SW fetch path allows shopd PDPs');
 assert(bgSrc.includes("requireStoreId: '109'"), 'SW fetch requires store_id 109 for shopd');
+assert(
+  bgSrc.includes('url.search === `?store_id=${rule.requireStoreId}`'),
+  'SW fetch requires exact store_id query (no extra params)'
+);
 // Behavioral SW gate (eval rules + isAllowedProductUrl without chrome APIs)
 {
   const rulesStart = bgSrc.indexOf('const ALLOWED_FETCH_RULES');
-  const fnStart = bgSrc.indexOf('function storeIdFromSearchParams');
+  const fnStart = bgSrc.indexOf('function isAllowedProductUrl');
   const fnEnd = bgSrc.indexOf('\nfunction normalizeHost');
   assert(rulesStart >= 0 && fnStart > rulesStart && fnEnd > fnStart, 'locate SW fetch gate helpers');
   const swGate = vm.runInNewContext(
     `${bgSrc.slice(rulesStart, fnStart)}${bgSrc.slice(fnStart, fnEnd)}\n({ isAllowedProductUrl })`,
     { URL }
   );
+  const shopdSwPdp =
+    'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538';
   assert(
-    swGate.isAllowedProductUrl(
-      'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538?store_id=109'
-    ),
-    'SW allows shopd PDP with store_id=109'
+    swGate.isAllowedProductUrl(`${shopdSwPdp}?store_id=109`),
+    'SW allows shopd PDP with exact store_id=109'
   );
   assert(
-    !swGate.isAllowedProductUrl(
-      'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538'
-    ),
-    'SW blocks shopd PDP without store_id'
+    !swGate.isAllowedProductUrl(`${shopdSwPdp}?store_id=109&x=1`),
+    'SW blocks shopd PDP with extra query params'
   );
   assert(
-    !swGate.isAllowedProductUrl(
-      'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538?store_id=999'
-    ),
+    !swGate.isAllowedProductUrl(`${shopdSwPdp}?store_id=109&store_id=999`),
+    'SW blocks shopd PDP with duplicate store_id'
+  );
+  assert(
+    !swGate.isAllowedProductUrl(`${shopdSwPdp}?store_id=999`),
     'SW blocks shopd PDP with non-109 store_id'
   );
+  assert(!swGate.isAllowedProductUrl(shopdSwPdp), 'SW blocks shopd PDP without store_id');
   assert(
     swGate.isAllowedProductUrl('https://www.sunnyside.shop/product/blue-dream'),
     'SW still allows Sunnyside PDP without store query'

@@ -14,6 +14,7 @@
  * Optional:
  *   parseListingHints(cardEl) → { price, onSale, weightText, cannabinoids, terpenes }
  *   shouldSuppressListingCannabinoidBadges(cardEl) → boolean (retail already shows THC/CBD)
+ *   authorizeFetchUrl(url) → string|null (mint store-gated fetch URL for SW allowlist)
  *   pdpChemSurface: 'floating-panel' | 'inline-buybox' (default: floating-panel only in core)
  *   detectSale(el), categoryUrlPatterns, notes
  *

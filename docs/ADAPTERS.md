@@ -114,7 +114,7 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 | Listing | `/shopd/category/:category` (also `/shopd`, `/shopd/brands/…`) |
 | PDP | `/shopd/product/:slug-sku` (e.g. `avenue-gsh-mnts-whole-flower-132538`) |
 | Landing | `/dispensaries/pennsylvania/limerick` — thin locator shell (`routeMode` null) |
-| Store id | Limerick = `109` (`localStorage.store_id`; from Dutchie+ `dutchieplus=109` on the locator page). Wave 1 only enhances when store_id is unset or `109`. |
+| Store id | Limerick = `109` (`localStorage.store_id`; from Dutchie+ `dutchieplus=109` on the locator page). Same-origin shopd: unset or `109`. Cross-origin / popup: require `store_id=109` (or `dutchieplus`) on the URL, or the Limerick landing path. SW PDP fetch requires `?store_id=109` (minted via `authorizeFetchUrl` on verified pages). |
 | Cards | `a[href*="/shopd/product/"]` with on-card `XX.X% THC \| X.XX Terps.` (totals only) |
 | Chem source | Live DOM scrape (`bridgeStrategy: 'shopd'`) + optional parse of public `api.trulieve.com/api/v2/products/…` / menu JSON the page already calls. Named terpene % on PDP Top Terpenes panel. |
 | Not Dutchie embed | Do **not** reuse `adapters/dutchie.js`. Inventory API `source` may say `"dutchie"`, but shoppers use Trulieve's own `/shopd` UI (no `dutchie.com/embedded-menu` iframe for this menu). |

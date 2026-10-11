@@ -219,6 +219,13 @@ assert(
   'bh buildProductUrl'
 );
 assert(
+  bh.buildProductUrl(
+    'https://www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ) ===
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch',
+  'bh buildProductUrl canonicalizes www → apex'
+);
+assert(
   !bh.buildProductUrl(
     '/pennsylvania-dispensaries/pittsburgh/medical-menu/menu/products/1/foo'
   ),

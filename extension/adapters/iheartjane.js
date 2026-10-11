@@ -131,7 +131,8 @@
           return `${u.origin}${path}`;
         }
         if (isBhHost(u.hostname) && BH_PDP_RE.test(path) && verifiedBhSlug(path)) {
-          return `${u.origin}${path}`;
+          // Canonical apex origin so www/apex share cache + taste-profile keys
+          return `https://beyond-hello.com${path}`;
         }
         return null;
       } catch {

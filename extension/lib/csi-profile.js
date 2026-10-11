@@ -255,6 +255,7 @@
       if (!SHOPD_PRODUCT_RE.test(parsed.pathname)) return null;
     }
     // Beyond Hello: only verified West Chester Jane Boost PDPs (adapter allowlist when present).
+    // Canonicalize to apex https://beyond-hello.com so www/apex share bought-before keys.
     if (/^beyond-hello\.com$/i.test(bareHost)) {
       if (CSI.adapters?.iheartjane?.buildProductUrl) {
         const built = CSI.adapters.iheartjane.buildProductUrl(parsed.href);
@@ -262,6 +263,7 @@
         return built.replace(/\/$/, '');
       }
       if (!BH_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
+      return `https://beyond-hello.com${parsed.pathname}`.replace(/\/$/, '');
     }
     return parsed.href.replace(/\/$/, '');
   }

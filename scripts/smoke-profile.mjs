@@ -311,11 +311,16 @@ assert(popupJs.includes("iheartjane: 'RISE / Beyond Hello'"), 'RISE/Beyond Hello
 const bhPdp =
   'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch';
 assert(CSI.profile.productKeyFromUrl(bhPdp), 'beyond-hello west-chester PDP key accepted');
+const bhWwwPdp =
+  'https://www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch';
+assert(CSI.profile.productKeyFromUrl(bhWwwPdp), 'www.beyond-hello.com west-chester PDP key accepted');
 assert(
-  CSI.profile.productKeyFromUrl(
-    'https://www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
-  ),
-  'www.beyond-hello.com west-chester PDP key accepted'
+  CSI.profile.productKeyFromUrl(bhPdp) === CSI.profile.productKeyFromUrl(bhWwwPdp),
+  'beyond-hello www and apex canonicalize to the same profile key'
+);
+assert(
+  CSI.profile.productKeyFromUrl(bhWwwPdp) === bhPdp.replace(/\/$/, ''),
+  'beyond-hello profile key uses apex origin'
 );
 assert(
   !CSI.profile.productKeyFromUrl(

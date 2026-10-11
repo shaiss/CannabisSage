@@ -16,6 +16,11 @@ const ALLOWED_FETCH_RULES = [
     path: /^\/locations\/[^/]+\/(?:(?:medical|recreational)-menu\/)?menu\/[^/]+\/[^/]+\/?$/i
   },
   {
+    // Curaleaf Sweed PDPs — verified King of Prussia slug only (fail closed)
+    hosts: ['curaleaf.com', 'www.curaleaf.com'],
+    path: /^\/shop\/pennsylvania\/curaleaf-pa-king-of-prussia\/menu\/[^/]+\/[^/]+\/?$/i
+  },
+  {
     hosts: ['risecannabis.com', 'www.risecannabis.com'],
     path: /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/product\/\d+\/[^/]+\/?$/i
   },

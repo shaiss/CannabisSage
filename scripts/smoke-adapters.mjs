@@ -52,6 +52,7 @@ loadScripts(
     'adapters/sunnyside.js',
     'adapters/zenleaf.js',
     'adapters/terravida.js',
+    'adapters/curaleaf.js',
     'adapters/iheartjane.js',
     'adapters/dutchie.js',
     'adapters/shopd.js',
@@ -122,6 +123,78 @@ assert(
     '/locations/malvern/recreational-menu/menu/flower-709/savvy-x-526093'
   ),
   'zenleaf accepts full path'
+);
+
+// Curaleaf King of Prussia (Sweed — shared parsers with Zen Leaf)
+assert(CSI.adapters.curaleaf, 'curaleaf registered');
+assert(CSI.adapters._sweedShared, 'sweed shared helpers exported from zenleaf');
+assert(
+  CSI.registry.BUILTIN_ORDER.indexOf('curaleaf') > CSI.registry.BUILTIN_ORDER.indexOf('zenleaf'),
+  'curaleaf after zenleaf'
+);
+assert(
+  CSI.registry.BUILTIN_ORDER.indexOf('iheartjane') > CSI.registry.BUILTIN_ORDER.indexOf('curaleaf'),
+  'iheartjane after curaleaf'
+);
+const clListing =
+  'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu';
+const cl = CSI.registry.resolveAdapter(clListing);
+assert(cl?.id === 'curaleaf', `expected curaleaf got ${cl?.id}`);
+assert(
+  cl.routeMode('/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu') === 'listing',
+  'curaleaf listing route'
+);
+assert(
+  cl.routeMode(
+    '/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ) === 'pdp',
+  'curaleaf pdp route'
+);
+assert(
+  cl.isAllowedFetchUrl(
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ),
+  'curaleaf KOP PDP fetch ok'
+);
+assert(
+  cl.isAllowedFetchUrl(
+    'https://www.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ),
+  'curaleaf www KOP PDP fetch ok'
+);
+assert(
+  !cl.isAllowedFetchUrl('https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'),
+  'curaleaf listing not fetchable'
+);
+assert(
+  !cl.isAllowedFetchUrl(
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-philadelphia-city-ave/menu/vape-1/foo-2'
+  ),
+  'curaleaf unverified slug PDP fetch blocked'
+);
+assert(
+  !CSI.registry.resolveAdapter(
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-philadelphia-city-ave/menu'
+  ),
+  'curaleaf unverified location fails closed'
+);
+assert(
+  !CSI.registry.resolveAdapter('https://evil.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'),
+  'curaleaf subdomain not matched'
+);
+assert(!cl.buildProductUrl('100227'), 'curaleaf must not invent URL from bare id');
+assert(
+  cl.buildProductUrl(
+    '/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ) ===
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227',
+  'curaleaf accepts full path and canonicalizes to apex'
+);
+assert(
+  !cl.buildProductUrl(
+    '/shop/pennsylvania/curaleaf-pa-gettysburg/menu/vape-1/foo-2'
+  ),
+  'curaleaf buildProductUrl fails closed for unverified slug'
 );
 
 const janeListing =
@@ -1086,9 +1159,44 @@ assert(
   'bh listing hints parse CBD'
 );
 
+// Curaleaf / Sweed PDP fixture (shape verified from live KOP HTML — age-gated live fetch)
+const curaleafPdpHtml = `
+<script type="application/ld+json">{"@type":"ListItem","position":1,"item":{"@type":"Product","@id":"https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227","name":"Biscotti 2g BRIQ"}}</script>
+<h1>Biscotti BRIQ</h1>
+<div>THC: 90.17% CBD: 0%</div>
+<div class="OUIWQpt">B-Caryophyllene</div><div class="zRYKXNN">1.546%</div>
+<div class="OUIWQpt">Limonene</div><div class="zRYKXNN">1.36%</div>
+<div class="OUIWQpt">Total Terpenes</div><div class="zRYKXNN">4.77%</div>
+<script>window.__PRODUCT__={"variants":[{"id":100227,"name":"2g","labTests":{"thc":{"value":[90.165],"unitAbbr":"%"},"cbd":{"value":[0],"unitAbbr":"%"},"displayThc":null,"terpenes":{"value":[4.77],"unitAbbr":"%"},"tac":null},"saleType":"Medical","unitSize":{"value":2,"unitAbbr":"G"},"price":85,"promoPrice":35}]}</script>
+`;
+const clParsed = CSI.adapters.curaleaf.parseProductHtml(
+  curaleafPdpHtml,
+  'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+);
+assert(clParsed.status === 'ok', 'curaleaf parse ok');
+assert(Math.abs(clParsed.cannabinoids.THC - 90.165) < 0.01, `curaleaf THC ${clParsed.cannabinoids.THC}`);
+assert(clParsed.cannabinoids.CBD === 0, 'curaleaf CBD');
+assert(clParsed.price === 35, `curaleaf promoPrice ${clParsed.price}`);
+assert(clParsed.onSale === true, 'curaleaf onSale from promoPrice');
+assert(/2\s*G/i.test(clParsed.weightText || ''), `curaleaf unitSize ${clParsed.weightText}`);
+assert(/Biscotti/i.test(clParsed.name || ''), `curaleaf name ${clParsed.name}`);
+const clTerps = Array.isArray(clParsed.terpenes) ? clParsed.terpenes : [];
+const clCary = clTerps.find((t) => /caryophyllene/i.test(t.name));
+assert(clCary && Math.abs(clCary.percentage - 1.546) < 0.01, 'curaleaf named Caryophyllene %');
+const clLim = clTerps.find((t) => /limonene/i.test(t.name));
+assert(clLim && Math.abs(clLim.percentage - 1.36) < 0.01, 'curaleaf named Limonene %');
+assert(
+  cl.parseListingHints({
+    textContent: 'Biscotti BRIQ THC: 90.17% CBD: 0% $35.00 $85.00',
+    querySelector: () => null,
+    closest: () => null
+  }).cannabinoids?.THC === 90.17,
+  'curaleaf listing hints parse THC'
+);
+
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.25', 'version bump');
+assert(manifest.version === '1.3.26', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -1179,10 +1287,14 @@ assert(
     (cs) =>
       cs.all_frames === true &&
       (cs.matches || []).some((m) =>
-        /sunnyside|zenleaf|risecannabis|beyond-hello|libertycannabis|trulieve/.test(m)
+        /sunnyside|zenleaf|curaleaf|risecannabis|beyond-hello|libertycannabis|trulieve/.test(m)
       )
   ),
-  'Sunnyside/Zenleaf/RISE/Beyond Hello/Liberty/Trulieve never use all_frames'
+  'Sunnyside/Zenleaf/Curaleaf/RISE/Beyond Hello/Liberty/Trulieve never use all_frames'
+);
+assert(
+  isolatedScripts.some((cs) => (cs.js || []).includes('adapters/curaleaf.js')),
+  'curaleaf content script listed'
 );
 assert(
   mainScripts.some((cs) => (cs.matches || []).some((m) => m.includes('dutchie.com/embedded-menu'))),
@@ -1259,7 +1371,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.25', 'core version 1.3.25');
+assert(CSI.VERSION === '1.3.26', 'core version 1.3.26');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -2128,6 +2240,8 @@ assert(
       'https://sunnyside.shop/*',
       'https://zenleafdispensaries.com/*',
       'https://www.zenleafdispensaries.com/*',
+      'https://curaleaf.com/*',
+      'https://www.curaleaf.com/*',
       'https://risecannabis.com/*',
       'https://www.risecannabis.com/*',
       'https://beyond-hello.com/*',
@@ -2143,7 +2257,7 @@ assert(
       'http://localhost:3000/*',
       'https://localhost:3000/*'
     ]),
-  'host permissions include RISE + Beyond Hello + Dutchie + Liberty + Trulieve + prior retailers'
+  'host permissions include Curaleaf + RISE + Beyond Hello + Dutchie + Liberty + Trulieve + prior retailers'
 );
 assert(
   (manifest.content_scripts || []).some(
@@ -2225,6 +2339,67 @@ assert(
   'Beyond Hello content scripts are not broad host wildcards'
 );
 assert(
+  (manifest.content_scripts || []).some(
+    (cs) =>
+      cs.all_frames !== true &&
+      (cs.matches || []).some((m) =>
+        /curaleaf\.com\/shop\/pennsylvania\/curaleaf-pa-king-of-prussia\//.test(m)
+      )
+  ),
+  'content scripts path-scoped to Curaleaf King of Prussia (top-frame)'
+);
+assert(
+  !(manifest.content_scripts || []).some((cs) =>
+    (cs.matches || []).some(
+      (m) =>
+        /curaleaf\.com\/\*$/.test(m) ||
+        /curaleaf\.com\/shop\/\*$/.test(m) ||
+        /curaleaf\.com\/shop\/pennsylvania\/\*$/.test(m)
+    )
+  ),
+  'Curaleaf content scripts are not broad host/path wildcards'
+);
+assert(
+  manifest.web_accessible_resources?.[0]?.matches?.includes('https://curaleaf.com/*') &&
+    manifest.web_accessible_resources?.[0]?.matches?.includes('https://www.curaleaf.com/*'),
+  'WAR matches Curaleaf origins (MV3 WAR path must be /*)'
+);
+assert(
+  bgSrc.includes("hosts: ['curaleaf.com', 'www.curaleaf.com']"),
+  'SW fetch allowlists curaleaf'
+);
+assert(
+  /curaleaf-pa-king-of-prussia\\\/menu\\\//.test(bgSrc),
+  'SW fetch path allows Curaleaf KOP PDPs only'
+);
+{
+  const rulesStart = bgSrc.indexOf('const ALLOWED_FETCH_RULES');
+  const fnStart = bgSrc.indexOf('function isAllowedProductUrl');
+  const fnEnd = bgSrc.indexOf('\nfunction normalizeHost');
+  const swGate = vm.runInNewContext(
+    `${bgSrc.slice(rulesStart, fnStart)}${bgSrc.slice(fnStart, fnEnd)}\n({ isAllowedProductUrl })`,
+    { URL }
+  );
+  assert(
+    swGate.isAllowedProductUrl(
+      'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+    ),
+    'SW allows Curaleaf KOP PDP'
+  );
+  assert(
+    !swGate.isAllowedProductUrl(
+      'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-philadelphia-city-ave/menu/vape-1/foo-2'
+    ),
+    'SW blocks Curaleaf unverified slug PDP'
+  );
+  assert(
+    !swGate.isAllowedProductUrl(
+      'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'
+    ),
+    'SW blocks Curaleaf listing URL'
+  );
+}
+assert(
   manifest.web_accessible_resources?.[0]?.matches?.includes('https://risecannabis.com/*'),
   'WAR matches RISE'
 );
@@ -2243,8 +2418,9 @@ assert(
 );
 {
   const rulesStart = bgSrc.indexOf('const ALLOWED_FETCH_RULES');
-  const fnStart = bgSrc.indexOf('function storeIdFromSearchParams');
+  const fnStart = bgSrc.indexOf('function isAllowedProductUrl');
   const fnEnd = bgSrc.indexOf('\nfunction normalizeHost');
+  assert(rulesStart >= 0 && fnStart > rulesStart && fnEnd > fnStart, 'locate SW fetch gate for BH checks');
   const swGate = vm.runInNewContext(
     `${bgSrc.slice(rulesStart, fnStart)}${bgSrc.slice(fnStart, fnEnd)}\n({ isAllowedProductUrl })`,
     { URL }

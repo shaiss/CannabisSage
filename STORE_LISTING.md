@@ -7,10 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.25 |
+| **Version** | 1.3.26 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
+
+## Release notes (v1.3.26)
+
+Wave 1 PA adapter #5: **Curaleaf King of Prussia** on `curaleaf.com` (Sweed-backed menu). Verified Zen Leaf is the same Sweed platform; shared HTML chem parsers live on `_sweedShared` (from the Zen Leaf adapter) while Curaleaf keeps a dedicated adapter id with fail-closed slug `curaleaf-pa-king-of-prussia`. Content scripts stay top-frame and path-scoped; SW fetch allowlists KOP PDPs only. No new remote APIs.
 
 ## Release notes (v1.3.25)
 
@@ -70,6 +74,10 @@ Inject UI and fetch same-origin product HTML on Sunnyside listings and PDPs.
 
 Inject UI and fetch same-origin product HTML on Zen Leaf location menus/PDPs (including Malvern / TerraVida alias).
 
+### Host permission: Curaleaf (`curaleaf.com`)
+
+Inject UI and fetch same-origin product HTML on verified Curaleaf Sweed menu paths (Wave 1: King of Prussia `/shop/pennsylvania/curaleaf-pa-king-of-prussia/…` only).
+
 ### Host permission: RISE (`risecannabis.com`)
 
 Inject UI and fetch same-origin product HTML on RISE iHeartJane medical/recreational menu listings and PDPs under `/dispensaries/...`.
@@ -119,7 +127,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.25.zip` (includes iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
+4. Upload `dist/cannabis-sage-1.3.26.zip` (includes Curaleaf KOP Sweed + iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

@@ -14,6 +14,12 @@
       "notes": "TerraVida Holistic Centers (Malvern) is a path alias on this host, not a separate ecommerce hostname."
     },
     {
+      "host": "curaleaf.com",
+      "status": "community",
+      "displayName": "Curaleaf King of Prussia",
+      "notes": "Sweed-backed Curaleaf menus. Wave 1 verified slug: curaleaf-pa-king-of-prussia only; other Curaleaf locations fail closed."
+    },
+    {
       "host": "risecannabis.com",
       "status": "community",
       "displayName": "RISE",

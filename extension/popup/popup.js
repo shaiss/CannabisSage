@@ -127,6 +127,7 @@
     sunnyside: 'Sunnyside',
     zenleaf: 'Zen Leaf',
     terravida: 'TerraVida (Zen Leaf Malvern)',
+    curaleaf: 'Curaleaf King of Prussia',
     iheartjane: 'RISE / Beyond Hello',
     dutchie: 'Liberty Norristown',
     shopd: 'Trulieve Limerick'

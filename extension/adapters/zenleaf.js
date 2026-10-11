@@ -1,6 +1,10 @@
 /**
  * Zen Leaf Dispensaries adapter (PA ecommerce: zenleafdispensaries.com).
  *
+ * Sweed-backed storefront (sweedpos.com assets / labTests payload). Shared HTML
+ * parsers are exported as CSI.adapters._sweedShared (and _zenleafShared alias)
+ * so Curaleaf and TerraVida can reuse them without forking chemms logic.
+ *
  * Menu listing cards already show THC / TERP ranges in the DOM.
  * Named terpene breakdowns and richer labTests live in PDP HTML / client state.
  */
@@ -270,10 +274,11 @@
     let totalTerpenes = null;
     if (textTerp) totalTerpenes = midRange(parseFloat(textTerp[1]), parseFloat(textTerp[2]));
 
-    // Named terpene percentages in page text
+    // Named terpene percentages in page text (Sweed themes often put the %
+    // in a sibling div a short hop after the label — allow up to ~80 chars).
     CSI.TERPENE_CANON.forEach(({ name, keys }) => {
       const syn = keys.map((s) => CSI.escapeRegExp(s)).join('|');
-      const re = new RegExp(`(?:${syn})[^0-9%]{0,12}([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
+      const re = new RegExp(`(?:${syn})[^0-9%]{0,80}([0-9]+(?:\\.[0-9]+)?)\\s*%`, 'gi');
       let m;
       while ((m = re.exec(html)) !== null) {
         const pct = parseFloat(m[1]);
@@ -311,8 +316,10 @@
     let name;
     const nameMatch =
       html.match(/\\"ecomm_display_name\\?":\s*\\?"([^\\"]+)\\?"/) ||
+      html.match(/"@type"\s*:\s*"Product"[^"]{0,20}"@id"\s*:\s*"[^"]{0,300}"\s*,\s*"name"\s*:\s*"([^"]+)"/) ||
+      html.match(/<h1[^>]*>\s*([^<]+?)\s*<\/h1>/i) ||
       html.match(/property="og:title"\s+content="([^"]+)"/i);
-    if (nameMatch) name = nameMatch[1];
+    if (nameMatch) name = nameMatch[1].trim();
     else {
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -379,12 +386,15 @@
 
   CSI.adapters = CSI.adapters || {};
   CSI.adapters.zenleaf = zenleafAdapter;
-  // Shared helpers for TerraVida alias
-  CSI.adapters._zenleafShared = {
+  // Shared Sweed helpers for TerraVida alias + Curaleaf (parseProductHtml / listing chem)
+  const sweedShared = {
     HOSTS,
     LISTING_RE,
     PDP_RE,
     parseProductHtml,
+    parseLabTestsObject,
+    parseRangePercents,
+    midRange,
     findProductCards,
     isLikelyProductCard,
     cardHost,
@@ -395,4 +405,6 @@
     routeMode,
     matchesUrl
   };
+  CSI.adapters._sweedShared = sweedShared;
+  CSI.adapters._zenleafShared = sweedShared;
 })(typeof globalThis !== 'undefined' ? globalThis : window);

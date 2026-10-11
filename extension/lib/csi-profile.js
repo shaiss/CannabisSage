@@ -23,6 +23,7 @@
     'sunnyside',
     'zenleaf',
     'terravida',
+    'curaleaf',
     'iheartjane',
     'dutchie',
     'shopd'
@@ -46,10 +47,10 @@
     'boughtBefore'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
-  // Dutchie + Trulieve + Beyond Hello: apex only after one-prefix www strip
+  // Dutchie + Trulieve + Beyond Hello + Curaleaf: apex only after one-prefix www strip
   // (not *.host / www.www.*). Other partners keep subdomain allow.
   const HOST_OK =
-    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^beyond-hello\.com$|^dutchie\.com$|^trulieve\.com$/i;
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^beyond-hello\.com$|^dutchie\.com$|^trulieve\.com$|^curaleaf\.com$/i;
   /** Fallback when Dutchie adapter is not loaded (e.g. minimal smoke harness). */
   const DUTCHIE_VERIFIED_PRODUCT_RE =
     /^\/embedded-menu\/liberty-norristown\/product\/[^/]+\/?$/i;
@@ -58,6 +59,9 @@
   /** Fallback when iHeartJane adapter is not loaded — Beyond Hello West Chester only. */
   const BH_VERIFIED_PRODUCT_RE =
     /^\/pennsylvania-dispensaries\/west-chester\/medical-menu\/menu\/products\/\d+\/[^/]+\/?$/i;
+  /** Fallback when Curaleaf adapter is not loaded — KOP slug only. */
+  const CURALEAF_VERIFIED_PRODUCT_RE =
+    /^\/shop\/pennsylvania\/curaleaf-pa-king-of-prussia\/menu\/[^/]+\/[^/]+\/?$/i;
 
   const COPY = Object.freeze({
     title: 'Local taste profile',
@@ -264,6 +268,16 @@
       }
       if (!BH_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
       return `https://beyond-hello.com${parsed.pathname}`.replace(/\/$/, '');
+    }
+    // Curaleaf: only verified King of Prussia Sweed PDPs (adapter allowlist when present).
+    if (/^curaleaf\.com$/i.test(bareHost)) {
+      if (CSI.adapters?.curaleaf?.buildProductUrl) {
+        const built = CSI.adapters.curaleaf.buildProductUrl(parsed.href);
+        if (!built) return null;
+        return built.replace(/\/$/, '');
+      }
+      if (!CURALEAF_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
+      return `https://curaleaf.com${parsed.pathname}`.replace(/\/$/, '');
     }
     return parsed.href.replace(/\/$/, '');
   }

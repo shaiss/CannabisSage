@@ -312,10 +312,33 @@ const bhPdp =
   'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch';
 assert(CSI.profile.productKeyFromUrl(bhPdp), 'beyond-hello west-chester PDP key accepted');
 assert(
+  CSI.profile.productKeyFromUrl(
+    'https://www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ),
+  'www.beyond-hello.com west-chester PDP key accepted'
+);
+assert(
   !CSI.profile.productKeyFromUrl(
     'https://beyond-hello.com/pennsylvania-dispensaries/pittsburgh/medical-menu/menu/products/1/foo'
   ),
   'beyond-hello unverified slug PDP key rejected'
+);
+// HOST_OK: Beyond Hello apex/www only — reject arbitrary *.beyond-hello.com
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://evil.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1/foo'
+  ),
+  'evil.beyond-hello.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://evil.beyond-hello.com/anything'),
+  'evil.beyond-hello.com arbitrary path rejected (must not skip West Chester PDP check)'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://www.www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1/foo'
+  ),
+  'www.www.beyond-hello.com rejected (one-prefix strip must not leave www.beyond-hello.com)'
 );
 
 // Dutchie embedded-menu product URLs must be accepted for bought-before / picks keys

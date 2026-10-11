@@ -46,10 +46,10 @@
     'boughtBefore'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
-  // Dutchie + Trulieve: apex only after one-prefix www strip (not *.host / www.www.*).
-  // Other partners keep subdomain allow.
+  // Dutchie + Trulieve + Beyond Hello: apex only after one-prefix www strip
+  // (not *.host / www.www.*). Other partners keep subdomain allow.
   const HOST_OK =
-    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|(^|\.)beyond-hello\.com$|^dutchie\.com$|^trulieve\.com$/i;
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^beyond-hello\.com$|^dutchie\.com$|^trulieve\.com$/i;
   /** Fallback when Dutchie adapter is not loaded (e.g. minimal smoke harness). */
   const DUTCHIE_VERIFIED_PRODUCT_RE =
     /^\/embedded-menu\/liberty-norristown\/product\/[^/]+\/?$/i;

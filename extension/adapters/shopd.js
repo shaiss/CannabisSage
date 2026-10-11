@@ -153,8 +153,9 @@
 
   /**
    * SW / adapter fetch allowlist: shopd PDP paths do not encode store, so require
-   * store_id=109 (or dutchieplus/storeId) in the query. Callers on a verified
-   * Limerick page should use authorizeFetchUrl() to mint this token.
+   * the query to be exactly store_id=109 (no extra params, no duplicates).
+   * Callers on a verified Limerick page should use authorizeFetchUrl() to mint
+   * this token.
    */
   function isAllowedFetchUrl(rawUrl) {
     try {
@@ -162,7 +163,7 @@
       if (url.protocol !== 'https:') return false;
       if (!HOSTS.includes(url.hostname)) return false;
       if (!PDP_RE.test(url.pathname)) return false;
-      return isVerifiedStoreId(storeIdFromUrl(url.href));
+      return url.search === '?store_id=109';
     } catch {
       return false;
     }

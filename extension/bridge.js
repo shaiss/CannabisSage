@@ -382,15 +382,62 @@
       if (v > 0) cannabinoids.CBD = v;
     }
     let totalTerpenes = null;
-    const terps = src.match(/(\d+(?:\.\d+)?)\s*%?\s*Terps?\.?/i);
+    // Word boundary after Terps? so "2.81 Terpsichore" / "5 TerpeneX" do not match.
+    const terps = src.match(/(\d+(?:\.\d+)?)\s*%?\s*Terps?\b\.?/i);
     if (terps) totalTerpenes = parseFloat(terps[1]);
     return { cannabinoids, totalTerpenes };
+  }
+
+  function shopdPathFromHref(href) {
+    if (!href) return '';
+    try {
+      const path = (String(href).startsWith('http') ? new URL(href).pathname : String(href))
+        .split(/[?#]/)[0]
+        .replace(/\/$/, '');
+      return path;
+    } catch {
+      return String(href).split(/[?#]/)[0].replace(/\/$/, '');
+    }
+  }
+
+  /**
+   * On PDP, strip related-product cards (other /shopd/product/ links) so potency/price
+   * are not taken from carousels inside main. Listing cards pass through unchanged.
+   */
+  function shopdSummaryScope(hostEl) {
+    const host = hostEl || document.body;
+    if (!host) return null;
+    const isPdp =
+      typeof location !== 'undefined' && /\/shopd\/product\//i.test(location.pathname || '');
+    if (!isPdp || typeof host.cloneNode !== 'function') return host;
+
+    const clone = host.cloneNode(true);
+    const currentPath = shopdPathFromHref(location.pathname);
+    clone.querySelectorAll?.('a[href*="/shopd/product/"]').forEach((a) => {
+      const href = a.getAttribute?.('href') || a.href || '';
+      const path = shopdPathFromHref(href);
+      if (!path || path === currentPath) return;
+      const card =
+        a.closest?.('article') ||
+        a.closest?.('li') ||
+        a.closest?.('[class*="product"]') ||
+        a.closest?.('[class*="card"]') ||
+        a;
+      card.remove?.();
+    });
+    clone
+      .querySelectorAll?.(
+        '[class*="related"], [class*="Related"], [class*="recommend"], [class*="Recommend"]'
+      )
+      .forEach?.((el) => el.remove?.());
+    return clone;
   }
 
   function summarizeShopdFromDom(hostEl) {
     const host = hostEl || document.body;
     if (!host) return null;
-    const text = host.textContent || '';
+    const scope = shopdSummaryScope(host) || host;
+    const text = scope.textContent || '';
     const { cannabinoids, totalTerpenes } = parseShopdPotencyLine(text);
     const named = dutchieNamedTerpenes(text);
     let terpenes = named.length ? named : undefined;
@@ -404,17 +451,23 @@
     );
     const price = prices.length ? Math.min(...prices) : parsePrice(text);
     const weightText = (text.match(/(\d+(?:\.\d+)?\s*(?:g|mg|oz)\b)/i) || [])[1] || null;
-    const name = host.querySelector?.('h1')?.textContent?.trim() || undefined;
+    const name =
+      host.querySelector?.('h1')?.textContent?.trim() ||
+      scope.querySelector?.('h1')?.textContent?.trim() ||
+      undefined;
 
     let slug;
-    const link =
-      host.querySelector?.('a[href*="/shopd/product/"]') ||
-      (host.matches?.('a[href*="/shopd/product/"]') ? host : null);
-    if (link) {
-      const href = link.getAttribute('href') || link.href;
-      if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
-    } else if (/\/shopd\/product\//i.test(location.pathname)) {
-      slug = location.pathname;
+    // PDP: always prefer the address bar — first product link in main may be related.
+    if (typeof location !== 'undefined' && /\/shopd\/product\//i.test(location.pathname || '')) {
+      slug = location.pathname.split(/[?#]/)[0];
+    } else {
+      const link =
+        host.querySelector?.('a[href*="/shopd/product/"]') ||
+        (host.matches?.('a[href*="/shopd/product/"]') ? host : null);
+      if (link) {
+        const href = link.getAttribute('href') || link.href;
+        if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
+      }
     }
 
     if (!Object.keys(cannabinoids).length && !terpenes) return null;

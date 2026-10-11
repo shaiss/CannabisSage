@@ -239,18 +239,60 @@ assert(limerickLanding?.id === 'shopd', 'limerick landing resolves shopd');
 assert(CSI.adapters.shopd.bridgeStrategy === 'shopd', 'shopd bridge strategy');
 assert(CSI.adapters.shopd.displayName.includes('Limerick'), 'shopd display name Limerick');
 
-// Unverified store_id must not activate (Wave 1 Limerick-only)
+// Unverified store_id must not activate on same-origin Trulieve pages (Wave 1 Limerick-only)
+const prevLoc = { ...sandbox.location };
+sandbox.location.href = 'https://www.trulieve.com/shopd/category/flower';
+sandbox.location.hostname = 'www.trulieve.com';
+sandbox.location.pathname = '/shopd/category/flower';
 sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '999' : null);
 assert(
   !CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower'),
-  'unverified shopd store_id does not resolve'
+  'same-origin unverified shopd store_id does not resolve'
 );
 sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '109' : null);
 assert(
   CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower')?.id === 'shopd',
-  'verified store_id 109 resolves shopd'
+  'same-origin verified store_id 109 resolves shopd'
+);
+// Cross-origin callers (popup / other menus) must not inherit another page's store_id
+sandbox.location.href = 'https://www.sunnyside.shop/products/flower';
+sandbox.location.hostname = 'www.sunnyside.shop';
+sandbox.location.pathname = '/products/flower';
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '999' : null);
+assert(
+  CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower')?.id === 'shopd',
+  'cross-origin store_id does not block Trulieve shopd URL match'
 );
 sandbox.localStorage.getItem = () => null;
+Object.assign(sandbox.location, prevLoc);
+
+// Bare /shopd is a listing route (manifest must inject there too)
+assert(CSI.adapters.shopd.routeMode('/shopd') === 'listing', 'bare /shopd is listing');
+assert(CSI.adapters.shopd.routeMode('/shopd/') === 'listing', 'bare /shopd/ is listing');
+assert(
+  CSI.adapters.shopd.matchPatterns.includes('https://www.trulieve.com/shopd') &&
+    CSI.adapters.shopd.matchPatterns.includes('https://trulieve.com/shopd'),
+  'adapter matchPatterns include bare /shopd'
+);
+
+// Terpene total: word boundary — do not treat "Terpsichore" as Terps.
+const shopdPotency = CSI.adapters._shopdShared.parseShopdPotencyLine;
+assert(
+  shopdPotency('28.9% THC | 2.81 Terps.').totalTerpenes === 2.81,
+  'shopd terps line parses total'
+);
+assert(
+  shopdPotency('28.9% THC | 2.81 Terps').totalTerpenes === 2.81,
+  'shopd terps without trailing period'
+);
+assert(
+  shopdPotency('Lot 2.81 Terpsichore strain notes').totalTerpenes == null,
+  'shopd terps does not match Terpsichore'
+);
+assert(
+  shopdPotency('Score 5 TerpeneX blend').totalTerpenes == null,
+  'shopd terps does not match TerpeneX'
+);
 
 const dutchieCardHtml = `
 <div data-testid="product-list-item">
@@ -558,6 +600,171 @@ assert(
 assert(bridgeSrcDutchie.includes('[:\\\\-]?'), 'bridge named-terp matcher requires value next to name');
 assert(bridgeSrcDutchie.includes("strategy === 'shopd'") || bridgeSrcDutchie.includes('summarizeShopdFromDom'), 'bridge has shopd strategy');
 assert(bridgeSrcDutchie.includes("host === 'trulieve.com'"), 'bridge detects trulieve host');
+assert(bridgeSrcDutchie.includes('Terps?\\b'), 'bridge terps regex has word boundary');
+assert(bridgeSrcDutchie.includes('function shopdSummaryScope'), 'bridge scopes shopd PDP away from related cards');
+assert(
+  bridgeSrcDutchie.includes('location.pathname') && bridgeSrcDutchie.includes('shopdSummaryScope'),
+  'bridge PDP prefers location.pathname and scoped text'
+);
+
+// Behavioral: shopd PDP scope strips related cards; slug/chem come from the primary product
+{
+  const pdpSlug = '/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+  const relatedSlug = '/shopd/product/other-strain-cheap-99999';
+  const makeEl = (tag, props = {}, children = []) => {
+    const el = {
+      tagName: String(tag).toUpperCase(),
+      textContent: props.textContent || '',
+      href: props.href,
+      className: props.className || '',
+      parentElement: null,
+      children: [],
+      getAttribute(name) {
+        return name === 'href' ? this.href || null : null;
+      },
+      querySelector(sel) {
+        return this.querySelectorAll(sel)[0] || null;
+      },
+      querySelectorAll(sel) {
+        const out = [];
+        if (sel.includes(',')) {
+          sel.split(',').forEach((part) => {
+            this.querySelectorAll(part.trim()).forEach((n) => {
+              if (!out.includes(n)) out.push(n);
+            });
+          });
+          return out;
+        }
+        const walk = (node) => {
+          if (!node) return;
+          if (sel === 'h1' && node.tagName === 'H1') out.push(node);
+          if (
+            sel === 'a[href*="/shopd/product/"]' &&
+            node.tagName === 'A' &&
+            String(node.href || '').includes('/shopd/product/')
+          ) {
+            out.push(node);
+          }
+          if (/related/i.test(sel) && /related/i.test(node.className || '')) out.push(node);
+          if (/recommend/i.test(sel) && /recommend/i.test(node.className || '')) out.push(node);
+          if (sel.includes('[class*="product"]') && /product/i.test(node.className || '')) {
+            out.push(node);
+          }
+          if (sel.includes('[class*="card"]') && /card/i.test(node.className || '')) out.push(node);
+          (node.children || []).forEach(walk);
+        };
+        walk(this);
+        return out;
+      },
+      closest(sel) {
+        let n = this;
+        while (n) {
+          if (sel === 'article' && n.tagName === 'ARTICLE') return n;
+          if (sel === 'li' && n.tagName === 'LI') return n;
+          if (sel.includes('product') && /product/i.test(n.className || '')) return n;
+          if (sel.includes('card') && /card/i.test(n.className || '')) return n;
+          n = n.parentElement;
+        }
+        return null;
+      },
+      cloneNode() {
+        const cloneChild = (node) =>
+          makeEl(
+            node.tagName,
+            { textContent: node._ownText || '', href: node.href, className: node.className },
+            (node.children || []).map(cloneChild)
+          );
+        return cloneChild(this);
+      },
+      remove() {
+        if (!this.parentElement) return;
+        this.parentElement.children = this.parentElement.children.filter((c) => c !== this);
+        const recompute = (node) => {
+          node.textContent = [node._ownText || '', ...(node.children || []).map((c) => c.textContent || '')]
+            .join(' ')
+            .trim();
+          if (node.parentElement) recompute(node.parentElement);
+        };
+        recompute(this.parentElement);
+        this.parentElement = null;
+      }
+    };
+    el._ownText = props.textContent || '';
+    children.forEach((child) => {
+      child.parentElement = el;
+      el.children.push(child);
+    });
+    el.textContent = [el._ownText, ...el.children.map((c) => c.textContent || '')].join(' ').trim();
+    return el;
+  };
+
+  const h1 = makeEl('h1', { textContent: 'GSH MNTS Flower' });
+  const chips = makeEl('div', { textContent: '26.8% THC | 1.55 Terps.' });
+  const named = makeEl('div', { textContent: 'Limonene 0.46%' });
+  const price = makeEl('div', { textContent: '$40.00' });
+  const relatedLink = makeEl('a', {
+    href: relatedSlug,
+    textContent: 'Other Strain 99.9% THC | 9.99 Terps. $9.00'
+  });
+  const relatedCard = makeEl('article', { className: 'product-card related' }, [relatedLink]);
+  const relatedSection = makeEl('div', { className: 'related-products' }, [relatedCard]);
+  const main = makeEl('main', {}, [h1, chips, named, price, relatedSection]);
+
+  // Run bridge.js shopd helpers in a sandbox (expose via temporary global for assertions).
+  const bridgeCode = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
+  const start = bridgeCode.indexOf('function parseShopdPotencyLine');
+  const end = bridgeCode.indexOf('function detectStrategy');
+  assert(start >= 0 && end > start, 'locate shopd helpers in bridge.js');
+  const helperCtx = {
+    location: {
+      href: `https://www.trulieve.com${pdpSlug}`,
+      hostname: 'www.trulieve.com',
+      pathname: pdpSlug
+    },
+    document: { body: main },
+    URL,
+    console
+  };
+  // Minimal deps used by summarizeShopdFromDom
+  const deps = `
+    function parsePrice(text) {
+      if (!text) return null;
+      const m = String(text).replace(/,/g, '').match(/\\$\\s*([0-9]+(?:\\.[0-9]+)?)/);
+      return m ? parseFloat(m[1]) : null;
+    }
+    function dutchieNamedTerpenes(text) {
+      const out = [];
+      const m = String(text || '').match(/limonene\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%/i);
+      if (m) out.push({ name: 'Limonene', percentage: parseFloat(m[1]) });
+      return out;
+    }
+  `;
+  const fn = vm.runInNewContext(
+    `${deps}\n${bridgeCode.slice(start, end)}\n({ parseShopdPotencyLine, shopdSummaryScope, summarizeShopdFromDom })`,
+    helperCtx
+  );
+  const scoped = fn.shopdSummaryScope(main);
+  assert(scoped, 'shopdSummaryScope returns a host');
+  assert(!/99\.9%\s*THC/i.test(scoped.textContent || ''), 'shopdSummaryScope strips related-card THC');
+  assert(!/\$9\.00/.test(scoped.textContent || ''), 'shopdSummaryScope strips related-card price');
+  assert(/26\.8%\s*THC/i.test(scoped.textContent || ''), 'shopdSummaryScope keeps primary THC');
+  const summary = fn.summarizeShopdFromDom(main);
+  assert(summary, 'summarizeShopdFromDom returns summary');
+  assert(summary.slug === pdpSlug, `PDP slug from location, got ${summary.slug}`);
+  assert(summary.id === pdpSlug, 'PDP id from location pathname');
+  assert(summary.cannabinoids?.THC === 26.8, `PDP thc ignores related, got ${summary.cannabinoids?.THC}`);
+  assert(
+    summary.terpenes?.['Total Terpenes'] === 1.55 ||
+      (Array.isArray(summary.terpenes) &&
+        summary.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 1.55)),
+    'PDP total terps from primary product'
+  );
+  assert(summary.price === 40, `PDP price ignores related $9, got ${summary.price}`);
+  assert(
+    fn.parseShopdPotencyLine('Lot 2.81 Terpsichore').totalTerpenes == null,
+    'bridge parseShopdPotencyLine rejects Terpsichore'
+  );
+}
 
 // Parse sample labTests-ish HTML
 const sampleHtml = `
@@ -707,6 +914,20 @@ assert(
 assert(
   topFrameScripts.some((cs) => (cs.matches || []).some((m) => /trulieve\.com\/shopd\//.test(m))),
   'Trulieve shopd is top-frame only'
+);
+assert(
+  topFrameScripts
+    .filter((cs) => (cs.matches || []).some((m) => /trulieve\.com/.test(m)))
+    .every((cs) => {
+      const matches = cs.matches || [];
+      return (
+        matches.includes('https://trulieve.com/shopd') &&
+        matches.includes('https://www.trulieve.com/shopd') &&
+        matches.includes('https://trulieve.com/shopd/*') &&
+        matches.includes('https://www.trulieve.com/shopd/*')
+      );
+    }),
+  'Trulieve content scripts match bare /shopd and /shopd/*'
 );
 assert(
   !contentScripts.some(

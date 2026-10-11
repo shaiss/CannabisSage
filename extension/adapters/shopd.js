@@ -75,10 +75,16 @@
     const path = pathOf(urlLike);
     if (DISPENSARY_LANDING_RE.test(path)) return true;
     if (!SHOPD_PATH_RE.test(path)) return false;
-    // Shopd paths activate the adapter. When a store_id is present, only verified
-    // Limerick (109) is supported in Wave 1 — other Trulieve shopd stores stay dark.
-    const storeId = currentStoreId();
-    if (storeId != null && !isVerifiedStoreId(storeId)) return false;
+    // Shopd paths activate the adapter. store_id lives in page localStorage, so only
+    // consult it when urlLike is same-origin as the current document. Cross-origin
+    // callers (popup picks, cached switcher links) must not inherit another page's store.
+    // Wave 1: when a store_id is present on-page, only verified Limerick (109) is supported.
+    const sameOrigin =
+      typeof location !== 'undefined' && hostOf(location.href) === host;
+    if (sameOrigin) {
+      const storeId = currentStoreId();
+      if (storeId != null && !isVerifiedStoreId(storeId)) return false;
+    }
     return true;
   }
 
@@ -195,7 +201,8 @@
     }
 
     let totalTerpenes = null;
-    const terps = src.match(/(\d+(?:\.\d+)?)\s*%?\s*Terps?\.?/i);
+    // Word boundary after Terps? so "2.81 Terpsichore" / "5 TerpeneX" do not match.
+    const terps = src.match(/(\d+(?:\.\d+)?)\s*%?\s*Terps?\b\.?/i);
     if (terps) totalTerpenes = parseFloat(terps[1]);
 
     return { cannabinoids, totalTerpenes };
@@ -433,6 +440,8 @@
     },
     matchHosts: HOSTS.slice(),
     matchPatterns: [
+      'https://trulieve.com/shopd',
+      'https://www.trulieve.com/shopd',
       'https://trulieve.com/shopd/*',
       'https://www.trulieve.com/shopd/*',
       'https://trulieve.com/dispensaries/pennsylvania/limerick*',

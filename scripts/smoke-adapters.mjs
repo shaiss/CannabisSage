@@ -54,6 +54,7 @@ loadScripts(
     'adapters/terravida.js',
     'adapters/iheartjane.js',
     'adapters/dutchie.js',
+    'adapters/shopd.js',
     'adapters/registry.js'
   ],
   vm.createContext(sandbox)
@@ -77,6 +78,11 @@ assert(CSI.adapters.dutchie, 'dutchie registered');
 assert(
   CSI.registry.BUILTIN_ORDER.indexOf('dutchie') > CSI.registry.BUILTIN_ORDER.indexOf('iheartjane'),
   'dutchie after iheartjane'
+);
+assert(CSI.adapters.shopd, 'shopd registered');
+assert(
+  CSI.registry.BUILTIN_ORDER.indexOf('shopd') > CSI.registry.BUILTIN_ORDER.indexOf('dutchie'),
+  'shopd after dutchie'
 );
 
 const sy = CSI.registry.resolveAdapter('https://www.sunnyside.shop/products/flower');
@@ -197,6 +203,95 @@ assert(
 assert(
   !CSI.adapters.dutchie.buildProductUrl('/embedded-menu/other/product/x'),
   'dutchie rejects unverified PDP path'
+);
+
+// Trulieve shopd / Limerick (Wave 1 store_id 109)
+const shopdListing = CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower');
+assert(shopdListing?.id === 'shopd', `expected shopd got ${shopdListing?.id}`);
+assert(shopdListing.routeMode('/shopd/category/flower') === 'listing', 'shopd listing route');
+assert(
+  shopdListing.routeMode('/shopd/product/avenue-gsh-mnts-whole-flower-132538') === 'pdp',
+  'shopd pdp route'
+);
+assert(
+  shopdListing.routeMode('/dispensaries/pennsylvania/limerick') === null,
+  'shopd limerick landing is thin shell'
+);
+assert(
+  shopdListing.isAllowedFetchUrl(
+    'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538'
+  ),
+  'shopd fetch ok for PDP'
+);
+assert(
+  !shopdListing.isAllowedFetchUrl('https://www.trulieve.com/shopd/category/flower'),
+  'shopd fetch blocks listing URL'
+);
+assert(
+  CSI.adapters.shopd.buildProductUrl('/shopd/product/modern-flower-admiral-apple-flower-90728'),
+  'shopd accepts PDP path'
+);
+assert(!CSI.adapters.shopd.buildProductUrl('/product/fl-only-path'), 'shopd rejects non-shopd PDP');
+const limerickLanding = CSI.registry.resolveAdapter(
+  'https://www.trulieve.com/dispensaries/pennsylvania/limerick'
+);
+assert(limerickLanding?.id === 'shopd', 'limerick landing resolves shopd');
+assert(CSI.adapters.shopd.bridgeStrategy === 'shopd', 'shopd bridge strategy');
+assert(CSI.adapters.shopd.displayName.includes('Limerick'), 'shopd display name Limerick');
+
+// Unverified store_id must not activate on same-origin Trulieve pages (Wave 1 Limerick-only)
+const prevLoc = { ...sandbox.location };
+sandbox.location.href = 'https://www.trulieve.com/shopd/category/flower';
+sandbox.location.hostname = 'www.trulieve.com';
+sandbox.location.pathname = '/shopd/category/flower';
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '999' : null);
+assert(
+  !CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower'),
+  'same-origin unverified shopd store_id does not resolve'
+);
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '109' : null);
+assert(
+  CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower')?.id === 'shopd',
+  'same-origin verified store_id 109 resolves shopd'
+);
+// Cross-origin callers (popup / other menus) must not inherit another page's store_id
+sandbox.location.href = 'https://www.sunnyside.shop/products/flower';
+sandbox.location.hostname = 'www.sunnyside.shop';
+sandbox.location.pathname = '/products/flower';
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '999' : null);
+assert(
+  CSI.registry.resolveAdapter('https://www.trulieve.com/shopd/category/flower')?.id === 'shopd',
+  'cross-origin store_id does not block Trulieve shopd URL match'
+);
+sandbox.localStorage.getItem = () => null;
+Object.assign(sandbox.location, prevLoc);
+
+// Bare /shopd is a listing route (manifest must inject there too)
+assert(CSI.adapters.shopd.routeMode('/shopd') === 'listing', 'bare /shopd is listing');
+assert(CSI.adapters.shopd.routeMode('/shopd/') === 'listing', 'bare /shopd/ is listing');
+assert(
+  CSI.adapters.shopd.matchPatterns.includes('https://www.trulieve.com/shopd') &&
+    CSI.adapters.shopd.matchPatterns.includes('https://trulieve.com/shopd'),
+  'adapter matchPatterns include bare /shopd'
+);
+
+// Terpene total: word boundary — do not treat "Terpsichore" as Terps.
+const shopdPotency = CSI.adapters._shopdShared.parseShopdPotencyLine;
+assert(
+  shopdPotency('28.9% THC | 2.81 Terps.').totalTerpenes === 2.81,
+  'shopd terps line parses total'
+);
+assert(
+  shopdPotency('28.9% THC | 2.81 Terps').totalTerpenes === 2.81,
+  'shopd terps without trailing period'
+);
+assert(
+  shopdPotency('Lot 2.81 Terpsichore strain notes').totalTerpenes == null,
+  'shopd terps does not match Terpsichore'
+);
+assert(
+  shopdPotency('Score 5 TerpeneX blend').totalTerpenes == null,
+  'shopd terps does not match TerpeneX'
 );
 
 const dutchieCardHtml = `
@@ -372,6 +467,123 @@ assert(
   'badge card keeps total terps'
 );
 
+// Trulieve shopd fixtures captured from live Limerick API / card DOM shape (2026-10)
+const shopdListingHtml = `
+<div class="relative flex flex-col">
+  <a href="/shopd/product/modern-flower-admiral-apple-flower-90728">
+    <h3>Admiral Apple Flower</h3>
+    <span>28.9% THC | 2.81 Terps.</span>
+    <span>$35.00</span>
+  </a>
+</div>`;
+const shopdListingParsed = CSI.adapters.shopd.parseProductHtml(
+  shopdListingHtml,
+  'https://www.trulieve.com/shopd/product/modern-flower-admiral-apple-flower-90728'
+);
+assert(shopdListingParsed.cannabinoids?.THC === 28.9, `shopd listing thc ${shopdListingParsed.cannabinoids?.THC}`);
+assert(
+  shopdListingParsed.terpenes?.['Total Terpenes'] === 2.81 ||
+    (Array.isArray(shopdListingParsed.terpenes) &&
+      shopdListingParsed.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 2.81)),
+  'shopd listing total terps'
+);
+assert(
+  !Array.isArray(shopdListingParsed.terpenes) ||
+    !shopdListingParsed.terpenes.some((t) => t.name === 'Limonene'),
+  'shopd listing has no named terpene from totals-only card'
+);
+
+const shopdMockCard = {
+  textContent: 'Admiral Apple Flower 28.9% THC | 2.81 Terps. $35.00',
+  querySelector: (sel) =>
+    String(sel).includes('/shopd/product/')
+      ? { getAttribute: () => '/shopd/product/modern-flower-admiral-apple-flower-90728', href: '/shopd/product/modern-flower-admiral-apple-flower-90728' }
+      : null,
+  closest: () => shopdMockCard,
+  matches: () => false
+};
+const shopdHints = CSI.adapters.shopd.parseListingHints(shopdMockCard);
+assert(shopdHints.cannabinoids?.THC === 28.9, 'shopd listing hint thc');
+assert(shopdHints.terpenes?.['Total Terpenes'] === 2.81, 'shopd listing hint terps');
+assert(
+  CSI.adapters.shopd.shouldSuppressListingCannabinoidBadges(shopdMockCard) === true,
+  'shopd suppresses duplicate THC badge'
+);
+
+// Live Limerick PDP JSON from api.trulieve.com/api/v2/products/…/109/MEDICAL/
+const shopdPdpJson = JSON.stringify({
+  name: 'GSH MNTS Flower',
+  sku: '132538',
+  product_id: '6aa31b305dfcf0989e7b5381',
+  slug: 'AVENUE_GSH-MNTS-Flower',
+  thc_content: 26.75,
+  thc_content_unit: '%',
+  cbd_content: 0,
+  cbd_content_unit: '%',
+  cannabinoids: [
+    { name: 'CBG (Cannabigerol)', unit: 'PERCENTAGE', value: 0.29 },
+    { name: 'THCA (Δ9-tetrahydrocannabinolic acid)', unit: 'PERCENTAGE', value: 26.51 }
+  ],
+  terpenes: [
+    { name: 'Alpha Pinene', unit: 'PERCENTAGE', value: 0.01, unitSymbol: '%' },
+    { name: 'Beta Caryophyllene', unit: 'PERCENTAGE', value: 0.47, unitSymbol: '%' },
+    { name: 'Beta Myrcene', unit: 'PERCENTAGE', value: 0.26, unitSymbol: '%' },
+    { name: 'Limonene', unit: 'PERCENTAGE', value: 0.46, unitSymbol: '%' },
+    { name: 'Linalool', unit: 'PERCENTAGE', value: 0.16, unitSymbol: '%' },
+    { name: 'Humulene', unit: 'PERCENTAGE', value: 0.1, unitSymbol: '%' },
+    { name: 'Ocimene', unit: 'PERCENTAGE', value: 0, unitSymbol: '%' }
+  ],
+  unit_price: 40,
+  specials: [],
+  subcategory: 'WHOLE-FLOWER',
+  store_id: 109
+});
+const shopdPdp = CSI.adapters.shopd.parseProductHtml(
+  shopdPdpJson,
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538'
+);
+assert(shopdPdp.cannabinoids?.THC === 26.75, 'shopd pdp thc from API JSON');
+assert(shopdPdp.cannabinoids?.THCA === 26.51, 'shopd pdp thca');
+assert(shopdPdp.cannabinoids?.CBG === 0.29, 'shopd pdp cbg');
+assert(
+  Array.isArray(shopdPdp.terpenes) &&
+    shopdPdp.terpenes.some((t) => t.name === 'Limonene' && t.percentage === 0.46),
+  'shopd pdp named limonene'
+);
+assert(
+  Array.isArray(shopdPdp.terpenes) &&
+    shopdPdp.terpenes.some((t) => /caryophyllene/i.test(t.name) && t.percentage === 0.47),
+  'shopd pdp caryophyllene'
+);
+assert(
+  !shopdPdp.terpenes.some((t) => t.name === 'Ocimene'),
+  'shopd skips zero-percent ocimene'
+);
+assert(shopdPdp.name === 'GSH MNTS Flower', 'shopd pdp name');
+assert(shopdPdp.price === 40, 'shopd pdp price');
+assert(shopdPdp.provenance?.source === '132538', 'shopd provenance sku');
+
+// PDP visible DOM shape (Top Terpenes panel)
+const shopdPdpDom = `
+<main>
+  <h1>GSH MNTS Flower</h1>
+  <div>26.8% THC | 1.51% Terps.</div>
+  <h2>Top Terpenes</h2>
+  <div>Beta Caryophyllene 0.470% / 1.510%</div>
+  <div>Limonene 0.460% / 1.510%</div>
+  <div>$40.00</div>
+</main>`;
+const shopdPdpDomParsed = CSI.adapters.shopd.parseProductHtml(
+  shopdPdpDom,
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-flower-132538'
+);
+assert(shopdPdpDomParsed.cannabinoids?.THC === 26.8, 'shopd pdp dom thc');
+assert(
+  Array.isArray(shopdPdpDomParsed.terpenes) &&
+    shopdPdpDomParsed.terpenes.some((t) => t.name === 'Limonene' && t.percentage === 0.46),
+  'shopd pdp dom named limonene'
+);
+
 const bridgeSrcDutchie = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
 assert(
   bridgeSrcDutchie.includes('(?<!beta[\\s-]?)(?<![a-z-])pinene'),
@@ -386,6 +598,173 @@ assert(
   'bridge named-terp matcher no longer uses loose 16-char window'
 );
 assert(bridgeSrcDutchie.includes('[:\\\\-]?'), 'bridge named-terp matcher requires value next to name');
+assert(bridgeSrcDutchie.includes("strategy === 'shopd'") || bridgeSrcDutchie.includes('summarizeShopdFromDom'), 'bridge has shopd strategy');
+assert(bridgeSrcDutchie.includes("host === 'trulieve.com'"), 'bridge detects trulieve host');
+assert(bridgeSrcDutchie.includes('Terps?\\b'), 'bridge terps regex has word boundary');
+assert(bridgeSrcDutchie.includes('function shopdSummaryScope'), 'bridge scopes shopd PDP away from related cards');
+assert(
+  bridgeSrcDutchie.includes('location.pathname') && bridgeSrcDutchie.includes('shopdSummaryScope'),
+  'bridge PDP prefers location.pathname and scoped text'
+);
+
+// Behavioral: shopd PDP scope strips related cards; slug/chem come from the primary product
+{
+  const pdpSlug = '/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+  const relatedSlug = '/shopd/product/other-strain-cheap-99999';
+  const makeEl = (tag, props = {}, children = []) => {
+    const el = {
+      tagName: String(tag).toUpperCase(),
+      textContent: props.textContent || '',
+      href: props.href,
+      className: props.className || '',
+      parentElement: null,
+      children: [],
+      getAttribute(name) {
+        return name === 'href' ? this.href || null : null;
+      },
+      querySelector(sel) {
+        return this.querySelectorAll(sel)[0] || null;
+      },
+      querySelectorAll(sel) {
+        const out = [];
+        if (sel.includes(',')) {
+          sel.split(',').forEach((part) => {
+            this.querySelectorAll(part.trim()).forEach((n) => {
+              if (!out.includes(n)) out.push(n);
+            });
+          });
+          return out;
+        }
+        const walk = (node) => {
+          if (!node) return;
+          if (sel === 'h1' && node.tagName === 'H1') out.push(node);
+          if (
+            sel === 'a[href*="/shopd/product/"]' &&
+            node.tagName === 'A' &&
+            String(node.href || '').includes('/shopd/product/')
+          ) {
+            out.push(node);
+          }
+          if (/related/i.test(sel) && /related/i.test(node.className || '')) out.push(node);
+          if (/recommend/i.test(sel) && /recommend/i.test(node.className || '')) out.push(node);
+          if (sel.includes('[class*="product"]') && /product/i.test(node.className || '')) {
+            out.push(node);
+          }
+          if (sel.includes('[class*="card"]') && /card/i.test(node.className || '')) out.push(node);
+          (node.children || []).forEach(walk);
+        };
+        walk(this);
+        return out;
+      },
+      closest(sel) {
+        let n = this;
+        while (n) {
+          if (sel === 'article' && n.tagName === 'ARTICLE') return n;
+          if (sel === 'li' && n.tagName === 'LI') return n;
+          if (sel.includes('product') && /product/i.test(n.className || '')) return n;
+          if (sel.includes('card') && /card/i.test(n.className || '')) return n;
+          n = n.parentElement;
+        }
+        return null;
+      },
+      cloneNode() {
+        const cloneChild = (node) =>
+          makeEl(
+            node.tagName,
+            { textContent: node._ownText || '', href: node.href, className: node.className },
+            (node.children || []).map(cloneChild)
+          );
+        return cloneChild(this);
+      },
+      remove() {
+        if (!this.parentElement) return;
+        this.parentElement.children = this.parentElement.children.filter((c) => c !== this);
+        const recompute = (node) => {
+          node.textContent = [node._ownText || '', ...(node.children || []).map((c) => c.textContent || '')]
+            .join(' ')
+            .trim();
+          if (node.parentElement) recompute(node.parentElement);
+        };
+        recompute(this.parentElement);
+        this.parentElement = null;
+      }
+    };
+    el._ownText = props.textContent || '';
+    children.forEach((child) => {
+      child.parentElement = el;
+      el.children.push(child);
+    });
+    el.textContent = [el._ownText, ...el.children.map((c) => c.textContent || '')].join(' ').trim();
+    return el;
+  };
+
+  const h1 = makeEl('h1', { textContent: 'GSH MNTS Flower' });
+  const chips = makeEl('div', { textContent: '26.8% THC | 1.55 Terps.' });
+  const named = makeEl('div', { textContent: 'Limonene 0.46%' });
+  const price = makeEl('div', { textContent: '$40.00' });
+  const relatedLink = makeEl('a', {
+    href: relatedSlug,
+    textContent: 'Other Strain 99.9% THC | 9.99 Terps. $9.00'
+  });
+  const relatedCard = makeEl('article', { className: 'product-card related' }, [relatedLink]);
+  const relatedSection = makeEl('div', { className: 'related-products' }, [relatedCard]);
+  const main = makeEl('main', {}, [h1, chips, named, price, relatedSection]);
+
+  // Run bridge.js shopd helpers in a sandbox (expose via temporary global for assertions).
+  const bridgeCode = fs.readFileSync(path.join(ext, 'bridge.js'), 'utf8');
+  const start = bridgeCode.indexOf('function parseShopdPotencyLine');
+  const end = bridgeCode.indexOf('function detectStrategy');
+  assert(start >= 0 && end > start, 'locate shopd helpers in bridge.js');
+  const helperCtx = {
+    location: {
+      href: `https://www.trulieve.com${pdpSlug}`,
+      hostname: 'www.trulieve.com',
+      pathname: pdpSlug
+    },
+    document: { body: main },
+    URL,
+    console
+  };
+  // Minimal deps used by summarizeShopdFromDom
+  const deps = `
+    function parsePrice(text) {
+      if (!text) return null;
+      const m = String(text).replace(/,/g, '').match(/\\$\\s*([0-9]+(?:\\.[0-9]+)?)/);
+      return m ? parseFloat(m[1]) : null;
+    }
+    function dutchieNamedTerpenes(text) {
+      const out = [];
+      const m = String(text || '').match(/limonene\\s*[:\\-]?\\s*([0-9]+(?:\\.[0-9]+)?)\\s*%/i);
+      if (m) out.push({ name: 'Limonene', percentage: parseFloat(m[1]) });
+      return out;
+    }
+  `;
+  const fn = vm.runInNewContext(
+    `${deps}\n${bridgeCode.slice(start, end)}\n({ parseShopdPotencyLine, shopdSummaryScope, summarizeShopdFromDom })`,
+    helperCtx
+  );
+  const scoped = fn.shopdSummaryScope(main);
+  assert(scoped, 'shopdSummaryScope returns a host');
+  assert(!/99\.9%\s*THC/i.test(scoped.textContent || ''), 'shopdSummaryScope strips related-card THC');
+  assert(!/\$9\.00/.test(scoped.textContent || ''), 'shopdSummaryScope strips related-card price');
+  assert(/26\.8%\s*THC/i.test(scoped.textContent || ''), 'shopdSummaryScope keeps primary THC');
+  const summary = fn.summarizeShopdFromDom(main);
+  assert(summary, 'summarizeShopdFromDom returns summary');
+  assert(summary.slug === pdpSlug, `PDP slug from location, got ${summary.slug}`);
+  assert(summary.id === pdpSlug, 'PDP id from location pathname');
+  assert(summary.cannabinoids?.THC === 26.8, `PDP thc ignores related, got ${summary.cannabinoids?.THC}`);
+  assert(
+    summary.terpenes?.['Total Terpenes'] === 1.55 ||
+      (Array.isArray(summary.terpenes) &&
+        summary.terpenes.some((t) => t.name === 'Total Terpenes' && t.percentage === 1.55)),
+    'PDP total terps from primary product'
+  );
+  assert(summary.price === 40, `PDP price ignores related $9, got ${summary.price}`);
+  assert(
+    fn.parseShopdPotencyLine('Lot 2.81 Terpsichore').totalTerpenes == null,
+    'bridge parseShopdPotencyLine rejects Terpsichore'
+  );
+}
 
 // Parse sample labTests-ish HTML
 const sampleHtml = `
@@ -464,7 +843,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.23', 'version bump');
+assert(manifest.version === '1.3.24', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -493,6 +872,11 @@ assert(
   manifest.host_permissions.includes('https://libertycannabis.com/*'),
   'liberty host perm'
 );
+assert(
+  manifest.host_permissions.includes('https://trulieve.com/*') ||
+    manifest.host_permissions.includes('https://www.trulieve.com/*'),
+  'trulieve host perm'
+);
 const contentScripts = manifest.content_scripts || [];
 const isolatedScripts = contentScripts.filter((cs) => cs.world === 'ISOLATED' || !cs.world);
 const mainScripts = contentScripts.filter((cs) => cs.world === 'MAIN');
@@ -505,6 +889,10 @@ const topFrameScripts = contentScripts.filter((cs) => cs.all_frames !== true);
 assert(
   isolatedScripts.some((cs) => (cs.js || []).includes('adapters/dutchie.js')),
   'dutchie content script listed'
+);
+assert(
+  isolatedScripts.some((cs) => (cs.js || []).includes('adapters/shopd.js')),
+  'shopd content script listed'
 );
 assert(dutchieFrameScripts.length === 2, 'exactly two all_frames blocks (MAIN + ISOLATED)');
 assert(
@@ -524,12 +912,30 @@ assert(
   'Liberty shop shell is top-frame only'
 );
 assert(
+  topFrameScripts.some((cs) => (cs.matches || []).some((m) => /trulieve\.com\/shopd\//.test(m))),
+  'Trulieve shopd is top-frame only'
+);
+assert(
+  topFrameScripts
+    .filter((cs) => (cs.matches || []).some((m) => /trulieve\.com/.test(m)))
+    .every((cs) => {
+      const matches = cs.matches || [];
+      return (
+        matches.includes('https://trulieve.com/shopd') &&
+        matches.includes('https://www.trulieve.com/shopd') &&
+        matches.includes('https://trulieve.com/shopd/*') &&
+        matches.includes('https://www.trulieve.com/shopd/*')
+      );
+    }),
+  'Trulieve content scripts match bare /shopd and /shopd/*'
+);
+assert(
   !contentScripts.some(
     (cs) =>
       cs.all_frames === true &&
-      (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis/.test(m))
+      (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis|trulieve/.test(m))
   ),
-  'Sunnyside/Zenleaf/RISE/Liberty never use all_frames'
+  'Sunnyside/Zenleaf/RISE/Liberty/Trulieve never use all_frames'
 );
 assert(
   mainScripts.some((cs) => (cs.matches || []).some((m) => m.includes('dutchie.com/embedded-menu'))),
@@ -538,6 +944,10 @@ assert(
 assert(
   manifest.web_accessible_resources?.[0]?.matches?.some((m) => m.includes('dutchie.com')),
   'WAR matches dutchie'
+);
+assert(
+  manifest.web_accessible_resources?.[0]?.matches?.some((m) => m.includes('trulieve.com')),
+  'WAR matches trulieve'
 );
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),
@@ -592,7 +1002,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.23', 'core version 1.3.23');
+assert(CSI.VERSION === '1.3.24', 'core version 1.3.24');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -601,7 +1011,7 @@ assert(!/\bstrain\b/i.test(addsCopy), 'chip does not frame by strain name');
 assert(!/hover profile/i.test(addsCopy), 'chip does not call hover a product profile');
 assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
 assert(
-  !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane|dutchie|liberty/i.test(addsCopy),
+  !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane|dutchie|liberty|trulieve|shopd/i.test(addsCopy),
   'no retailer brand in chip copy'
 );
 assert(
@@ -1465,12 +1875,14 @@ assert(
       'https://www.dutchie.com/*',
       'https://libertycannabis.com/*',
       'https://www.libertycannabis.com/*',
+      'https://trulieve.com/*',
+      'https://www.trulieve.com/*',
       'https://cannabissage.app/*',
       'https://cannabissage.vercel.app/*',
       'http://localhost:3000/*',
       'https://localhost:3000/*'
     ]),
-  'host permissions include RISE + Dutchie + Liberty + prior retailers'
+  'host permissions include RISE + Dutchie + Liberty + Trulieve + prior retailers'
 );
 assert(
   (manifest.content_scripts || []).some(
@@ -1478,6 +1890,15 @@ assert(
   ),
   'iheartjane content script listed'
 );
+assert(
+  (manifest.content_scripts || []).some(
+    (cs) => (cs.world === 'ISOLATED' || !cs.world) && (cs.js || []).includes('adapters/shopd.js')
+  ),
+  'shopd content script listed in isolated world'
+);
+const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
+assert(bgSrc.includes("hosts: ['trulieve.com', 'www.trulieve.com']"), 'SW fetch allowlists trulieve');
+assert(/shopd\\\/product\\\//.test(bgSrc), 'SW fetch path allows shopd PDPs');
 assert(
   (manifest.content_scripts || []).some(
     (cs) =>

@@ -66,6 +66,19 @@ Checks per listing:
 | Unverified Dutchie slug does not activate | | |
 | `node scripts/smoke-adapters.mjs` covers dutchie parse + slug allowlist | | |
 
+## Trulieve shopd / Limerick — smoke (v1.3.24+)
+
+| Step | URL / action | Pass? |
+| --- | --- | --- |
+| Limerick dispensary landing (thin locator; top-frame) | https://www.trulieve.com/dispensaries/pennsylvania/limerick | |
+| Flower listing on shopd (select Limerick / store_id 109) | https://www.trulieve.com/shopd/category/flower | |
+| Filter bar shows **Trulieve Limerick** | | |
+| Cards show on-card `XX% THC \| X.XX Terps.` (listing bar: totals only) | | |
+| Open a PDP; panel shows named terpene % (Top Terpenes) | e.g. `/shopd/product/avenue-gsh-mnts-whole-flower-132538` | |
+| Non-Limerick shopd store_id does not activate adapter | | |
+| `all_frames` still Dutchie embedded-menu only (Trulieve top-frame) | | |
+| `node scripts/smoke-adapters.mjs` covers shopd parse + store allowlist | | |
+
 ## Zen Leaf — smoke
 
 | Step | URL / action | Pass? |
@@ -249,7 +262,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -326,6 +339,8 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 
 **v1.3.23:** Dutchie taste-profile product keys accept only `dutchie.com` / `www.dutchie.com` (apex after one `www.` strip). `evil.dutchie.com`, `shop.dutchie.com`, and `www.www.dutchie.com` must not yield a product key (`smoke-profile.mjs`).
 
+**v1.3.24:** Trulieve shopd adapter (Limerick PA, store_id 109). Taste-profile `HOST_OK` accepts `trulieve.com` / `www.trulieve.com` apex only; `/shopd/product/…` PDP paths only. Listing chem = THC + total terps; named terps on PDP.
+
 | Step | Pass? |
 | --- | --- |
 | Fresh install: popup profile is off; `chrome.storage.local` has no `csi_taste_profile` | |
@@ -339,7 +354,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -357,7 +372,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.23.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

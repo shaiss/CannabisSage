@@ -465,7 +465,7 @@
     bridgeStrategy: 'dutchie',
     pdpChemSurface: 'floating-panel',
     notes:
-      'Multi-tenant Dutchie embed adapter. Wave 1 tenant: Liberty Norristown (dutchie.com/embedded-menu/liberty-norristown + libertycannabis.com/shop/norristown thin WP shell). Listing: THC/TERPS totals; PDP: named cannabinoids + named terpenes. Trulieve/shopd out of scope.'
+      'Multi-tenant Dutchie embed adapter. Wave 1 tenant: Liberty Norristown (dutchie.com/embedded-menu/liberty-norristown + libertycannabis.com/shop/norristown thin WP shell). Listing: THC/TERPS totals; PDP: named cannabinoids + named terpenes. Trulieve Limerick uses dedicated shopd adapter.'
   };
 
   CSI.adapters = CSI.adapters || {};

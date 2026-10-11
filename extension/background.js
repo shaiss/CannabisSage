@@ -23,6 +23,11 @@ const ALLOWED_FETCH_RULES = [
     // Dutchie embedded-menu PDPs (verified slugs only; mirrors adapters/dutchie.js)
     hosts: ['dutchie.com', 'www.dutchie.com'],
     path: /^\/embedded-menu\/(?:liberty-norristown)\/product\/[^/]+\/?$/i
+  },
+  {
+    // Trulieve shopd PDPs (Wave 1: Limerick menu on /shopd/product/…)
+    hosts: ['trulieve.com', 'www.trulieve.com'],
+    path: /^\/shopd\/product\/[^/]+\/?$/i
   }
 ];
 

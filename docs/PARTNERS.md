@@ -73,6 +73,7 @@ Seeded hosts match real in-repo adapter hosts (normalized, no `www.`):
 | `risecannabis.com` | RISE | `community` | iHeartJane-powered menus under `/dispensaries/.../(medical\|recreational)-menu/`. Adapter id `iheartjane`. |
 | `dutchie.com` | Liberty Norristown | `community` | Dutchie embedded-menu host. Verified slug: `liberty-norristown`. Do not treat all Dutchie menus as supported. |
 | `libertycannabis.com` | Liberty Cannabis | `community` | Thin WP entry for the Norristown Dutchie embed (`/shop/norristown/`). |
+| `trulieve.com` | Trulieve Limerick | `community` | Trulieve shopd storefront (`/shopd/…`). Wave 1 verified store_id `109` (Limerick PA). Not the Dutchie embed adapter. |
 
 Do not invent partner verification proofs. GitHub release tags (after an adapter is vendored into the zip) are community **adapter** provenance, not brand proof by themselves. Seeds stay `community` until ops flips a host after a human check.
 

@@ -2,6 +2,7 @@
  * MAIN-world bridge: store-specific product extraction + SPA route notify.
  * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints),
  * dutchie (live DOM potency chips + named terpene rows; Cloudflare often blocks HTML fetch),
+ * shopd (Trulieve shopd cards/PDP: `XX% THC | X.XX Terps.` + Top Terpenes named %),
  * none (HTML-parse adapters such as iHeartJane / RISE — bridge returns null).
  */
 (function () {
@@ -367,18 +368,137 @@
     };
   }
 
+  /** Trulieve shopd: listing line `28.9% THC | 2.81 Terps.`; PDP adds Top Terpenes named %. */
+  function parseShopdPotencyLine(text) {
+    const src = String(text || '');
+    const cannabinoids = {};
+    const thcPct = src.match(/(\d+(?:\.\d+)?)\s*%\s*THC\b/i);
+    const thcMg = src.match(/(\d+(?:\.\d+)?)\s*mg\s*THC\b/i);
+    if (thcPct) cannabinoids.THC = parseFloat(thcPct[1]);
+    else if (thcMg) cannabinoids.THC = parseFloat(thcMg[1]);
+    const cbdPct = src.match(/(\d+(?:\.\d+)?)\s*%\s*CBD\b/i);
+    if (cbdPct) {
+      const v = parseFloat(cbdPct[1]);
+      if (v > 0) cannabinoids.CBD = v;
+    }
+    let totalTerpenes = null;
+    // Word boundary after Terps? so "2.81 Terpsichore" / "5 TerpeneX" do not match.
+    const terps = src.match(/(\d+(?:\.\d+)?)\s*%?\s*Terps?\b\.?/i);
+    if (terps) totalTerpenes = parseFloat(terps[1]);
+    return { cannabinoids, totalTerpenes };
+  }
+
+  function shopdPathFromHref(href) {
+    if (!href) return '';
+    try {
+      const path = (String(href).startsWith('http') ? new URL(href).pathname : String(href))
+        .split(/[?#]/)[0]
+        .replace(/\/$/, '');
+      return path;
+    } catch {
+      return String(href).split(/[?#]/)[0].replace(/\/$/, '');
+    }
+  }
+
+  /**
+   * On PDP, strip related-product cards (other /shopd/product/ links) so potency/price
+   * are not taken from carousels inside main. Listing cards pass through unchanged.
+   */
+  function shopdSummaryScope(hostEl) {
+    const host = hostEl || document.body;
+    if (!host) return null;
+    const isPdp =
+      typeof location !== 'undefined' && /\/shopd\/product\//i.test(location.pathname || '');
+    if (!isPdp || typeof host.cloneNode !== 'function') return host;
+
+    const clone = host.cloneNode(true);
+    const currentPath = shopdPathFromHref(location.pathname);
+    clone.querySelectorAll?.('a[href*="/shopd/product/"]').forEach((a) => {
+      const href = a.getAttribute?.('href') || a.href || '';
+      const path = shopdPathFromHref(href);
+      if (!path || path === currentPath) return;
+      const card =
+        a.closest?.('article') ||
+        a.closest?.('li') ||
+        a.closest?.('[class*="product"]') ||
+        a.closest?.('[class*="card"]') ||
+        a;
+      card.remove?.();
+    });
+    clone
+      .querySelectorAll?.(
+        '[class*="related"], [class*="Related"], [class*="recommend"], [class*="Recommend"]'
+      )
+      .forEach?.((el) => el.remove?.());
+    return clone;
+  }
+
+  function summarizeShopdFromDom(hostEl) {
+    const host = hostEl || document.body;
+    if (!host) return null;
+    const scope = shopdSummaryScope(host) || host;
+    const text = scope.textContent || '';
+    const { cannabinoids, totalTerpenes } = parseShopdPotencyLine(text);
+    const named = dutchieNamedTerpenes(text);
+    let terpenes = named.length ? named : undefined;
+    if (!named.length && totalTerpenes != null) terpenes = { 'Total Terpenes': totalTerpenes };
+    else if (named.length && totalTerpenes != null) {
+      terpenes = [...named, { name: 'Total Terpenes', percentage: totalTerpenes }];
+    }
+
+    const prices = [...String(text).matchAll(/\$\s*([0-9]+(?:\.[0-9]+)?)/g)].map((m) =>
+      parseFloat(m[1])
+    );
+    const price = prices.length ? Math.min(...prices) : parsePrice(text);
+    const weightText = (text.match(/(\d+(?:\.\d+)?\s*(?:g|mg|oz)\b)/i) || [])[1] || null;
+    const name =
+      host.querySelector?.('h1')?.textContent?.trim() ||
+      scope.querySelector?.('h1')?.textContent?.trim() ||
+      undefined;
+
+    let slug;
+    // PDP: always prefer the address bar — first product link in main may be related.
+    if (typeof location !== 'undefined' && /\/shopd\/product\//i.test(location.pathname || '')) {
+      slug = location.pathname.split(/[?#]/)[0];
+    } else {
+      const link =
+        host.querySelector?.('a[href*="/shopd/product/"]') ||
+        (host.matches?.('a[href*="/shopd/product/"]') ? host : null);
+      if (link) {
+        const href = link.getAttribute('href') || link.href;
+        if (href) slug = href.startsWith('http') ? new URL(href).pathname : href.split(/[?#]/)[0];
+      }
+    }
+
+    if (!Object.keys(cannabinoids).length && !terpenes) return null;
+
+    return {
+      id: slug || undefined,
+      slug: slug || undefined,
+      name,
+      cannabinoids: Object.keys(cannabinoids).length ? cannabinoids : undefined,
+      terpenes,
+      price: price || undefined,
+      weightText: weightText ? String(weightText) : undefined,
+      onSale: /\d+\s*%\s*off/i.test(text) || /(?:was|was:)\s*\$/i.test(text),
+      strategy: 'shopd'
+    };
+  }
+
   function detectStrategy() {
     const host = location.hostname.replace(/^www\./, '');
     if (host === 'sunnyside.shop') return 'sunnyside';
     if (host === 'zenleafdispensaries.com') return 'zenleaf';
     if (host === 'risecannabis.com') return 'none';
     if (host === 'dutchie.com') return 'dutchie';
+    if (host === 'trulieve.com') return 'shopd';
     return 'sunnyside';
   }
 
   function summarize(product, hostEl, strategy) {
     if (strategy === 'none') return null;
     if (strategy === 'dutchie') return summarizeDutchieFromDom(hostEl) || summarizeZenleaf(product, hostEl);
+    if (strategy === 'shopd') return summarizeShopdFromDom(hostEl);
     if (strategy === 'zenleaf') return summarizeZenleaf(product, hostEl);
     return summarizeSunnyside(product, hostEl);
   }
@@ -395,6 +515,14 @@
     if (strategy === 'dutchie') {
       host = el?.closest('[data-testid="product-list-item"]') || el;
       return summarizeDutchieFromDom(host);
+    }
+    if (strategy === 'shopd') {
+      host =
+        el?.closest('a[href*="/shopd/product/"]')?.parentElement ||
+        el?.closest('article') ||
+        el?.closest('li') ||
+        el;
+      return summarizeShopdFromDom(host);
     }
     if (strategy === 'zenleaf') {
       host = el?.closest('[data-testid="product-card"]') || el?.closest('[role="listitem"]') || el;
@@ -414,6 +542,14 @@
       ].filter(Boolean);
       for (const root of roots) {
         const summary = summarizeDutchieFromDom(root);
+        if (summary && (summary.cannabinoids || summary.terpenes)) return summary;
+      }
+      return null;
+    }
+    if (strategy === 'shopd') {
+      const roots = [document.querySelector('main'), document.body].filter(Boolean);
+      for (const root of roots) {
+        const summary = summarizeShopdFromDom(root);
         if (summary && (summary.cannabinoids || summary.terpenes)) return summary;
       }
       return null;

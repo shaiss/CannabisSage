@@ -7,14 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.23 |
+| **Version** | 1.3.24 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
 
-## Release notes (v1.3.23)
+## Release notes (v1.3.24)
 
-Security: taste-profile `HOST_OK` in `csi-profile` now accepts only `dutchie.com` apex and `www.dutchie.com` (after a single `www.` strip). Arbitrary `*.dutchie.com` subdomains and repeated-`www` hosts are rejected so they cannot bypass the Liberty Norristown embedded-menu PDP path check. No new hosts, permissions, or adapter behavior.
+Wave 1 PA adapter #3: dedicated **Trulieve shopd** adapter for the **Limerick, PA** menu on `trulieve.com/shopd/…`. Listing cards expose THC + total terpenes; named terpene percentages appear on the PDP panel. Taste-profile `HOST_OK` accepts `trulieve.com` / `www.trulieve.com` (apex after one `www.` strip). Content scripts stay top-frame only (Cipher: `all_frames` remains Dutchie embedded-menu only). Not a reuse of the Dutchie host adapter.
 
 ## Short description (≤ 132 characters)
 
@@ -78,6 +78,10 @@ Inject UI into verified Dutchie `/embedded-menu/*` iframe documents (first tenan
 
 Inject on Liberty shop entry URLs that host the Dutchie embed script (`/shop/norristown/`). The live product grid runs inside the Dutchie iframe.
 
+### Host permission: Trulieve (`trulieve.com`)
+
+Inject UI on Trulieve shopd listings/PDPs under `/shopd/*` (Wave 1: Limerick PA, store_id 109) and the Limerick dispensary locator landing; allowlisted same-origin PDP HTML fetches for `/shopd/product/…`.
+
 ### Host permission: CannabisSage site (`https://cannabissage.app/*`, `https://cannabissage.vercel.app/*`)
 
 Call entitlement activate/validate APIs and open Upgrade / Manage links on the production landing origin (`cannabissage.app`; `cannabissage.vercel.app` kept as Vercel fallback). Cards are never entered in the extension.
@@ -107,7 +111,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.23.zip` (includes iHeartJane + Dutchie Liberty; v1.3.23 tightens taste-profile `HOST_OK` to dutchie.com apex/www only).
+4. Upload `dist/cannabis-sage-1.3.24.zip` (includes iHeartJane + Dutchie Liberty + Trulieve shopd Limerick).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

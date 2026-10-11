@@ -19,7 +19,14 @@
   const POTENCY_BANDS = Object.freeze(['under-15', '15-25', '25-plus']);
   const FLAGS = Object.freeze(['rebuy', 'fine', 'never']);
   const DEAL_TIERS = Object.freeze(['any', 'sale', 'below-median']);
-  const STORE_IDS = Object.freeze(['sunnyside', 'zenleaf', 'terravida', 'iheartjane', 'dutchie']);
+  const STORE_IDS = Object.freeze([
+    'sunnyside',
+    'zenleaf',
+    'terravida',
+    'iheartjane',
+    'dutchie',
+    'shopd'
+  ]);
   const ALLOWED_KEYS = Object.freeze([
     'schemaVersion',
     'enabled',
@@ -39,13 +46,15 @@
     'boughtBefore'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
-  // Dutchie: apex only after one-prefix www strip (not *.dutchie.com / www.www.*).
+  // Dutchie + Trulieve: apex only after one-prefix www strip (not *.host / www.www.*).
   // Other partners keep subdomain allow.
   const HOST_OK =
-    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^dutchie\.com$/i;
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^dutchie\.com$|^trulieve\.com$/i;
   /** Fallback when Dutchie adapter is not loaded (e.g. minimal smoke harness). */
   const DUTCHIE_VERIFIED_PRODUCT_RE =
     /^\/embedded-menu\/liberty-norristown\/product\/[^/]+\/?$/i;
+  /** Fallback when shopd adapter is not loaded. */
+  const SHOPD_PRODUCT_RE = /^\/shopd\/product\/[^/]+\/?$/i;
 
   const COPY = Object.freeze({
     title: 'Local taste profile',
@@ -232,6 +241,15 @@
         return built.replace(/\/$/, '');
       }
       if (!DUTCHIE_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
+    }
+    // Trulieve shopd: only /shopd/product/… PDPs (adapter allowlist when present).
+    if (/^trulieve\.com$/i.test(bareHost)) {
+      if (CSI.adapters?.shopd?.buildProductUrl) {
+        const built = CSI.adapters.shopd.buildProductUrl(parsed.href);
+        if (!built) return null;
+        return built.replace(/\/$/, '');
+      }
+      if (!SHOPD_PRODUCT_RE.test(parsed.pathname)) return null;
     }
     return parsed.href.replace(/\/$/, '');
   }

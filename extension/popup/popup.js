@@ -128,7 +128,8 @@
     zenleaf: 'Zen Leaf',
     terravida: 'TerraVida (Zen Leaf Malvern)',
     iheartjane: 'RISE',
-    dutchie: 'Liberty Norristown'
+    dutchie: 'Liberty Norristown',
+    shopd: 'Trulieve Limerick'
   };
 
   function fillSelect(el, entries, selected, includeBlank) {

@@ -17,9 +17,10 @@ Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only)
 | `extension/adapters/terravida.js` | TerraVida alias for Zen Leaf **Malvern** only |
 | `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (first host: RISE / `risecannabis.com`) |
 | `extension/adapters/dutchie.js` | Multi-tenant Dutchie embed (`dutchie.com/embedded-menu/…`) |
+| `extension/adapters/shopd.js` | Trulieve shopd storefront (`trulieve.com/shopd/…`) |
 | `extension/adapters/_template.js` | Copy-paste starter (not registered) |
 
-Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `dutchie` → `sunnyside`.
+Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `dutchie` → `shopd` → `sunnyside`.
 
 ## Adapter interface
 
@@ -38,7 +39,7 @@ Each adapter is a plain object with at least:
 | `parseProductHtml(html, url)` | Chem scrape from fetched PDP HTML |
 | `parseListingHints(cardEl)` *(optional)* | On-card price/sale/THC |
 | `isAllowedFetchUrl(url)` | Background fetch allowlist mirror |
-| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'dutchie'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
+| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'dutchie'` \| `'shopd'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
 
 ### Provenance
 
@@ -104,6 +105,19 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 - Listing chem is **filter-bar ready** for THC and total terpenes; **named terpene %** appear on PDP panels (listing GraphQL `terpenes` / `terpenesV2` are null)
 - Bridge: `dutchie` (live DOM scrape; background HTML fetch may hit Cloudflare)
 - New tenants: add slug → display name in `VERIFIED_SLUGS` (and optional retailer shop path map). Do not open all of `dutchie.com`.
+
+### Trulieve shopd (Limerick first store) — verified findings
+
+| Item | Result |
+| --- | --- |
+| Host | `trulieve.com` / `www.trulieve.com` (Next.js shopd storefront) |
+| Listing | `/shopd/category/:category` (also `/shopd`, `/shopd/brands/…`) |
+| PDP | `/shopd/product/:slug-sku` (e.g. `avenue-gsh-mnts-whole-flower-132538`) |
+| Landing | `/dispensaries/pennsylvania/limerick` — thin locator shell (`routeMode` null) |
+| Store id | Limerick = `109` (`localStorage.store_id`; from Dutchie+ `dutchieplus=109` on the locator page). Wave 1 only enhances when store_id is unset or `109`. |
+| Cards | `a[href*="/shopd/product/"]` with on-card `XX.X% THC \| X.XX Terps.` (totals only) |
+| Chem source | Live DOM scrape (`bridgeStrategy: 'shopd'`) + optional parse of public `api.trulieve.com/api/v2/products/…` / menu JSON the page already calls. Named terpene % on PDP Top Terpenes panel. |
+| Not Dutchie embed | Do **not** reuse `adapters/dutchie.js`. Inventory API `source` may say `"dutchie"`, but shoppers use Trulieve's own `/shopd` UI (no `dutchie.com/embedded-menu` iframe for this menu). |
 
 ## How to add a store (community PR)
 

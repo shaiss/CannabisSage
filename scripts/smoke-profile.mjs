@@ -304,6 +304,8 @@ const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
 assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');
 assert(popupJs.includes("dutchie: 'Liberty Norristown'"), 'dutchie store label in popup');
 assert(CSI.profile.STORE_IDS.includes('dutchie'), 'dutchie in profile store ids');
+assert(popupJs.includes("shopd: 'Trulieve Limerick'"), 'shopd store label in popup');
+assert(CSI.profile.STORE_IDS.includes('shopd'), 'shopd in profile store ids');
 assert(popupJs.includes("zenleaf: 'Zen Leaf'"), 'Zen Leaf label in popup');
 assert(popupJs.includes("iheartjane: 'RISE'"), 'RISE label in popup');
 
@@ -363,6 +365,36 @@ assert(
   ),
   'dutchie.com.evil.net lookalike host rejected'
 );
+// Trulieve shopd: apex/www only + /shopd/product/… PDPs
+const shopdPdp =
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+assert(CSI.profile.productKeyFromUrl(shopdPdp), 'trulieve shopd PDP key accepted');
+assert(
+  CSI.profile.productKeyFromUrl(
+    'https://trulieve.com/shopd/product/modern-flower-admiral-apple-flower-90728'
+  ),
+  'trulieve.com apex shopd PDP key accepted'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://www.trulieve.com/shopd/category/flower'),
+  'trulieve listing path rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://www.www.trulieve.com/shopd/product/foo'),
+  'www.www.trulieve.com rejected'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://shop.trulieve.com/shopd/product/foo'),
+  'shop.trulieve.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://evil.trulieve.com/shopd/product/foo'),
+  'evil.trulieve.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://trulieve.com.evil.net/shopd/product/foo'),
+  'trulieve.com.evil.net lookalike host rejected'
+);
 // Other partner hosts unchanged (subdomains still allowed where previously allowed)
 assert(
   CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/abc-1'),
@@ -374,7 +406,7 @@ assert(
 );
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.23', 'manifest 1.3.23');
+assert(manifest.version === '1.3.24', 'manifest 1.3.24');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
 assert(
   (manifest.content_scripts || []).some(

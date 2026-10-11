@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-07T00:00:00.000Z",
+  "updatedAt": "2026-10-11T00:00:00.000Z",
   "partners": [
     {
       "host": "sunnyside.shop",
@@ -30,6 +30,12 @@
       "status": "community",
       "displayName": "Liberty Cannabis",
       "notes": "Thin WordPress shop shell for the Dutchie Norristown embed (/shop/norristown/)."
+    },
+    {
+      "host": "trulieve.com",
+      "status": "community",
+      "displayName": "Trulieve Limerick",
+      "notes": "Trulieve shopd storefront (/shopd/…). Wave 1 verified store_id 109 (Limerick PA). Dedicated shopd adapter — not Dutchie embed."
     }
   ]
 }

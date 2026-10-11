@@ -13,14 +13,15 @@ Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only)
 | `extension/adapters/interface.js` | Contract helpers + required field list |
 | `extension/adapters/registry.js` | Built-in registry + `getActiveAdapter()` |
 | `extension/adapters/sunnyside.js` | Primary adapter |
-| `extension/adapters/zenleaf.js` | Zen Leaf Dispensaries (`zenleafdispensaries.com`) |
+| `extension/adapters/zenleaf.js` | Zen Leaf Dispensaries (`zenleafdispensaries.com`); exports `_sweedShared` HTML parsers |
 | `extension/adapters/terravida.js` | TerraVida alias for Zen Leaf **Malvern** only |
+| `extension/adapters/curaleaf.js` | Curaleaf Sweed menus (`curaleaf.com`; Wave 1 King of Prussia only) |
 | `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (RISE / `risecannabis.com`; Beyond Hello West Chester / `beyond-hello.com`) |
 | `extension/adapters/dutchie.js` | Multi-tenant Dutchie embed (`dutchie.com/embedded-menu/…`) |
 | `extension/adapters/shopd.js` | Trulieve shopd storefront (`trulieve.com/shopd/…`) |
 | `extension/adapters/_template.js` | Copy-paste starter (not registered) |
 
-Registry order (first match wins): `terravida` → `zenleaf` → `iheartjane` → `dutchie` → `shopd` → `sunnyside`.
+Registry order (first match wins): `terravida` → `zenleaf` → `curaleaf` → `iheartjane` → `dutchie` → `shopd` → `sunnyside`.
 
 ## Adapter interface
 
@@ -39,7 +40,7 @@ Each adapter is a plain object with at least:
 | `parseProductHtml(html, url)` | Chem scrape from fetched PDP HTML |
 | `parseListingHints(cardEl)` *(optional)* | On-card price/sale/THC |
 | `isAllowedFetchUrl(url)` | Background fetch allowlist mirror |
-| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` \| `'dutchie'` \| `'shopd'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
+| `bridgeStrategy` | `'sunnyside'` \| `'zenleaf'` (Sweed; also Curaleaf) \| `'dutchie'` \| `'shopd'` \| `'none'` (HTML-parse hosts; skip fiber bridge) |
 
 ### Provenance
 
@@ -62,13 +63,27 @@ Listing cards repeat that line only when a lab label or a date is present, as qu
 - Listing: `/products/*` · PDP: `/product/<id>`
 - Bridge: React fiber product props
 
-### Zen Leaf
+### Zen Leaf (Sweed)
 
 - Hosts: `zenleafdispensaries.com`, `www.zenleafdispensaries.com`
 - Listing: `/locations/:slug/(medical\|recreational)-menu/menu` or `/locations/:slug/menu`
 - PDP: `.../menu/:category/:product-slug`
 - Cards: `[data-testid="product-card"]` with on-card `THC` / `TERP` ranges
+- Platform: **Sweed** (`sweedpos.com` media / embedded `labTests` JSON). Shared parsers export as `CSI.adapters._sweedShared`.
 - Order email domain (informational): `orders-pa@zenleafdispensaries.com`
+
+### Curaleaf (Sweed) — verified findings
+
+| Item | Result |
+| --- | --- |
+| Host | `curaleaf.com` / `www.curaleaf.com` (Sweed-themed Next.js storefront) |
+| Listing | `/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu` |
+| PDP | `.../menu/:categorySlug/:productSlug` (e.g. `vape-1296/briq-hybrid-biscotti-briq-2g-100227`) |
+| Cards | `[data-landmark="product-card"]` with on-card `THC: XX.XX%` / `CBD: …` (no Zen Leaf `data-testid`) |
+| Chem source | Same-origin PDP HTML: Sweed `labTests` / `promoPrice` / `unitSize`; named terps in sibling label/value divs |
+| Bridge | `zenleaf` (shared Sweed fiber + DOM strategy; landmark card selector) |
+| Verified stores | **King of Prussia** only (`curaleaf-pa-king-of-prussia`). Other Curaleaf location slugs fail closed. |
+| Adapter design | Dedicated `curaleaf` adapter id; reuses `_sweedShared.parseProductHtml` from Zen Leaf — not a second copy of the chem parser. |
 
 ### TerraVida — verified findings
 

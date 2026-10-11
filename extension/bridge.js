@@ -1,9 +1,10 @@
 /**
  * MAIN-world bridge: store-specific product extraction + SPA route notify.
- * Strategies: sunnyside (React fiber), zenleaf (React fiber + DOM lab hints),
- * dutchie (live DOM potency chips + named terpene rows; Cloudflare often blocks HTML fetch),
- * shopd (Trulieve shopd cards/PDP: `XX% THC | X.XX Terps.` + Top Terpenes named %),
- * none (HTML-parse adapters such as iHeartJane / RISE — bridge returns null).
+ * Strategies: sunnyside (React fiber), zenleaf (Sweed React fiber + DOM lab hints;
+ * also used by Curaleaf on curaleaf.com), dutchie (live DOM potency chips + named
+ * terpene rows; Cloudflare often blocks HTML fetch), shopd (Trulieve shopd cards/PDP:
+ * `XX% THC | X.XX Terps.` + Top Terpenes named %), none (HTML-parse adapters such as
+ * iHeartJane / RISE — bridge returns null).
  */
 (function () {
   'use strict';
@@ -489,6 +490,7 @@
     const host = location.hostname.replace(/^www\./, '');
     if (host === 'sunnyside.shop') return 'sunnyside';
     if (host === 'zenleafdispensaries.com') return 'zenleaf';
+    if (host === 'curaleaf.com') return 'zenleaf'; // Sweed — same labTests fiber strategy
     if (host === 'risecannabis.com') return 'none';
     if (host === 'beyond-hello.com') return 'none';
     if (host === 'dutchie.com') return 'dutchie';
@@ -526,7 +528,11 @@
       return summarizeShopdFromDom(host);
     }
     if (strategy === 'zenleaf') {
-      host = el?.closest('[data-testid="product-card"]') || el?.closest('[role="listitem"]') || el;
+      host =
+        el?.closest('[data-testid="product-card"]') ||
+        el?.closest('[data-landmark="product-card"]') ||
+        el?.closest('[role="listitem"]') ||
+        el;
     } else {
       host = el?.closest('[data-cy="ProductListItem"]')?.parentElement || el?.parentElement || el;
     }
@@ -560,6 +566,7 @@
       strategy === 'zenleaf'
         ? [
             document.querySelector('[data-testid="product-details"]'),
+            document.querySelector('[data-landmark="product-details"]'),
             document.querySelector('main'),
             document.body
           ].filter(Boolean)

@@ -307,6 +307,8 @@ assert(CSI.profile.STORE_IDS.includes('dutchie'), 'dutchie in profile store ids'
 assert(popupJs.includes("shopd: 'Trulieve Limerick'"), 'shopd store label in popup');
 assert(CSI.profile.STORE_IDS.includes('shopd'), 'shopd in profile store ids');
 assert(popupJs.includes("zenleaf: 'Zen Leaf'"), 'Zen Leaf label in popup');
+assert(popupJs.includes("curaleaf: 'Curaleaf King of Prussia'"), 'Curaleaf store label in popup');
+assert(CSI.profile.STORE_IDS.includes('curaleaf'), 'curaleaf in profile store ids');
 assert(popupJs.includes("iheartjane: 'RISE / Beyond Hello'"), 'RISE/Beyond Hello label in popup');
 const bhPdp =
   'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch';
@@ -432,6 +434,61 @@ assert(
   !CSI.profile.productKeyFromUrl('https://trulieve.com.evil.net/shopd/product/foo'),
   'trulieve.com.evil.net lookalike host rejected'
 );
+// Curaleaf: apex/www only + verified KOP Sweed PDPs
+const clPdp =
+  'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227';
+assert(CSI.profile.productKeyFromUrl(clPdp), 'curaleaf KOP PDP key accepted');
+const clWwwPdp =
+  'https://www.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227';
+assert(CSI.profile.productKeyFromUrl(clWwwPdp), 'www.curaleaf.com KOP PDP key accepted');
+assert(
+  CSI.profile.productKeyFromUrl(clPdp) === CSI.profile.productKeyFromUrl(clWwwPdp),
+  'curaleaf www and apex canonicalize to the same profile key'
+);
+assert(
+  CSI.profile.productKeyFromUrl(clWwwPdp) === clPdp.replace(/\/$/, ''),
+  'curaleaf profile key uses apex origin'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-philadelphia-city-ave/menu/vape-1/foo-2'
+  ),
+  'curaleaf unverified slug PDP key rejected'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://curaleaf.com/shop/florida/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ),
+  'curaleaf non-Pennsylvania state path rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'
+  ),
+  'curaleaf listing path rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://evil.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1/foo-2'
+  ),
+  'evil.curaleaf.com subdomain rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl('https://evil.curaleaf.com/anything'),
+  'evil.curaleaf.com arbitrary path rejected'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://www.www.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1/foo-2'
+  ),
+  'www.www.curaleaf.com rejected (one-prefix strip must not leave www.curaleaf.com)'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
+    'https://curaleaf.com.evil.net/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1/foo-2'
+  ),
+  'curaleaf.com.evil.net lookalike host rejected'
+);
 // Other partner hosts unchanged (subdomains still allowed where previously allowed)
 assert(
   CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/abc-1'),
@@ -443,7 +500,7 @@ assert(
 );
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.25', 'manifest 1.3.25');
+assert(manifest.version === '1.3.26', 'manifest 1.3.26');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
 assert(
   (manifest.content_scripts || []).some(

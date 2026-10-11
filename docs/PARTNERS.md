@@ -70,6 +70,7 @@ Seeded hosts match real in-repo adapter hosts (normalized, no `www.`):
 | --- | --- | --- | --- |
 | `sunnyside.shop` | Sunnyside | `community` | Adapter hosts: `www.sunnyside.shop`, `sunnyside.shop` |
 | `zenleafdispensaries.com` | Zen Leaf | `community` | Adapter hosts: `zenleafdispensaries.com`, `www.zenleafdispensaries.com`. TerraVida/Malvern is a **path alias** on this host (`/locations/malvern/…`), not a separate ecommerce hostname. Do not add `terravidahc.com` or `terravida.com`. |
+| `curaleaf.com` | Curaleaf King of Prussia | `community` | Sweed-backed menus under `/shop/…`. Wave 1 verified slug `curaleaf-pa-king-of-prussia` only. Adapter id `curaleaf`; HTML chem parse shared with Zen Leaf via `_sweedShared`. |
 | `risecannabis.com` | RISE | `community` | iHeartJane-powered menus under `/dispensaries/.../(medical\|recreational)-menu/`. Adapter id `iheartjane`. |
 | `beyond-hello.com` | Beyond Hello West Chester | `community` | Partner-hosted Jane Boost menus. Wave 1 verified slug `west-chester` medical-menu only. Adapter id `iheartjane`. |
 | `dutchie.com` | Liberty Norristown | `community` | Dutchie embedded-menu host. Verified slug: `liberty-norristown`. Do not treat all Dutchie menus as supported. |

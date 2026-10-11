@@ -363,6 +363,8 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 
 **v1.3.23:** Dutchie taste-profile product keys accept only `dutchie.com` / `www.dutchie.com` (apex after one `www.` strip). `evil.dutchie.com`, `shop.dutchie.com`, and `www.www.dutchie.com` must not yield a product key (`smoke-profile.mjs`).
 
+**v1.3.26:** Curaleaf King of Prussia on dedicated Sweed-backed adapter (shared `_sweedShared` parsers with Zen Leaf). Verified slug `curaleaf-pa-king-of-prussia` only; other Curaleaf locations fail closed. Content scripts path-scoped; SW fetch allowlists KOP PDPs.
+
 **v1.3.25:** Beyond Hello West Chester on multi-tenant iHeartJane adapter (partner-hosted Jane Boost). Verified slug `west-chester` only; other BH locations fail closed. Content scripts path-scoped; SW fetch allowlists West Chester PDPs.
 
 **v1.3.24:** Trulieve shopd adapter (Limerick PA, store_id 109). Taste-profile `HOST_OK` accepts `trulieve.com` / `www.trulieve.com` apex only; `/shopd/product/…` PDP paths only. Listing chem = THC + total terps; named terps on PDP.

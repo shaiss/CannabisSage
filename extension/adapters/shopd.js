@@ -53,13 +53,34 @@
     }
   }
 
+  function parseStoreIdRaw(raw) {
+    if (raw == null || raw === '' || raw === '0') return null;
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+
   function currentStoreId() {
     try {
       if (typeof localStorage === 'undefined') return null;
       const raw = localStorage.getItem('store_id') || localStorage.getItem('storeId');
-      if (!raw || raw === '0') return null;
-      const n = Number(raw);
-      return Number.isFinite(n) && n > 0 ? n : null;
+      return parseStoreIdRaw(raw);
+    } catch {
+      return null;
+    }
+  }
+
+  /** Store id from URL query (store_id | storeId | dutchieplus). Path never encodes it. */
+  function storeIdFromUrl(urlLike) {
+    try {
+      const u = new URL(
+        String(urlLike || ''),
+        typeof location !== 'undefined' ? location.href : 'https://trulieve.com/'
+      );
+      return parseStoreIdRaw(
+        u.searchParams.get('store_id') ||
+          u.searchParams.get('storeId') ||
+          u.searchParams.get('dutchieplus')
+      );
     } catch {
       return null;
     }
@@ -73,19 +94,25 @@
     const host = hostOf(urlLike);
     if (!HOSTS.includes(host)) return false;
     const path = pathOf(urlLike);
+    // Limerick locator path proves the verified store without localStorage.
     if (DISPENSARY_LANDING_RE.test(path)) return true;
     if (!SHOPD_PATH_RE.test(path)) return false;
-    // Shopd paths activate the adapter. store_id lives in page localStorage, so only
-    // consult it when urlLike is same-origin as the current document. Cross-origin
-    // callers (popup picks, cached switcher links) must not inherit another page's store.
-    // Wave 1: when a store_id is present on-page, only verified Limerick (109) is supported.
+
+    // Prefer store proof on the URL itself (works for popup / cross-origin callers).
+    const fromUrl = storeIdFromUrl(urlLike);
+    if (fromUrl != null) return isVerifiedStoreId(fromUrl);
+
+    // Same-origin shopd pages: Wave 1 allows unset or verified Limerick (109).
     const sameOrigin =
       typeof location !== 'undefined' && hostOf(location.href) === host;
     if (sameOrigin) {
       const storeId = currentStoreId();
       if (storeId != null && !isVerifiedStoreId(storeId)) return false;
+      return true;
     }
-    return true;
+
+    // Popup / other menus / no store proof: refuse (do not inherit foreign localStorage).
+    return false;
   }
 
   function routeMode(pathname) {
@@ -124,14 +151,44 @@
     return `https://www.trulieve.com${path}`;
   }
 
+  /**
+   * SW / adapter fetch allowlist: shopd PDP paths do not encode store, so require
+   * store_id=109 (or dutchieplus/storeId) in the query. Callers on a verified
+   * Limerick page should use authorizeFetchUrl() to mint this token.
+   */
   function isAllowedFetchUrl(rawUrl) {
     try {
       const url = new URL(rawUrl);
       if (url.protocol !== 'https:') return false;
       if (!HOSTS.includes(url.hostname)) return false;
-      return PDP_RE.test(url.pathname);
+      if (!PDP_RE.test(url.pathname)) return false;
+      return isVerifiedStoreId(storeIdFromUrl(url.href));
     } catch {
       return false;
+    }
+  }
+
+  /** Mint a store-109-gated fetch URL when the URL or page context proves store 109. */
+  function authorizeFetchUrl(rawUrl) {
+    try {
+      if (!rawUrl) return null;
+      const url = new URL(String(rawUrl), 'https://www.trulieve.com/');
+      if (url.protocol !== 'https:') return null;
+      if (!HOSTS.includes(url.hostname)) return null;
+      const path = url.pathname.split(/[?#]/)[0];
+      if (!PDP_RE.test(path)) return null;
+      const bare = `${url.origin}${path}`;
+      // Explicit non-109 store proof fails closed before any page-context fallback.
+      const explicitStoreId = storeIdFromUrl(url.href);
+      if (explicitStoreId != null && !isVerifiedStoreId(explicitStoreId)) return null;
+      // Accept URL query store proof or same-origin verified page context.
+      if (!matchesUrl(url.href) && !matchesUrl(bare)) return null;
+      url.search = '';
+      url.hash = '';
+      url.searchParams.set('store_id', '109');
+      return url.href;
+    } catch {
+      return null;
     }
   }
 
@@ -467,6 +524,7 @@
     parseListingHints,
     shouldSuppressListingCannabinoidBadges,
     isAllowedFetchUrl,
+    authorizeFetchUrl,
     bridgeStrategy: 'shopd',
     pdpChemSurface: 'floating-panel',
     notes:
@@ -489,10 +547,12 @@
     resolveProductUrlFromDom,
     buildProductUrl,
     isAllowedFetchUrl,
+    authorizeFetchUrl,
     routeMode,
     matchesUrl,
     displayNameForStore,
     currentStoreId,
+    storeIdFromUrl,
     parseShopdPotencyLine
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

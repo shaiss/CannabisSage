@@ -593,6 +593,103 @@ assert(popupJs.includes('loadPicksUi'), 'popup wires picks UI');
 assert(popupJs.includes('picksLoadVersion'), 'popup ignores stale picks loads');
 assert(popupJs.includes('picks-upgrade') && popupJs.includes('openUpgrade'), 'Free upsell uses Upgrade');
 
+// Popup (chrome-extension origin): unproven Trulieve /shopd → null adapter → neutral empty state
+assert(
+  /chrome-extension\.invalid\/popup/.test(sandbox.location.href),
+  'smoke-picks sandbox is popup-origin'
+);
+const bareShopdPdp =
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+const provenShopdPdp = `${bareShopdPdp}?store_id=109`;
+assert(
+  !CSI.registry.resolveAdapter(bareShopdPdp) && CSI.adapterIdFromUrl(bareShopdPdp) == null,
+  'popup harness: unproven shopd PDP has no adapter'
+);
+assert(
+  CSI.registry.resolveAdapter(provenShopdPdp)?.id === 'shopd' &&
+    CSI.adapterIdFromUrl(provenShopdPdp) === 'shopd',
+  'popup harness: store_id=109 PDP resolves shopd'
+);
+assert(
+  !/resolveAdapter|getActiveAdapter|refreshActiveAdapter/.test(popupJs),
+  'popup.js does not resolve the active tab adapter (null cannot blank the panel)'
+);
+
+const shopdProfile = CSI.profile.normalize({
+  ...baseProfile,
+  homeStore: 'shopd',
+  secondaryStores: [],
+  boughtBefore: {}
+}).value;
+const unprovenShopdCache = [
+  {
+    url: bareShopdPdp,
+    fetchedAt: now - 5 * 60 * 1000,
+    // No adapterId — must resolve via matchesUrl in popup context
+    data: {
+      name: 'Unproven Shopd Flower',
+      brand: 'Shopd Brand',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 40,
+      onSale: false,
+      cannabinoids: { THC: 22, CBD: 0.1 },
+      terpenes: [{ name: 'Limonene', percentage: 0.5 }],
+      url: bareShopdPdp,
+      status: 'ok'
+    }
+  }
+];
+const unprovenPicks = CSI.picks.rankPicks({
+  profile: shopdProfile,
+  cacheEntries: unprovenShopdCache,
+  isPro: true,
+  now
+});
+assert(unprovenPicks.status === 'no_cache', 'popup: unproven shopd is neutral no_cache (unsupported)');
+assert(!unprovenPicks.picks.length, 'popup: unproven shopd yields no pick rows');
+assert(
+  !/trulieve|limerick|shopd/i.test(unprovenPicks.message || ''),
+  'popup: unsupported empty copy names no retailer'
+);
+assert(
+  !/trulieve|limerick/i.test(JSON.stringify(unprovenPicks.picks || [])),
+  'popup: unproven path exposes no retailer labels'
+);
+
+const provenShopdCache = [
+  {
+    url: provenShopdPdp,
+    fetchedAt: now - 5 * 60 * 1000,
+    data: {
+      name: 'Proven Limerick Flower',
+      brand: 'Shopd Brand',
+      categoryKey: 'flower',
+      weightText: '3.5g',
+      price: 40,
+      onSale: false,
+      cannabinoids: { THC: 22, CBD: 0.1 },
+      terpenes: [{ name: 'Limonene', percentage: 0.5 }],
+      url: provenShopdPdp,
+      status: 'ok'
+    }
+  }
+];
+const provenPicks = CSI.picks.rankPicks({
+  profile: shopdProfile,
+  cacheEntries: provenShopdCache,
+  isPro: true,
+  now
+});
+assert(provenPicks.status === 'ok', 'popup: store_id=109 shopd returns normal picks');
+assert(provenPicks.picks.length === 1, 'popup: proven shopd yields one pick');
+assert(provenPicks.picks[0].adapterId === 'shopd', 'popup: proven pick adapterId is shopd');
+assert(
+  /Limerick/i.test(provenPicks.picks[0].storeLabel || ''),
+  'popup: proven store-109 pick shows Limerick store label'
+);
+assert(provenPicks.picks[0].url === provenShopdPdp, 'popup: proven pick keeps store_id=109 URL');
+
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.24', 'manifest 1.3.24');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');

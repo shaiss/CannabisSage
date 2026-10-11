@@ -32,17 +32,30 @@
         return;
       }
 
-      if (!bypassCache && CSI.storage) {
-        const cached = await CSI.storage.getPdpCache(url);
-        if (cached) {
-          CSI.log('cache hit', url);
-          resolve({ ...cached, status: cached.status || 'ok', fromCache: true });
+      try {
+        // Authorize before cache so bare shopd PDP cache entries cannot bypass store-109.
+        // Keep cache/parse keys on the caller `url`; only the network request uses the mint.
+        const adapter = CSI.registry?.getActiveAdapter?.() || CSI.registry?.resolveAdapter?.(url);
+        const requestUrl =
+          typeof adapter?.authorizeFetchUrl === 'function' ? adapter.authorizeFetchUrl(url) : url;
+        if (typeof adapter?.authorizeFetchUrl === 'function' && !requestUrl) {
+          resolve({
+            error: 'Blocked: URL is not an allowed product page.',
+            status: 'error'
+          });
           return;
         }
-      }
 
-      try {
-        chrome.runtime.sendMessage({ type: 'FETCH_PRODUCT_HTML', url }, async (response) => {
+        if (!bypassCache && CSI.storage) {
+          const cached = await CSI.storage.getPdpCache(url);
+          if (cached) {
+            CSI.log('cache hit', url);
+            resolve({ ...cached, status: cached.status || 'ok', fromCache: true });
+            return;
+          }
+        }
+
+        chrome.runtime.sendMessage({ type: 'FETCH_PRODUCT_HTML', url: requestUrl || url }, async (response) => {
           if (chrome.runtime.lastError) {
             resolve({
               error: chrome.runtime.lastError.message || 'Extension messaging failed',

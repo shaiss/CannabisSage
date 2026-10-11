@@ -25,9 +25,11 @@ const ALLOWED_FETCH_RULES = [
     path: /^\/embedded-menu\/(?:liberty-norristown)\/product\/[^/]+\/?$/i
   },
   {
-    // Trulieve shopd PDPs (Wave 1: Limerick menu on /shopd/product/…)
+    // Trulieve shopd PDPs — path has no store id; require store_id=109 in query
+    // (adapter authorizeFetchUrl mints this on verified Limerick pages only).
     hosts: ['trulieve.com', 'www.trulieve.com'],
-    path: /^\/shopd\/product\/[^/]+\/?$/i
+    path: /^\/shopd\/product\/[^/]+\/?$/i,
+    requireStoreId: '109'
   }
 ];
 
@@ -46,13 +48,26 @@ const PARTNER_STATUSES = ['verified', 'community', 'denied'];
 let denylistInflight = null;
 let partnersInflight = null;
 
+function storeIdFromSearchParams(url) {
+  const raw =
+    url.searchParams.get('store_id') ||
+    url.searchParams.get('storeId') ||
+    url.searchParams.get('dutchieplus');
+  if (raw == null || raw === '' || raw === '0') return null;
+  return String(raw);
+}
+
 function isAllowedProductUrl(rawUrl) {
   try {
     const url = new URL(rawUrl);
     if (url.protocol !== 'https:') return false;
-    return ALLOWED_FETCH_RULES.some(
-      (rule) => rule.hosts.includes(url.hostname) && rule.path.test(url.pathname)
-    );
+    return ALLOWED_FETCH_RULES.some((rule) => {
+      if (!rule.hosts.includes(url.hostname) || !rule.path.test(url.pathname)) return false;
+      if (rule.requireStoreId != null) {
+        return storeIdFromSearchParams(url) === String(rule.requireStoreId);
+      }
+      return true;
+    });
   } catch {
     return false;
   }

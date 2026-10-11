@@ -179,6 +179,18 @@ assert(
   'curaleaf unverified location fails closed'
 );
 assert(
+  !CSI.registry.resolveAdapter(
+    'https://curaleaf.com/shop/florida/curaleaf-pa-king-of-prussia/menu'
+  ),
+  'curaleaf non-Pennsylvania state path fails closed'
+);
+assert(
+  !cl.isAllowedFetchUrl(
+    'https://curaleaf.com/shop/florida/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ),
+  'curaleaf non-Pennsylvania PDP fetch blocked'
+);
+assert(
   !CSI.registry.resolveAdapter('https://evil.curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'),
   'curaleaf subdomain not matched'
 );

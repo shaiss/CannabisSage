@@ -27,10 +27,10 @@
     'curaleaf-pa-king-of-prussia': 'Curaleaf King of Prussia'
   });
 
-  /** /shop/:state/:slug/menu */
-  const LISTING_RE = /^\/shop\/[^/]+\/([^/]+)\/menu\/?$/i;
-  /** /shop/:state/:slug/menu/:categorySlug/:productSlug */
-  const PDP_RE = /^\/shop\/[^/]+\/([^/]+)\/menu\/[^/]+\/[^/]+\/?$/i;
+  /** /shop/pennsylvania/:slug/menu — PA only (matches SW fetch allowlist) */
+  const LISTING_RE = /^\/shop\/pennsylvania\/([^/]+)\/menu\/?$/i;
+  /** /shop/pennsylvania/:slug/menu/:categorySlug/:productSlug */
+  const PDP_RE = /^\/shop\/pennsylvania\/([^/]+)\/menu\/[^/]+\/[^/]+\/?$/i;
 
   function hostOf(urlLike) {
     return CSI.adapterInterface.hostOf(urlLike);
@@ -47,7 +47,7 @@
 
   function slugFromPath(pathname) {
     const path = (pathname || '').split(/[?#]/)[0];
-    const m = path.match(/^\/shop\/[^/]+\/([^/]+)\//i);
+    const m = path.match(/^\/shop\/pennsylvania\/([^/]+)\//i);
     return m ? m[1].toLowerCase() : null;
   }
 

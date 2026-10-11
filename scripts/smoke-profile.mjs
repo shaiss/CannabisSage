@@ -457,6 +457,12 @@ assert(
 );
 assert(
   !CSI.profile.productKeyFromUrl(
+    'https://curaleaf.com/shop/florida/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227'
+  ),
+  'curaleaf non-Pennsylvania state path rejected for profile key'
+);
+assert(
+  !CSI.profile.productKeyFromUrl(
     'https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu'
   ),
   'curaleaf listing path rejected for profile key'

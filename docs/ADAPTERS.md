@@ -15,7 +15,7 @@ Ops can **pause** a host without a rebuild via HTTPS denylist JSON (config only)
 | `extension/adapters/sunnyside.js` | Primary adapter |
 | `extension/adapters/zenleaf.js` | Zen Leaf Dispensaries (`zenleafdispensaries.com`) |
 | `extension/adapters/terravida.js` | TerraVida alias for Zen Leaf **Malvern** only |
-| `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (first host: RISE / `risecannabis.com`) |
+| `extension/adapters/iheartjane.js` | Multi-tenant iHeartJane (RISE / `risecannabis.com`; Beyond Hello West Chester / `beyond-hello.com`) |
 | `extension/adapters/dutchie.js` | Multi-tenant Dutchie embed (`dutchie.com/embedded-menu/…`) |
 | `extension/adapters/shopd.js` | Trulieve shopd storefront (`trulieve.com/shopd/…`) |
 | `extension/adapters/_template.js` | Copy-paste starter (not registered) |
@@ -80,18 +80,23 @@ Listing cards repeat that line only when a lab label or a date is present, as qu
 
 The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (display name `TerraVida (Zen Leaf Malvern)`), reusing Zen Leaf DOM/HTML parsers. No invented hostnames.
 
-### iHeartJane (RISE first host) — verified findings
+### iHeartJane (RISE + Beyond Hello) — verified findings
 
 | Item | Result |
 | --- | --- |
-| Host | `risecannabis.com` / `www.risecannabis.com` (Next.js storefront; Jane-powered menu) |
-| Listing | `/dispensaries/:state/:slug/:storeId/(medical\|recreational)-menu/` |
-| PDP | `.../medical-menu/product/:productId/:slug/` |
-| Cards | `article[data-testid^="product-card-"]` with `product-card-potency-*` = `Total THC XX.XX%` |
-| Chem source | Same-origin PDP HTML / Next.js flight payload: `percentThc`, `inventoryPotencies[].thc_potency`, terpene percents in `productDescription` (`Name: 0.418% \| ...`) |
+| Host (RISE) | `risecannabis.com` / `www.risecannabis.com` (Next.js storefront; Jane-powered menu) |
+| Listing (RISE) | `/dispensaries/:state/:slug/:storeId/(medical\|recreational)-menu/` |
+| PDP (RISE) | `.../medical-menu/product/:productId/:slug/` |
+| Cards (RISE) | `article[data-testid^="product-card-"]` with `product-card-potency-*` = `Total THC XX.XX%` |
+| Chem source (RISE) | Same-origin PDP HTML / Next.js flight payload: `percentThc`, `inventoryPotencies[].thc_potency`, terpene percents in `productDescription` (`Name: 0.418% \| ...`) |
+| Host (Beyond Hello) | `beyond-hello.com` / `www.beyond-hello.com` (WordPress + Jane Boost frameless embed; top-frame) |
+| Listing (BH) | `/pennsylvania-dispensaries/:slug/medical-menu/` |
+| PDP (BH) | `.../medical-menu/menu/products/:productId/:slug` |
+| Cards (BH) | `a[href*="/menu/products/"]` with on-card `THC XX.XX%` (CSS-module classes; no RISE testids) |
+| Chem source (BH) | Same-origin PDP HTML: pipe terpene percents in `meta name="og:description"`; THC from listing text / live outerHTML |
 | Bridge | `none` (HTML parse; no React fiber strategy) |
-| First store | RISE King of Prussia medical menu (`.../king-of-prussia/1552/medical-menu/`). Sibling PA RISE location paths match the same patterns. |
-| Follow-up | Beyond Hello is a later Wave 1 host — extend `HOSTS` / labels, do not hard-code KoP only. |
+| Verified stores | RISE King of Prussia medical menu (`.../king-of-prussia/1552/medical-menu/`) + sibling PA RISE paths. Beyond Hello **West Chester** only (`storeId` 1640 / embedConfigId 4149). Other BH location slugs fail closed. |
+| Not a fork | Same `iheartjane` adapter id; path/host tables + BH slug allowlist — do not invent a second Jane adapter. |
 
 ### Dutchie (multi-tenant)
 

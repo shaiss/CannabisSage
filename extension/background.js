@@ -20,6 +20,11 @@ const ALLOWED_FETCH_RULES = [
     path: /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/product\/\d+\/[^/]+\/?$/i
   },
   {
+    // Beyond Hello Jane Boost PDPs — verified West Chester slug only (fail closed)
+    hosts: ['beyond-hello.com', 'www.beyond-hello.com'],
+    path: /^\/pennsylvania-dispensaries\/west-chester\/medical-menu\/menu\/products\/\d+\/[^/]+\/?$/i
+  },
+  {
     // Dutchie embedded-menu PDPs (verified slugs only; mirrors adapters/dutchie.js)
     hosts: ['dutchie.com', 'www.dutchie.com'],
     path: /^\/embedded-menu\/(?:liberty-norristown)\/product\/[^/]+\/?$/i

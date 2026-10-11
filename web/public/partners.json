@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-10-11T00:00:00.000Z",
+  "updatedAt": "2026-10-11T19:00:00.000Z",
   "partners": [
     {
       "host": "sunnyside.shop",
@@ -18,6 +18,12 @@
       "status": "community",
       "displayName": "RISE",
       "notes": "iHeartJane-powered medical menus under /dispensaries/.../(medical|recreational)-menu/."
+    },
+    {
+      "host": "beyond-hello.com",
+      "status": "community",
+      "displayName": "Beyond Hello West Chester",
+      "notes": "Partner-hosted iHeartJane Boost menus. Wave 1 verified slug: west-chester medical-menu only; other Beyond Hello locations fail closed."
     },
     {
       "host": "dutchie.com",

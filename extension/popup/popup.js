@@ -127,7 +127,7 @@
     sunnyside: 'Sunnyside',
     zenleaf: 'Zen Leaf',
     terravida: 'TerraVida (Zen Leaf Malvern)',
-    iheartjane: 'RISE',
+    iheartjane: 'RISE / Beyond Hello',
     dutchie: 'Liberty Norristown',
     shopd: 'Trulieve Limerick'
   };

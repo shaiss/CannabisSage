@@ -1,54 +1,121 @@
 /**
  * iHeartJane multi-tenant adapter (Wave 1).
  *
- * First host: RISE Cannabis medical menus on risecannabis.com
- * (e.g. King of Prussia `/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/`).
- * URL shape is store-agnostic so sibling PA RISE locations share this adapter.
- * Beyond Hello (Wave 1 #4) can extend HOSTS later without a rewrite.
+ * Hosts:
+ * - RISE Cannabis medical menus on risecannabis.com
+ *   (e.g. King of Prussia `/dispensaries/pennsylvania/king-of-prussia/1552/medical-menu/`).
+ * - Beyond Hello partner-hosted Jane Boost menus on beyond-hello.com
+ *   (Wave 1 #4: West Chester medical menu; other BH locations fail closed).
  *
  * Verified on live RISE KoP HTML (2026-10):
  * - Listing cards: `article[data-testid^="product-card-"]` with
  *   `product-card-potency-*` text like `Total THC 46.24%`
  * - PDP Next.js flight payload embeds `percentThc`, `inventoryPotencies`, and
  *   pipe-separated terpene percents in `productDescription`
- *   (e.g. `Caryophyllene: 0.418% | Myrcene: 0.313% | ...`)
  * - Product assets / uploads come from iheartjane.com CDNs (Jane-powered menu)
+ *
+ * Verified on live Beyond Hello West Chester (2026-10):
+ * - Frameless Jane Boost on `beyond-hello.com` (top-frame; `isFramelessEmbedMode`)
+ * - Listing: `/pennsylvania-dispensaries/west-chester/medical-menu/`
+ * - PDP: `.../medical-menu/menu/products/:productId/:slug`
+ * - storeId 1640 / embedConfigId 4149; CDN `boost-assets.iheartjane.com`
+ * - Cards: `a[href*="/menu/products/"]` with on-card `THC XX.XX%` (no RISE testids)
+ * - PDP SSR meta `name="og:description"` carries pipe terpene percents; THC is
+ *   client-rendered (live outerHTML scrape on PDP covers it)
  */
 (function (global) {
   'use strict';
   const CSI = global.CSI;
   if (!CSI) throw new Error('CSI core missing');
 
-  const HOSTS = ['risecannabis.com', 'www.risecannabis.com'];
+  const RISE_HOSTS = ['risecannabis.com', 'www.risecannabis.com'];
+  const BH_HOSTS = ['beyond-hello.com', 'www.beyond-hello.com'];
+  const HOSTS = RISE_HOSTS.concat(BH_HOSTS);
+
+  /** Beyond Hello location slug → display label (fail closed for other slugs). */
+  const BH_VERIFIED_SLUGS = Object.freeze({
+    'west-chester': 'Beyond Hello West Chester'
+  });
 
   /** /dispensaries/:state/:slug/:storeId/(medical|recreational)-menu */
-  const LISTING_RE =
+  const RISE_LISTING_RE =
     /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/?$/i;
   /** .../medical-menu/product/:productId/:slug */
-  const PDP_RE =
+  const RISE_PDP_RE =
     /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/product\/\d+\/[^/]+\/?$/i;
+
+  /** /pennsylvania-dispensaries/:slug/medical-menu[/menu] */
+  const BH_LISTING_RE =
+    /^\/pennsylvania-dispensaries\/([^/]+)\/medical-menu\/?(?:menu\/?)?$/i;
+  /** .../medical-menu/menu/products/:productId/:slug */
+  const BH_PDP_RE =
+    /^\/pennsylvania-dispensaries\/([^/]+)\/medical-menu\/menu\/products\/(\d+)\/([^/]+)\/?$/i;
+
+  // Back-compat aliases used by smoke harness / shared exports
+  const LISTING_RE = RISE_LISTING_RE;
+  const PDP_RE = RISE_PDP_RE;
 
   const HOST_LABELS = {
     'risecannabis.com': 'RISE',
-    'www.risecannabis.com': 'RISE'
+    'www.risecannabis.com': 'RISE',
+    'beyond-hello.com': 'Beyond Hello',
+    'www.beyond-hello.com': 'Beyond Hello'
   };
 
   function hostOf(urlLike) {
     return CSI.adapterInterface.hostOf(urlLike);
   }
 
+  function pathOf(urlLike) {
+    try {
+      const base = typeof location !== 'undefined' ? location.href : 'https://risecannabis.com/';
+      return new URL(urlLike, base).pathname.split(/[?#]/)[0];
+    } catch {
+      return String(urlLike || '').split(/[?#]/)[0];
+    }
+  }
+
+  function isRiseHost(hostname) {
+    return RISE_HOSTS.includes(hostname);
+  }
+
+  function isBhHost(hostname) {
+    return BH_HOSTS.includes(hostname);
+  }
+
+  function bhSlugFromPath(pathname) {
+    const path = (pathname || '').split(/[?#]/)[0];
+    const m = path.match(/^\/pennsylvania-dispensaries\/([^/]+)\//i);
+    return m ? m[1].toLowerCase() : null;
+  }
+
+  function verifiedBhSlug(pathname) {
+    const slug = bhSlugFromPath(pathname);
+    return slug && Object.prototype.hasOwnProperty.call(BH_VERIFIED_SLUGS, slug) ? slug : null;
+  }
+
   function matchesUrl(urlLike) {
-    return HOSTS.includes(hostOf(urlLike));
+    const hostname = hostOf(urlLike);
+    if (isRiseHost(hostname)) return true;
+    if (isBhHost(hostname)) {
+      return !!verifiedBhSlug(pathOf(urlLike));
+    }
+    return false;
   }
 
   function routeMode(pathname) {
     const path = (pathname || '').split(/[?#]/)[0];
-    if (PDP_RE.test(path)) return 'pdp';
-    if (LISTING_RE.test(path)) return 'listing';
+    if (RISE_PDP_RE.test(path) || BH_PDP_RE.test(path)) return 'pdp';
+    if (RISE_LISTING_RE.test(path) || BH_LISTING_RE.test(path)) return 'listing';
     return null;
   }
 
-  function displayNameForHost(hostname) {
+  function displayNameForHost(hostname, pathname) {
+    if (isBhHost(hostname)) {
+      const slug = verifiedBhSlug(pathname || '');
+      if (slug) return BH_VERIFIED_SLUGS[slug];
+      return 'Beyond Hello';
+    }
     return HOST_LABELS[hostname] || HOST_LABELS[String(hostname || '').replace(/^www\./, '')] || 'RISE';
   }
 
@@ -60,14 +127,21 @@
         const u = new URL(raw);
         if (!HOSTS.includes(u.hostname)) return null;
         const path = u.pathname.split(/[?#]/)[0];
-        return PDP_RE.test(path) ? `${u.origin}${path}` : null;
+        if (isRiseHost(u.hostname) && RISE_PDP_RE.test(path)) {
+          return `${u.origin}${path}`;
+        }
+        if (isBhHost(u.hostname) && BH_PDP_RE.test(path) && verifiedBhSlug(path)) {
+          return `${u.origin}${path}`;
+        }
+        return null;
       } catch {
         return null;
       }
     }
     const path = (raw.startsWith('/') ? raw : `/${raw}`).split(/[?#]/)[0];
-    if (!PDP_RE.test(path)) return null;
-    return `https://risecannabis.com${path}`;
+    if (RISE_PDP_RE.test(path)) return `https://risecannabis.com${path}`;
+    if (BH_PDP_RE.test(path) && verifiedBhSlug(path)) return `https://beyond-hello.com${path}`;
+    return null;
   }
 
   function isAllowedFetchUrl(rawUrl) {
@@ -75,7 +149,11 @@
       const url = new URL(rawUrl);
       if (url.protocol !== 'https:') return false;
       if (!HOSTS.includes(url.hostname)) return false;
-      return PDP_RE.test(url.pathname);
+      if (isRiseHost(url.hostname)) return RISE_PDP_RE.test(url.pathname);
+      if (isBhHost(url.hostname)) {
+        return BH_PDP_RE.test(url.pathname) && !!verifiedBhSlug(url.pathname);
+      }
+      return false;
     } catch {
       return false;
     }
@@ -84,14 +162,36 @@
   function findProductCards() {
     const cards = Array.from(document.querySelectorAll('article[data-testid^="product-card-"]'));
     if (cards.length) return cards;
-    // Fallback: any element with a product-card-* test id that is not a child control
+    // RISE fallback: product-card-* test id roots
     const roots = Array.from(document.querySelectorAll('[data-testid^="product-card-"]')).filter(
       (el) => {
         const id = el.getAttribute('data-testid') || '';
         return /^product-card-\d+$/i.test(id);
       }
     );
-    return roots;
+    if (roots.length) return roots;
+
+    // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root
+    const links = Array.from(
+      document.querySelectorAll('a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]')
+    );
+    const bhCards = [];
+    const seen = new Set();
+    links.forEach((a) => {
+      const href = a.getAttribute('href') || a.href || '';
+      const built = buildProductUrl(href);
+      if (!built || seen.has(built)) return;
+      seen.add(built);
+      // Prefer a small card wrapper; fall back to the anchor itself
+      const root =
+        a.closest('[class*="product"]') ||
+        a.closest('article') ||
+        a.closest('li') ||
+        a.parentElement ||
+        a;
+      bhCards.push(root);
+    });
+    return bhCards;
   }
 
   function isLikelyProductCard(element) {
@@ -101,10 +201,17 @@
     if (element.closest?.('#csi-filter-bar, [data-testid="product-filter-bar"], [data-testid="filter-drawer"]')) {
       return false;
     }
+    if (
+      element.matches?.('a[href*="/menu/products/"]') ||
+      element.closest?.('a[href*="/menu/products/"]') ||
+      element.querySelector?.('a[href*="/menu/products/"]')
+    ) {
+      return true;
+    }
     const text = element.textContent || '';
     return (
       /\$\s*\d/.test(text) &&
-      (/Total\s*THC/i.test(text) || !!element.querySelector?.('img'))
+      (/Total\s*THC/i.test(text) || /\bTHC\s+\d/i.test(text) || !!element.querySelector?.('img'))
     );
   }
 
@@ -112,6 +219,7 @@
     return (
       cardEl.closest?.('article[data-testid^="product-card-"]') ||
       cardEl.closest?.('[data-testid^="product-card-"]') ||
+      cardEl.closest?.('a[href*="/menu/products/"]') ||
       cardEl
     );
   }
@@ -121,7 +229,10 @@
     const link =
       root.querySelector?.('a[href*="/medical-menu/product/"]') ||
       root.querySelector?.('a[href*="/recreational-menu/product/"]') ||
-      root.querySelector?.('a[href*="/product/"]');
+      root.querySelector?.('a[href*="/menu/products/"]') ||
+      root.querySelector?.('a[href*="/product/"]') ||
+      (root.matches?.('a[href*="/menu/products/"]') ? root : null) ||
+      (root.matches?.('a[href*="/product/"]') ? root : null);
     if (!link) return null;
     const href = link.getAttribute('href') || link.href;
     if (!href) return null;
@@ -131,8 +242,9 @@
   function parseTotalThc(text) {
     const m = String(text || '').match(/Total\s*THC\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
     if (m) return parseFloat(m[1]);
-    const single = String(text || '').match(/\bTHC\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
-    return single ? parseFloat(single[1]) : null;
+    // Beyond Hello listing cards: "THC 24.88%" (no "Total")
+    const plain = String(text || '').match(/\bTHC\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+    return plain ? parseFloat(plain[1]) : null;
   }
 
   function parseListingHints(cardEl) {
@@ -169,7 +281,7 @@
     };
   }
 
-  /** Retail cards already print Total THC — avoid duplicate chem badges. */
+  /** Retail cards already print Total THC / THC — avoid duplicate chem badges. */
   function shouldSuppressListingCannabinoidBadges(cardEl) {
     const host = cardHost(cardEl);
     const potency = host?.querySelector?.('[data-testid^="product-card-potency-"]')?.textContent || '';
@@ -184,6 +296,18 @@
       .replace(/\\n/g, '\n')
       .replace(/\\r/g, '\r')
       .replace(/\\u([0-9a-fA-F]{4})/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  }
+
+  function unescapeHtmlEntities(text) {
+    return String(text || '')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#039;/g, "'")
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(parseInt(n, 10)))
+      .replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
   }
 
   function parseTerpenesFromDescription(desc) {
@@ -216,6 +340,18 @@
         const n = parseFloat(m[1]);
         if (!Number.isNaN(n)) return n;
       }
+    }
+    return null;
+  }
+
+  function metaContent(html, names) {
+    for (const name of names) {
+      const re = new RegExp(
+        `<meta[^>]+(?:name|property)=["']${name}["'][^>]+content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]+(?:name|property)=["']${name}["']`,
+        'i'
+      );
+      const m = html.match(re);
+      if (m) return unescapeHtmlEntities(m[1] || m[2] || '');
     }
     return null;
   }
@@ -256,8 +392,12 @@
       const visible = parseTotalThc(html.replace(/<[^>]+>/g, ' '));
       if (visible != null) cannabinoids.THC = visible;
     }
+    if (cannabinoids.CBD == null) {
+      const cbdVis = String(html.replace(/<[^>]+>/g, ' ')).match(/\bCBD\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      if (cbdVis) cannabinoids.CBD = parseFloat(cbdVis[1]);
+    }
 
-    // Terpenes from productDescription pipe list in flight payload
+    // Terpenes from productDescription pipe list in flight payload (RISE)
     const descMatch =
       html.match(/\\"productDescription\\":\s*\\"((?:[^"\\]|\\.)*)\\"/) ||
       html.match(/"productDescription":\s*"((?:[^"\\]|\\.)*)"/);
@@ -268,6 +408,20 @@
         if (!existing) terpenes.push(t);
         else if (t.percentage > existing.percentage) existing.percentage = t.percentage;
       });
+    }
+
+    // Beyond Hello Jane Boost SSR: pipe terps in og/twitter description meta
+    if (!terpenes.length) {
+      const ogDesc =
+        metaContent(html, ['og:description', 'twitter:description']) ||
+        metaContent(html, ['description']);
+      if (ogDesc && /:\s*\d+(?:\.\d+)?\s*%/.test(ogDesc)) {
+        parseTerpenesFromDescription(ogDesc).forEach((t) => {
+          const existing = terpenes.find((x) => x.name === t.name);
+          if (!existing) terpenes.push(t);
+          else if (t.percentage > existing.percentage) existing.percentage = t.percentage;
+        });
+      }
     }
 
     // Visible / text fallback for named terpenes with percentages
@@ -304,9 +458,21 @@
     const nameMatch =
       html.match(/\\"name\\":\s*\\"([^\\"]+)\\"\s*,\s*\\"offerText/) ||
       html.match(/\\"name\\":\s*\\"([^\\"]+)\\"\s*,\s*\\"offerTextForSegmentEvent/) ||
-      html.match(/property="og:title"\s+content="([^"]+)"/i);
+      null;
     if (nameMatch) name = nameMatch[1];
-    else {
+    if (!name) {
+      const ogTitle = metaContent(html, ['og:title', 'twitter:title']);
+      // BH product titles look like "Jawa Lemon Crunch | Double Bear | Distillate Cartridge"
+      // Skip generic storefront titles that name the menu/location only.
+      if (
+        ogTitle &&
+        !/medical\s+cannabis\s+menu/i.test(ogTitle) &&
+        !/^beyond\s*\/?\s*hello/i.test(ogTitle)
+      ) {
+        name = ogTitle.split('|')[0].trim();
+      }
+    }
+    if (!name) {
       try {
         const doc = new DOMParser().parseFromString(html, 'text/html');
         name = doc.querySelector('h1')?.textContent?.trim();
@@ -324,7 +490,7 @@
     const idMatch =
       html.match(/\\"productId\\":\s*(\d+)/) ||
       html.match(/"productId":\s*(\d+)/) ||
-      (url && String(url).match(/\/product\/(\d+)\//));
+      (url && String(url).match(/\/products?\/(\d+)\//));
     if (idMatch) productId = idMatch[1];
 
     const empty =
@@ -351,7 +517,7 @@
     get displayName() {
       try {
         if (typeof location !== 'undefined' && location.hostname) {
-          return displayNameForHost(location.hostname);
+          return displayNameForHost(location.hostname, location.pathname || '');
         }
       } catch {
         /* ignore */
@@ -359,16 +525,22 @@
       return 'RISE';
     },
     matchHosts: HOSTS.slice(),
-    matchPatterns: ['https://risecannabis.com/*', 'https://www.risecannabis.com/*'],
+    matchPatterns: [
+      'https://risecannabis.com/*',
+      'https://www.risecannabis.com/*',
+      'https://beyond-hello.com/*',
+      'https://www.beyond-hello.com/*'
+    ],
     categoryUrlPatterns: [
-      /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/?$/i
+      /^\/dispensaries\/[^/]+\/[^/]+\/\d+\/(?:medical|recreational)-menu\/?$/i,
+      /^\/pennsylvania-dispensaries\/[^/]+\/medical-menu\/?(?:menu\/?)?$/i
     ],
     matchesUrl,
     routeMode,
     listingSelectors: {
-      card: 'article[data-testid^="product-card-"]',
+      card: 'article[data-testid^="product-card-"], a[href*="/menu/products/"]',
       grid: '[data-testid="product-grid"]',
-      link: 'a[href*="/medical-menu/product/"], a[href*="/recreational-menu/product/"]'
+      link: 'a[href*="/medical-menu/product/"], a[href*="/recreational-menu/product/"], a[href*="/menu/products/"]'
     },
     pdpSelectors: {
       root: 'main',
@@ -386,15 +558,22 @@
     bridgeStrategy: 'none',
     pdpChemSurface: 'floating-panel',
     notes:
-      'Multi-tenant iHeartJane adapter. Wave 1 host: RISE (risecannabis.com) medical-menu paths. Chem from listing potency nodes + PDP flight payload (percentThc, productDescription terp percents). Beyond Hello out of scope for this slice.'
+      'Multi-tenant iHeartJane adapter. Hosts: RISE (risecannabis.com) medical-menu paths; Beyond Hello West Chester (beyond-hello.com partner-hosted Jane Boost, verified slug west-chester only — other BH locations fail closed). Chem from listing potency / THC text + PDP flight payload or og:description terp percents.'
   };
 
   CSI.adapters = CSI.adapters || {};
   CSI.adapters.iheartjane = iheartjaneAdapter;
   CSI.adapters._iheartjaneShared = {
     HOSTS,
+    RISE_HOSTS,
+    BH_HOSTS,
+    BH_VERIFIED_SLUGS,
     LISTING_RE,
     PDP_RE,
+    RISE_LISTING_RE,
+    RISE_PDP_RE,
+    BH_LISTING_RE,
+    BH_PDP_RE,
     parseProductHtml,
     findProductCards,
     isLikelyProductCard,
@@ -405,6 +584,7 @@
     isAllowedFetchUrl,
     routeMode,
     matchesUrl,
-    displayNameForHost
+    displayNameForHost,
+    verifiedBhSlug
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

@@ -71,6 +71,7 @@ Seeded hosts match real in-repo adapter hosts (normalized, no `www.`):
 | `sunnyside.shop` | Sunnyside | `community` | Adapter hosts: `www.sunnyside.shop`, `sunnyside.shop` |
 | `zenleafdispensaries.com` | Zen Leaf | `community` | Adapter hosts: `zenleafdispensaries.com`, `www.zenleafdispensaries.com`. TerraVida/Malvern is a **path alias** on this host (`/locations/malvern/…`), not a separate ecommerce hostname. Do not add `terravidahc.com` or `terravida.com`. |
 | `risecannabis.com` | RISE | `community` | iHeartJane-powered menus under `/dispensaries/.../(medical\|recreational)-menu/`. Adapter id `iheartjane`. |
+| `beyond-hello.com` | Beyond Hello West Chester | `community` | Partner-hosted Jane Boost menus. Wave 1 verified slug `west-chester` medical-menu only. Adapter id `iheartjane`. |
 | `dutchie.com` | Liberty Norristown | `community` | Dutchie embedded-menu host. Verified slug: `liberty-norristown`. Do not treat all Dutchie menus as supported. |
 | `libertycannabis.com` | Liberty Cannabis | `community` | Thin WP entry for the Norristown Dutchie embed (`/shop/norristown/`). |
 | `trulieve.com` | Trulieve Limerick | `community` | Trulieve shopd storefront (`/shopd/…`). Wave 1 verified store_id `109` (Limerick PA). Not the Dutchie embed adapter. |

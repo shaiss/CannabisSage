@@ -302,6 +302,72 @@ assert(
     ?.id === 'shopd',
   'cross-origin limerick landing still resolves shopd'
 );
+
+// Popup surface (chrome-extension origin): null adapter = neutral unsupported-site path
+const popupLoc = {
+  href: 'chrome-extension://csi-test/popup/popup.html',
+  hostname: 'csi-test',
+  pathname: '/popup/popup.html',
+  search: ''
+};
+Object.assign(sandbox.location, popupLoc);
+sandbox.localStorage.getItem = () => null;
+CSI.registry.setActiveAdapter(null);
+const bareShopdListing = 'https://www.trulieve.com/shopd/category/flower';
+const bareShopdPdp =
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+const provenShopdListing = `${bareShopdListing}?store_id=109`;
+const provenShopdPdp = `${bareShopdPdp}?store_id=109`;
+assert(
+  !CSI.registry.resolveAdapter(bareShopdListing),
+  'popup: unproven /shopd listing has no adapter'
+);
+assert(
+  !CSI.registry.resolveAdapter(bareShopdPdp),
+  'popup: unproven /shopd PDP has no adapter'
+);
+assert(
+  CSI.adapterIdFromUrl(bareShopdListing) == null && CSI.adapterIdFromUrl(bareShopdPdp) == null,
+  'popup: unproven shopd URLs yield null adapterId'
+);
+assert(
+  CSI.adapterDisplayName(CSI.adapterIdFromUrl(bareShopdPdp)) === '',
+  'popup: null adapter has no retailer display name'
+);
+assert(
+  CSI.registry.getActiveAdapter() == null,
+  'popup: active adapter stays null on unproven shopd (unsupported site)'
+);
+// Proven store 109 restores normal adapter resolution in the same popup context
+assert(
+  CSI.registry.resolveAdapter(provenShopdListing)?.id === 'shopd',
+  'popup: store_id=109 listing resolves shopd'
+);
+assert(
+  CSI.registry.resolveAdapter(provenShopdPdp)?.id === 'shopd',
+  'popup: store_id=109 PDP resolves shopd'
+);
+assert(CSI.adapterIdFromUrl(provenShopdPdp) === 'shopd', 'popup: proven PDP adapterId is shopd');
+assert(
+  CSI.adapterDisplayName('shopd').includes('Limerick'),
+  'popup: proven store shows Limerick display name'
+);
+// Popup source: no tab-aware adapter path that could throw/blank on null adapter
+const popupJsSrc = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
+const popupHtmlSrc = fs.readFileSync(path.join(ext, 'popup/popup.html'), 'utf8');
+assert(
+  !/resolveAdapter|getActiveAdapter|refreshActiveAdapter|matchesUrl\s*\(/.test(popupJsSrc),
+  'popup.js has no tab adapter resolve (null adapter cannot throw/blank)'
+);
+assert(
+  !/id="[^"]*site[^"]*"|unsupported site|active.?store|current.?site/i.test(popupHtmlSrc),
+  'popup has no site-status panel that could blank when adapter is null'
+);
+assert(
+  popupHtmlSrc.includes('id="picks-section"') && popupHtmlSrc.includes('id="profile-section"'),
+  'popup keeps neutral settings sections when site is unsupported'
+);
+
 Object.assign(sandbox.location, prevLoc);
 sandbox.localStorage.getItem = () => null;
 

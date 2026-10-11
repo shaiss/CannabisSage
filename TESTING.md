@@ -111,6 +111,18 @@ Checks per listing:
 | Sibling PA RISE medical-menu path still activates iHeartJane adapter | e.g. `.../philadelphia/5383/medical-menu/` | |
 | `node scripts/smoke-adapters.mjs` includes iHeartJane parse fixture | | |
 
+## iHeartJane / Beyond Hello — smoke (v1.3.25+)
+
+| Step | URL / action | Pass? |
+| --- | --- | --- |
+| Beyond Hello West Chester medical menu listing | https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/ | |
+| Filter bar shows **Beyond Hello West Chester** | | |
+| Cards enhance; on-card `THC XX%` present (duplicate THC badge suppressed) | | |
+| Open a product PDP (`.../medical-menu/menu/products/<id>/<slug>`) | | |
+| PDP panel shows named terp percents from description / og:description | | |
+| Unverified BH location fails closed (no injection / unsupported) | e.g. `.../pennsylvania-dispensaries/pittsburgh/medical-menu/` | |
+| `node scripts/smoke-adapters.mjs` includes Beyond Hello parse + fail-closed fixtures | | |
+
 ## Compare tray persistence
 
 | Step | Pass? |
@@ -262,7 +274,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.25.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -339,6 +351,8 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 
 **v1.3.23:** Dutchie taste-profile product keys accept only `dutchie.com` / `www.dutchie.com` (apex after one `www.` strip). `evil.dutchie.com`, `shop.dutchie.com`, and `www.www.dutchie.com` must not yield a product key (`smoke-profile.mjs`).
 
+**v1.3.25:** Beyond Hello West Chester on multi-tenant iHeartJane adapter (partner-hosted Jane Boost). Verified slug `west-chester` only; other BH locations fail closed. Content scripts path-scoped; SW fetch allowlists West Chester PDPs.
+
 **v1.3.24:** Trulieve shopd adapter (Limerick PA, store_id 109). Taste-profile `HOST_OK` accepts `trulieve.com` / `www.trulieve.com` apex only; `/shopd/product/…` PDP paths only. Listing chem = THC + total terps; named terps on PDP.
 
 | Step | Pass? |
@@ -354,7 +368,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.25.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -372,7 +386,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.24.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.25.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

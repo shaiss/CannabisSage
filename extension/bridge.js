@@ -490,6 +490,7 @@
     if (host === 'sunnyside.shop') return 'sunnyside';
     if (host === 'zenleafdispensaries.com') return 'zenleaf';
     if (host === 'risecannabis.com') return 'none';
+    if (host === 'beyond-hello.com') return 'none';
     if (host === 'dutchie.com') return 'dutchie';
     if (host === 'trulieve.com') return 'shopd';
     return 'sunnyside';

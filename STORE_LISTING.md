@@ -7,10 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.24 |
+| **Version** | 1.3.25 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
+
+## Release notes (v1.3.25)
+
+Wave 1 PA adapter #4: extend the multi-tenant **iHeartJane** adapter to **Beyond Hello West Chester** on `beyond-hello.com` (partner-hosted Jane Boost, top-frame). Verified slug `west-chester` only — other Beyond Hello locations fail closed. Content scripts stay top-frame and path-scoped; SW fetch allowlists West Chester PDPs only. Reuses the existing Jane adapter (no fork).
 
 ## Release notes (v1.3.24)
 
@@ -70,6 +74,10 @@ Inject UI and fetch same-origin product HTML on Zen Leaf location menus/PDPs (in
 
 Inject UI and fetch same-origin product HTML on RISE iHeartJane medical/recreational menu listings and PDPs under `/dispensaries/...`.
 
+### Host permission: Beyond Hello (`beyond-hello.com`)
+
+Inject UI and fetch same-origin product HTML on verified Beyond Hello Jane Boost medical-menu paths (Wave 1: West Chester `/pennsylvania-dispensaries/west-chester/…` only).
+
 ### Host permission: Dutchie embedded menu
 
 Inject UI into verified Dutchie `/embedded-menu/*` iframe documents (first tenant: Liberty Norristown) and allowlisted same-origin PDP HTML fetches when Cloudflare permits.
@@ -111,7 +119,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.24.zip` (includes iHeartJane + Dutchie Liberty + Trulieve shopd Limerick).
+4. Upload `dist/cannabis-sage-1.3.25.zip` (includes iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

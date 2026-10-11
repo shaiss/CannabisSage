@@ -46,15 +46,18 @@
     'boughtBefore'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
-  // Dutchie + Trulieve: apex only after one-prefix www strip (not *.host / www.www.*).
-  // Other partners keep subdomain allow.
+  // Dutchie + Trulieve + Beyond Hello: apex only after one-prefix www strip
+  // (not *.host / www.www.*). Other partners keep subdomain allow.
   const HOST_OK =
-    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^dutchie\.com$|^trulieve\.com$/i;
+    /(^|\.)sunnyside\.shop$|(^|\.)zenleafdispensaries\.com$|(^|\.)risecannabis\.com$|^beyond-hello\.com$|^dutchie\.com$|^trulieve\.com$/i;
   /** Fallback when Dutchie adapter is not loaded (e.g. minimal smoke harness). */
   const DUTCHIE_VERIFIED_PRODUCT_RE =
     /^\/embedded-menu\/liberty-norristown\/product\/[^/]+\/?$/i;
   /** Fallback when shopd adapter is not loaded. */
   const SHOPD_PRODUCT_RE = /^\/shopd\/product\/[^/]+\/?$/i;
+  /** Fallback when iHeartJane adapter is not loaded — Beyond Hello West Chester only. */
+  const BH_VERIFIED_PRODUCT_RE =
+    /^\/pennsylvania-dispensaries\/west-chester\/medical-menu\/menu\/products\/\d+\/[^/]+\/?$/i;
 
   const COPY = Object.freeze({
     title: 'Local taste profile',
@@ -250,6 +253,17 @@
         return built.replace(/\/$/, '');
       }
       if (!SHOPD_PRODUCT_RE.test(parsed.pathname)) return null;
+    }
+    // Beyond Hello: only verified West Chester Jane Boost PDPs (adapter allowlist when present).
+    // Canonicalize to apex https://beyond-hello.com so www/apex share bought-before keys.
+    if (/^beyond-hello\.com$/i.test(bareHost)) {
+      if (CSI.adapters?.iheartjane?.buildProductUrl) {
+        const built = CSI.adapters.iheartjane.buildProductUrl(parsed.href);
+        if (!built) return null;
+        return built.replace(/\/$/, '');
+      }
+      if (!BH_VERIFIED_PRODUCT_RE.test(parsed.pathname)) return null;
+      return `https://beyond-hello.com${parsed.pathname}`.replace(/\/$/, '');
     }
     return parsed.href.replace(/\/$/, '');
   }

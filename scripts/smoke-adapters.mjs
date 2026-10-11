@@ -161,6 +161,76 @@ const janeSibling = CSI.registry.resolveAdapter(
   'https://www.risecannabis.com/dispensaries/pennsylvania/philadelphia/5383/medical-menu/'
 );
 assert(janeSibling?.id === 'iheartjane', 'sibling RISE store uses iheartjane');
+
+// Beyond Hello West Chester (Jane Boost partner-hosted)
+const bhListing =
+  'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/';
+const bh = CSI.registry.resolveAdapter(bhListing);
+assert(bh?.id === 'iheartjane', `expected iheartjane for BH got ${bh?.id}`);
+assert(
+  bh.routeMode('/pennsylvania-dispensaries/west-chester/medical-menu/') === 'listing',
+  'bh listing route'
+);
+assert(
+  bh.routeMode('/pennsylvania-dispensaries/west-chester/medical-menu/menu/') === 'listing',
+  'bh listing route with /menu/'
+);
+assert(
+  bh.routeMode(
+    '/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ) === 'pdp',
+  'bh pdp route'
+);
+assert(
+  bh.isAllowedFetchUrl(
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ),
+  'bh west-chester PDP fetch ok'
+);
+assert(
+  !bh.isAllowedFetchUrl(
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/'
+  ),
+  'bh listing not fetchable'
+);
+assert(
+  !bh.isAllowedFetchUrl(
+    'https://beyond-hello.com/pennsylvania-dispensaries/pittsburgh/medical-menu/menu/products/1/foo'
+  ),
+  'bh unverified slug PDP fetch blocked'
+);
+assert(
+  !CSI.registry.resolveAdapter(
+    'https://beyond-hello.com/pennsylvania-dispensaries/pittsburgh/medical-menu/'
+  ),
+  'bh unverified location fails closed (no adapter)'
+);
+assert(
+  !CSI.registry.resolveAdapter(
+    'https://beyond-hello.com/pennsylvania-dispensaries/ardmore/medical-menu/'
+  ),
+  'bh ardmore not in Wave 1 allowlist (fail closed until verified activation)'
+);
+assert(
+  bh.buildProductUrl(
+    '/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ) ===
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch',
+  'bh buildProductUrl'
+);
+assert(
+  bh.buildProductUrl(
+    'https://www.beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+  ) ===
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch',
+  'bh buildProductUrl canonicalizes www → apex'
+);
+assert(
+  !bh.buildProductUrl(
+    '/pennsylvania-dispensaries/pittsburgh/medical-menu/menu/products/1/foo'
+  ),
+  'bh buildProductUrl rejects unverified slug'
+);
 // Dutchie / Liberty Norristown
 const dutchieListing = CSI.registry.resolveAdapter(
   'https://dutchie.com/embedded-menu/liberty-norristown/products/flower'
@@ -962,9 +1032,63 @@ assert(
   'jane suppresses duplicate THC listing badge'
 );
 
+// Beyond Hello PDP SSR fixture (og:description terps + live-style THC text)
+const bhHtml = `
+<meta name="og:title" content="Jawa Lemon Crunch | Double Bear | Distillate Cartridge">
+<meta name="og:description" content="Caryophyllene: 0.286% | Humulene: 0.072% | Limonene&nbsp;: 0.42% | Linalool&nbsp;: 0.296% | Myrcene&nbsp;: 0.845% | Terpinolene&nbsp;: 0.006% | Bisabolol&nbsp;: 0.077% | Pinene&nbsp;: 1.17% | b-Pinene&nbsp;: 0.561% | 
+--
+Jawa Lemon Crunch is a hybrid cross.">
+<meta name="og:url" content="https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch">
+<div>THC 93.23%</div>
+`;
+const bhParsed = CSI.adapters.iheartjane.parseProductHtml(
+  bhHtml,
+  'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+);
+assert(bhParsed.cannabinoids?.THC === 93.23, `bh thc ${bhParsed.cannabinoids?.THC}`);
+assert(bhParsed.name === 'Jawa Lemon Crunch', `bh name ${bhParsed.name}`);
+assert(
+  Array.isArray(bhParsed.terpenes) &&
+    bhParsed.terpenes.some((t) => t.name === 'Beta-Caryophyllene' && t.percentage === 0.286),
+  'bh caryophyllene from og:description'
+);
+assert(
+  bhParsed.terpenes.some((t) => t.name === 'Beta-Myrcene' && t.percentage === 0.845),
+  'bh myrcene from og:description'
+);
+assert(
+  bhParsed.terpenes.some((t) => t.name === 'Beta-Pinene' && t.percentage === 0.561),
+  'bh b-pinene from og:description'
+);
+assert(bhParsed.provenance?.source === '1580931', 'bh menu source is product id');
+assert(
+  bh.shouldSuppressListingCannabinoidBadges({
+    textContent: 'Jawa Lemon Crunch THC 93.23% $45',
+    querySelector: () => null,
+    closest: () => null
+  }) === true,
+  'bh suppresses duplicate THC listing badge'
+);
+assert(
+  bh.parseListingHints({
+    textContent: 'Grapefruit #3 THC 9.26% CBD 12.57% $35.00',
+    querySelector: () => null,
+    closest: () => null
+  }).cannabinoids?.THC === 9.26,
+  'bh listing hints parse THC without Total'
+);
+assert(
+  bh.parseListingHints({
+    textContent: 'Grapefruit #3 THC 9.26% CBD 12.57% $35.00',
+    querySelector: () => null,
+    closest: () => null
+  }).cannabinoids?.CBD === 12.57,
+  'bh listing hints parse CBD'
+);
+
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.24', 'version bump');
+assert(manifest.version === '1.3.25', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -1054,9 +1178,11 @@ assert(
   !contentScripts.some(
     (cs) =>
       cs.all_frames === true &&
-      (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis|trulieve/.test(m))
+      (cs.matches || []).some((m) =>
+        /sunnyside|zenleaf|risecannabis|beyond-hello|libertycannabis|trulieve/.test(m)
+      )
   ),
-  'Sunnyside/Zenleaf/RISE/Liberty/Trulieve never use all_frames'
+  'Sunnyside/Zenleaf/RISE/Beyond Hello/Liberty/Trulieve never use all_frames'
 );
 assert(
   mainScripts.some((cs) => (cs.matches || []).some((m) => m.includes('dutchie.com/embedded-menu'))),
@@ -1133,7 +1259,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.24', 'core version 1.3.24');
+assert(CSI.VERSION === '1.3.25', 'core version 1.3.25');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -1142,7 +1268,9 @@ assert(!/\bstrain\b/i.test(addsCopy), 'chip does not frame by strain name');
 assert(!/hover profile/i.test(addsCopy), 'chip does not call hover a product profile');
 assert(/Pro tools/i.test(adds.detail), 'expand mentions Pro tools');
 assert(
-  !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|iheartjane|dutchie|liberty|trulieve|shopd/i.test(addsCopy),
+  !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|beyond\s*hello|iheartjane|dutchie|liberty|trulieve|shopd/i.test(
+    addsCopy
+  ),
   'no retailer brand in chip copy'
 );
 assert(
@@ -2002,6 +2130,8 @@ assert(
       'https://www.zenleafdispensaries.com/*',
       'https://risecannabis.com/*',
       'https://www.risecannabis.com/*',
+      'https://beyond-hello.com/*',
+      'https://www.beyond-hello.com/*',
       'https://dutchie.com/*',
       'https://www.dutchie.com/*',
       'https://libertycannabis.com/*',
@@ -2013,7 +2143,7 @@ assert(
       'http://localhost:3000/*',
       'https://localhost:3000/*'
     ]),
-  'host permissions include RISE + Dutchie + Liberty + Trulieve + prior retailers'
+  'host permissions include RISE + Beyond Hello + Dutchie + Liberty + Trulieve + prior retailers'
 );
 assert(
   (manifest.content_scripts || []).some(
@@ -2079,9 +2209,65 @@ assert(
   'bridge matches RISE dispensaries (top-frame)'
 );
 assert(
+  (manifest.content_scripts || []).some(
+    (cs) =>
+      cs.all_frames !== true &&
+      (cs.matches || []).some((m) =>
+        /beyond-hello\.com\/pennsylvania-dispensaries\/west-chester\//.test(m)
+      )
+  ),
+  'content scripts path-scoped to Beyond Hello West Chester (top-frame)'
+);
+assert(
+  !(manifest.content_scripts || []).some((cs) =>
+    (cs.matches || []).some((m) => /beyond-hello\.com\/\*$/.test(m) || /beyond-hello\.com\/pennsylvania-dispensaries\/\*$/.test(m))
+  ),
+  'Beyond Hello content scripts are not broad host wildcards'
+);
+assert(
   manifest.web_accessible_resources?.[0]?.matches?.includes('https://risecannabis.com/*'),
   'WAR matches RISE'
 );
+assert(
+  manifest.web_accessible_resources?.[0]?.matches?.includes('https://beyond-hello.com/*') &&
+    manifest.web_accessible_resources?.[0]?.matches?.includes('https://www.beyond-hello.com/*'),
+  'WAR matches Beyond Hello origins (MV3 WAR path must be /*)'
+);
+assert(
+  bgSrc.includes("hosts: ['beyond-hello.com', 'www.beyond-hello.com']"),
+  'SW fetch allowlists beyond-hello'
+);
+assert(
+  /west-chester\\\/medical-menu\\\/menu\\\/products\\\//.test(bgSrc),
+  'SW fetch path allows Beyond Hello West Chester PDPs only'
+);
+{
+  const rulesStart = bgSrc.indexOf('const ALLOWED_FETCH_RULES');
+  const fnStart = bgSrc.indexOf('function storeIdFromSearchParams');
+  const fnEnd = bgSrc.indexOf('\nfunction normalizeHost');
+  const swGate = vm.runInNewContext(
+    `${bgSrc.slice(rulesStart, fnStart)}${bgSrc.slice(fnStart, fnEnd)}\n({ isAllowedProductUrl })`,
+    { URL }
+  );
+  assert(
+    swGate.isAllowedProductUrl(
+      'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa-lemon-crunch'
+    ),
+    'SW allows Beyond Hello West Chester PDP'
+  );
+  assert(
+    !swGate.isAllowedProductUrl(
+      'https://beyond-hello.com/pennsylvania-dispensaries/pittsburgh/medical-menu/menu/products/1/foo'
+    ),
+    'SW blocks Beyond Hello unverified slug PDP'
+  );
+  assert(
+    !swGate.isAllowedProductUrl(
+      'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/'
+    ),
+    'SW blocks Beyond Hello listing URL'
+  );
+}
 
 const zlFlower = {
   url: 'https://zenleafdispensaries.com/locations/abington/medical-menu/menu/flower-709/blue-dream-1',

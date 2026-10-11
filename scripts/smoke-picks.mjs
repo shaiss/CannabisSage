@@ -113,7 +113,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.24', 'core version 1.3.24');
+assert(CSI.VERSION === '1.3.25', 'core version 1.3.25');
 assert(CSI.picks, 'picks module');
 assert(CSI.picks.FEATURE_ID === 'picksForYou', 'feature id');
 assert(CSI.features.PRO_FEATURES.picksForYou === true, 'picksForYou is Pro');
@@ -691,7 +691,7 @@ assert(
 assert(provenPicks.picks[0].url === provenShopdPdp, 'popup: proven pick keeps store_id=109 URL');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.24', 'manifest 1.3.24');
+assert(manifest.version === '1.3.25', 'manifest 1.3.25');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
 const isolatedJs =
   (manifest.content_scripts || []).find(
@@ -703,7 +703,9 @@ assert(
   !(manifest.content_scripts || []).some(
     (cs) =>
       cs.all_frames === true &&
-      (cs.matches || []).some((m) => /sunnyside|zenleaf|risecannabis|libertycannabis|trulieve/.test(m))
+      (cs.matches || []).some((m) =>
+        /sunnyside|zenleaf|risecannabis|beyond-hello|libertycannabis|trulieve/.test(m)
+      )
   ),
   'all_frames scoped to Dutchie embedded-menu only'
 );

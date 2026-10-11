@@ -178,6 +178,9 @@
       const path = url.pathname.split(/[?#]/)[0];
       if (!PDP_RE.test(path)) return null;
       const bare = `${url.origin}${path}`;
+      // Explicit non-109 store proof fails closed before any page-context fallback.
+      const explicitStoreId = storeIdFromUrl(url.href);
+      if (explicitStoreId != null && !isVerifiedStoreId(explicitStoreId)) return null;
       // Accept URL query store proof or same-origin verified page context.
       if (!matchesUrl(url.href) && !matchesUrl(bare)) return null;
       url.search = '';

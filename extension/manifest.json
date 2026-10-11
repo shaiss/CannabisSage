@@ -174,12 +174,8 @@
         "https://www.dutchie.com/*",
         "https://libertycannabis.com/*",
         "https://www.libertycannabis.com/*",
-        "https://trulieve.com/shopd",
-        "https://www.trulieve.com/shopd",
-        "https://trulieve.com/shopd/*",
-        "https://www.trulieve.com/shopd/*",
-        "https://trulieve.com/dispensaries/pennsylvania/limerick*",
-        "https://www.trulieve.com/dispensaries/pennsylvania/limerick*"
+        "https://trulieve.com/*",
+        "https://www.trulieve.com/*"
       ]
     }
   ]

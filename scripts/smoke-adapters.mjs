@@ -245,6 +245,14 @@ assert(
   'authorizeFetchUrl mints store_id=109 on verified Limerick page'
 );
 assert(
+  !CSI.adapters.shopd.authorizeFetchUrl(`${shopdPdpBare}?store_id=999`),
+  'authorizeFetchUrl fails closed for explicit non-109 store_id despite page context'
+);
+assert(
+  CSI.adapters.shopd.authorizeFetchUrl(shopdPdpStore109) === shopdPdpStore109,
+  'authorizeFetchUrl keeps mint for explicit store_id=109'
+);
+assert(
   CSI.adapters.shopd.buildProductUrl('/shopd/product/modern-flower-admiral-apple-flower-90728'),
   'shopd accepts PDP path'
 );
@@ -1052,17 +1060,17 @@ assert(
 );
 const warMatches = manifest.web_accessible_resources?.[0]?.matches || [];
 assert(
-  warMatches.includes('https://trulieve.com/shopd') &&
-    warMatches.includes('https://www.trulieve.com/shopd') &&
-    warMatches.includes('https://trulieve.com/shopd/*') &&
-    warMatches.includes('https://www.trulieve.com/shopd/*') &&
-    warMatches.includes('https://trulieve.com/dispensaries/pennsylvania/limerick*') &&
-    warMatches.includes('https://www.trulieve.com/dispensaries/pennsylvania/limerick*'),
-  'WAR matches Trulieve shopd + Limerick landing only'
+  warMatches.includes('https://trulieve.com/*') && warMatches.includes('https://www.trulieve.com/*'),
+  'WAR matches Trulieve origins (MV3 WAR path must be /*)'
+);
+// Chrome rejects WAR match patterns whose path is not exactly /*.
+assert(
+  warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
+  'every WAR match pattern has path /* (Chrome MV3 requirement)'
 );
 assert(
-  !warMatches.includes('https://trulieve.com/*') && !warMatches.includes('https://www.trulieve.com/*'),
-  'WAR does not expose Trulieve site-wide'
+  !warMatches.some((m) => /trulieve\.com\/(?!\*$)/.test(m)),
+  'WAR has no path-scoped Trulieve patterns'
 );
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),
@@ -2501,6 +2509,52 @@ assert(!/product\.tasteProfile/.test(pdpSrc), 'pdp keeps profile in content-scri
 const fetchSrcPref = fs.readFileSync(path.join(ext, 'lib/csi-fetch.js'), 'utf8');
 assert(fetchSrcPref.includes('delete out.tasteProfile') && fetchSrcPref.includes('delete out.tasteMap'), 'host product cache strips prefs');
 assert(fetchSrcPref.includes('omitSensitivePrefs'), 'host cache sanitizes data-csi-product-data');
+const authIdx = fetchSrcPref.indexOf('authorizeFetchUrl');
+const cacheIdx = fetchSrcPref.indexOf('getPdpCache');
+assert(authIdx !== -1 && cacheIdx !== -1 && authIdx < cacheIdx, 'authorizeFetchUrl runs before PDP cache read');
+
+// Behavioral: bare shopd cache must not bypass store-109 authorize gate
+loadScripts(['lib/csi-fetch.js'], sandbox);
+const bareShopdCacheUrl =
+  'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538';
+let fetchMessages = 0;
+sandbox.chrome = {
+  runtime: {
+    lastError: null,
+    sendMessage: (_msg, cb) => {
+      fetchMessages += 1;
+      cb && cb({ ok: false, error: 'unexpected network fetch in cache-gate smoke' });
+    }
+  }
+};
+CSI.storage = {
+  getPdpCache: async (u) =>
+    u === bareShopdCacheUrl
+      ? { name: 'Stale bare cache', cannabinoids: { THC: 22 }, status: 'ok', url: bareShopdCacheUrl }
+      : null,
+  setPdpCache: async () => {}
+};
+Object.assign(sandbox.location, {
+  href: 'https://www.trulieve.com/shopd/category/flower',
+  hostname: 'www.trulieve.com',
+  pathname: '/shopd/category/flower',
+  search: ''
+});
+// Active shopd + unverified store: authorize must fail closed before cache read.
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '999' : null);
+CSI.registry.setActiveAdapter(CSI.adapters.shopd);
+const blockedCached = await CSI.fetchProductDetails(bareShopdCacheUrl);
+assert(blockedCached.status === 'error', 'bare shopd cache blocked without store-109 proof');
+assert(!blockedCached.fromCache, 'unauthorized bare shopd does not return fromCache');
+assert(/Blocked/i.test(blockedCached.error || ''), 'unauthorized bare shopd reports blocked');
+assert(fetchMessages === 0, 'unauthorized bare shopd does not hit network');
+
+sandbox.localStorage.getItem = (k) => (k === 'store_id' ? '109' : null);
+CSI.registry.setActiveAdapter(CSI.adapters.shopd);
+const allowedCached = await CSI.fetchProductDetails(bareShopdCacheUrl);
+assert(allowedCached.fromCache === true, 'authorized store-109 page may use bare PDP cache');
+assert(allowedCached.name === 'Stale bare cache', 'authorized cache hit returns cached product');
+assert(fetchMessages === 0, 'authorized cache hit does not hit network');
 
 // Picks for you (v1.3.20) — Pro, popup-only, cached menus
 assert(fs.existsSync(path.join(ext, 'lib/csi-picks.js')), 'csi-picks.js present');

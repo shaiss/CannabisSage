@@ -32,17 +32,9 @@
         return;
       }
 
-      if (!bypassCache && CSI.storage) {
-        const cached = await CSI.storage.getPdpCache(url);
-        if (cached) {
-          CSI.log('cache hit', url);
-          resolve({ ...cached, status: cached.status || 'ok', fromCache: true });
-          return;
-        }
-      }
-
       try {
-        // Some adapters (shopd) mint a store-gated fetch URL; keep cache/parse on `url`.
+        // Authorize before cache so bare shopd PDP cache entries cannot bypass store-109.
+        // Keep cache/parse keys on the caller `url`; only the network request uses the mint.
         const adapter = CSI.registry?.getActiveAdapter?.() || CSI.registry?.resolveAdapter?.(url);
         const requestUrl =
           typeof adapter?.authorizeFetchUrl === 'function' ? adapter.authorizeFetchUrl(url) : url;
@@ -53,6 +45,16 @@
           });
           return;
         }
+
+        if (!bypassCache && CSI.storage) {
+          const cached = await CSI.storage.getPdpCache(url);
+          if (cached) {
+            CSI.log('cache hit', url);
+            resolve({ ...cached, status: cached.status || 'ok', fromCache: true });
+            return;
+          }
+        }
+
         chrome.runtime.sendMessage({ type: 'FETCH_PRODUCT_HTML', url: requestUrl || url }, async (response) => {
           if (chrome.runtime.lastError) {
             resolve({

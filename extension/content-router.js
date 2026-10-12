@@ -80,7 +80,10 @@
     }
 
     if (next === 'listing') {
-      CSI.entitlement?.refreshIsPro?.().finally(() => CSI.routes?.startListing?.());
+      CSI.entitlement?.refreshIsPro?.().finally(() => {
+        if (currentMode() !== 'listing') return;
+        CSI.routes?.startListing?.();
+      });
     }
     if (next === 'pdp') {
       // Free and Pro get the same PDP on every supported partner store (no per-store gate).

@@ -1500,18 +1500,17 @@ assert(
   'WAR matches dutchie'
 );
 const warMatches = manifest.web_accessible_resources?.[0]?.matches || [];
+// Chrome MV3 WAR matches are origin-only: path must be exactly /* (path-scoped
+// patterns like /shopd/* are rejected as "Invalid match pattern"). Content
+// scripts load taste-map/glossary/config via chrome.runtime.getURL and do not
+// need WAR, so Trulieve is omitted — no site-wide page exposure on trulieve.com.
 assert(
-  warMatches.includes('https://trulieve.com/*') && warMatches.includes('https://www.trulieve.com/*'),
-  'WAR matches Trulieve origins (MV3 WAR path must be /*)'
+  !warMatches.some((m) => /trulieve\.com/i.test(m)),
+  'WAR omits Trulieve (MV3 cannot path-scope; content scripts do not need WAR)'
 );
-// Chrome rejects WAR match patterns whose path is not exactly /*.
 assert(
   warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
   'every WAR match pattern has path /* (Chrome MV3 requirement)'
-);
-assert(
-  !warMatches.some((m) => /trulieve\.com\/(?!\*$)/.test(m)),
-  'WAR has no path-scoped Trulieve patterns'
 );
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),

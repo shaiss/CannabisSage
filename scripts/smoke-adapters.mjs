@@ -1370,27 +1370,30 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.28', 'version bump');
+assert(manifest.version === '1.3.29', 'version bump');
 {
   const listingMd = fs.readFileSync(path.join(root, 'STORE_LISTING.md'), 'utf8');
   const notesMatch = listingMd.match(
-    /## Release notes \(v1\.3\.28\)\s*\n\n([\s\S]*?)\n\n## Release notes/
+    /## Release notes \(v1\.3\.29\)\s*\n\n([\s\S]*?)\n\n## Release notes/
   );
-  assert(notesMatch, 'STORE_LISTING has v1.3.28 release notes');
+  assert(notesMatch, 'STORE_LISTING has v1.3.29 release notes');
   const notes = notesMatch[1];
   assert(
     !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|beyond\s*hello|iheartjane|dutchie|liberty|trulieve|shopd|curaleaf/i.test(
       notes
     ),
-    'v1.3.28 public notes have no store names'
+    'v1.3.29 public notes have no store names'
   );
   assert(
     !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(
       notes
     ),
-    'v1.3.28 public notes have no medical claims'
+    'v1.3.29 public notes have no medical claims'
   );
-  assert(/shadow/i.test(notes) && /flex|layout|column|mount/i.test(notes), 'notes mention the fixes');
+  assert(
+    /web_accessible|getURL|hardening/i.test(notes),
+    'notes mention WAR / getURL hardening'
+  );
 }
 
 const mockCard = {
@@ -1512,6 +1515,47 @@ assert(
   warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
   'every WAR match pattern has path /* (Chrome MV3 requirement)'
 );
+// Content scripts (isolated world) load WAR-listed JSON via chrome.runtime.getURL —
+// that path does not require the page origin in web_accessible_resources. Confirm
+// the loaders still use getURL (not page-injected <script>/<link> to extension URLs).
+{
+  const warResources = manifest.web_accessible_resources?.[0]?.resources || [];
+  assert(
+    warResources.includes('data/default-taste-map.json') &&
+      warResources.includes('data/terpene-glossary.json') &&
+      warResources.includes('data/config.json'),
+    'WAR resources are the three bundled JSON files'
+  );
+  const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
+  const glossarySrc = fs.readFileSync(path.join(ext, 'lib/csi-glossary.js'), 'utf8');
+  const entitlementSrc = fs.readFileSync(path.join(ext, 'lib/csi-entitlement.js'), 'utf8');
+  assert(
+    /chrome\.runtime\.getURL\(\s*['"]data\/default-taste-map\.json['"]\s*\)/.test(storageSrc),
+    'taste-map loader uses chrome.runtime.getURL (no page WAR needed)'
+  );
+  assert(
+    /chrome\.runtime\.getURL\(\s*['"]data\/terpene-glossary\.json['"]\s*\)/.test(glossarySrc),
+    'glossary loader uses chrome.runtime.getURL (no page WAR needed)'
+  );
+  assert(
+    /chrome\.runtime\.getURL\(/.test(entitlementSrc),
+    'config loader uses chrome.runtime.getURL (no page WAR needed)'
+  );
+  // shopd adapter + content scripts still match Trulieve listing/PDP without WAR
+  // (explicit store_id so resolve does not depend on sandbox location / localStorage).
+  assert(
+    CSI.registry.resolveAdapter(
+      'https://www.trulieve.com/shopd/category/flower?store_id=109'
+    )?.id === 'shopd',
+    'shopd listing resolves without Trulieve WAR'
+  );
+  assert(
+    CSI.registry.resolveAdapter(
+      'https://www.trulieve.com/shopd/product/avenue-gsh-mnts-whole-flower-132538?store_id=109'
+    )?.id === 'shopd',
+    'shopd PDP resolves without Trulieve WAR'
+  );
+}
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),
   'prod API host perm (custom domain)'
@@ -1565,7 +1609,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.28', 'core version 1.3.28');
+assert(CSI.VERSION === '1.3.29', 'core version 1.3.29');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');

@@ -114,7 +114,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.28', 'core version 1.3.28');
+assert(CSI.VERSION === '1.3.29', 'core version 1.3.29');
 assert(CSI.picks, 'picks module');
 assert(CSI.picks.FEATURE_ID === 'picksForYou', 'feature id');
 assert(CSI.features.PRO_FEATURES.picksForYou === true, 'picksForYou is Pro');
@@ -692,7 +692,7 @@ assert(
 assert(provenPicks.picks[0].url === provenShopdPdp, 'popup: proven pick keeps store_id=109 URL');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.28', 'manifest 1.3.28');
+assert(manifest.version === '1.3.29', 'manifest 1.3.29');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
 const isolatedJs =
   (manifest.content_scripts || []).find(

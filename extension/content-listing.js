@@ -394,7 +394,7 @@
       }
       await persist();
       syncLabel();
-      tray.updateTrayButton();
+      tray?.updateTrayButton();
     });
 
     host.appendChild(btn);
@@ -597,7 +597,7 @@
     // Re-sync all buttons against persisted selection (covers cards skipped as already enhanced)
     findProductCards().forEach((card) => syncSelectButtonForCard(card));
     await refreshCategoryDealFlags();
-    tray.updateTrayButton();
+    tray?.updateTrayButton();
     applyFiltersAndSort();
   }
 
@@ -668,25 +668,9 @@
     // Keep compare tray across PDP
   }
 
-  function showStoreGateBanner() {
-    document.getElementById('csi-store-gate')?.remove();
-    const el = document.createElement('div');
-    el.id = 'csi-store-gate';
-    el.innerHTML = `
-      <strong>CannabisSage Pro</strong>
-      <span>Multi-store coverage requires Pro.</span>
-      <button type="button" id="csi-store-upgrade">Upgrade</button>
-    `;
-    document.body.appendChild(el);
-    el.querySelector('#csi-store-upgrade')?.addEventListener('click', () => {
-      CSI.entitlement?.openUpgrade?.();
-    });
-  }
-
   /**
    * Soft unlock sits beside the menu after browse has started.
-   * It never replaces badges, hover, or compare, and it is not mounted
-   * on the multi-store gate (that path returns before this is armed).
+   * It never replaces badges, hover, or compare.
    */
   const SOFT_UNLOCK_SCROLL_PX = 64;
   let softUnlockDismissed = false;
@@ -731,7 +715,7 @@
     if (document.getElementById('csi-soft-unlock')) return;
     const offer = CSI.ui?.shouldOfferSoftUnlock?.({
       hasPro: !!CSI.features?.hasPro?.(),
-      storeAllowed: CSI.features?.canUseActiveStore?.() !== false,
+      storeAllowed: true,
       enrichedCount: countChemReadyCards(),
       engaged: browseEngaged,
       dismissed: softUnlockDismissed
@@ -764,11 +748,7 @@
       location.href
     );
 
-    if (!CSI.features?.canUseActiveStore?.()) {
-      showStoreGateBanner();
-      active = false;
-      return;
-    }
+    // Free and Pro get the same listing enhancement on every supported partner store.
     document.getElementById('csi-store-gate')?.remove();
 
     softUnlockDismissed = !!(await CSI.storage?.loadSoftUnlockDismissed?.());
@@ -801,7 +781,7 @@
       }
       scheduleEnhance();
       setupObserver();
-      tray.updateTrayButton();
+      tray?.updateTrayButton();
     };
     start();
 

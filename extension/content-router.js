@@ -80,15 +80,14 @@
     }
 
     if (next === 'listing') {
-      CSI.entitlement?.refreshIsPro?.().finally(() => CSI.routes?.startListing?.());
+      CSI.entitlement?.refreshIsPro?.().finally(() => {
+        if (currentMode() !== 'listing') return;
+        CSI.routes?.startListing?.();
+      });
     }
     if (next === 'pdp') {
-      // Free: PDP allowed on primary store; multi-store PDPs require Pro
+      // Free and Pro get the same PDP on every supported partner store (no per-store gate).
       CSI.entitlement?.refreshIsPro?.().finally(() => {
-        if (!CSI.features?.canUseActiveStore?.()) {
-          CSI.routes?.startListing?.(); // shows store gate banner path via listing
-          return;
-        }
         setTimeout(() => CSI.routes?.startPdp?.(), 200);
       });
     }

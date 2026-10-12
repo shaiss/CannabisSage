@@ -256,7 +256,7 @@ Copy says “Preference match” and lists the preferred terpenes in this listed
 
 Free listings that already show chemistry can offer one quiet note. It is not a wall. Badges, hover, Compare Select, and the product panel stay usable while it is on screen. It does not appear on the product page.
 
-The note waits until you have scrolled the menu (or hovered a card) and at least three cards have finished chemistry badges — not a lone “Loading…” chip. Fewer than three ready cards stays quiet. Pro never sees it. A store that is already behind the multi-store gate does not also show this note.
+The note waits until you have scrolled the menu (or hovered a card) and at least three cards have finished chemistry badges — not a lone “Loading…” chip. Fewer than three ready cards stays quiet. Pro never sees it.
 
 **Upgrade** uses the same control as the filter-bar Upgrade: it opens `https://cannabissage.app/#pricing`, where Stripe Checkout runs on the site. The extension does not collect a card. **Not now** removes the note and stores `csi_soft_unlock_dismissed` in extension storage so it stays hidden after reload. Clear that key to see the note again.
 
@@ -271,7 +271,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Not now hides the note; reload the listing and it stays hidden | |
 | Pro: no note | |
 | Menu with fewer than three chem-ready cards: no note | |
-| Store behind the multi-store gate: existing gate only, no second note | |
+| Partner store (non-Sunnyside) Free listing: badges/compare work; soft unlock may appear; no “Multi-store coverage requires Pro” banner | |
 | Note copy does not name a retailer or make medical/effects claims | |
 
 ## SPA / scroll
@@ -286,7 +286,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.26.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -382,7 +382,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.26.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -400,7 +400,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.26.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 
@@ -461,8 +461,8 @@ Prereq: `cd web && npm i && npm run dev` with `.env.local` Stripe test keys; `st
 | Success page shows `CSG-…` license key | |
 | Popup → Activate license → status Pro | |
 | Sunnyside: filters unlock; Free shows Upgrade on filter bar | |
-| Zen Leaf without Pro: multi-store gate banner | |
-| Zen Leaf with Pro: TerraVida/Zen Leaf enhancements work | |
+| Zen Leaf (and other partners) without Pro: listing badges + PDP panel same as Sunnyside; no multi-store coverage gate banner | |
+| Zen Leaf with Pro: taste-map / filters / cross-store soft match unlock | |
 | Manage → Customer Portal (test) | |
 | Cancel sub → webhook → validate inactive → Pro features lock | |
 

@@ -6,7 +6,6 @@ export const FEATURE_GATES = {
     'compareTray',
     'pdpPanel',
     'similarByChem',
-    'sunnysideStore',
     'tasteProfile'
   ],
   /** Requires active Pro license */

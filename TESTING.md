@@ -87,6 +87,7 @@ Checks per listing:
 | Filter bar shows **TerraVida (Zen Leaf Malvern)** (Malvern uses TerraVida alias) | | |
 | Cards enhance with THC badge from on-card ranges | | |
 | Compare Select + hover tooltip | | |
+| **v1.3.28+:** badge row + Compare Select do not squeeze the card into tall narrow columns (content column / flex-basis mount) | | |
 | Open a product PDP from a card (`.../menu/<category>/<slug>`) | | |
 | PDP panel loads chem / empty / error (never silent) | | |
 | Non-Malvern Zen Leaf (e.g. Abington) shows **Zen Leaf** in filter title | https://zenleafdispensaries.com/locations/abington/medical-menu/menu | |

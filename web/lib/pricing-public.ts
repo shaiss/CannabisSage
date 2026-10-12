@@ -49,10 +49,10 @@ export const FEATURE_GATES = {
     'Optional on-device taste profile',
     'Core supported dispensary menus'
   ],
-  /** Pro bullets lead with money-savers: match, multi-store coverage, $/mg. */
+  /** Pro bullets lead with money-savers: match, $/mg, cached cross-store tools. */
   proLabels: [
     'Taste-map match on listings',
-    'More stores you shop (multi-store, including cached PDP matches + store switcher)',
+    'Cached cross-store matches + store switcher (menus you already opened)',
     '$/mg and deal badges',
     'Listing filters & sort',
     'CSV / JSON export',

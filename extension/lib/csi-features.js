@@ -1,6 +1,10 @@
 /**
  * Feature gates — Free vs Pro.
  * Tweak FREE_FEATURES / PRO_FEATURES to change the split; keep docs/MONETIZATION.md in sync.
+ *
+ * Store access is the same on Free and Pro for every supported partner adapter.
+ * `multiStore` gates cross-store soft match + store switcher (cached other-store
+ * rows), not whether listing/PDP enhancement runs on a given host.
  */
 (function (global) {
   'use strict';
@@ -14,6 +18,7 @@
     compareTray: true,
     pdpPanel: true,
     similarByChem: true,
+    /** @deprecated Access is no longer Sunnyside-only; kept for label/docs parity. */
     sunnysideStore: true,
     tasteProfile: true
   };
@@ -24,6 +29,7 @@
     filters: true,
     sort: true,
     exportCompare: true,
+    /** Cross-store soft match + store switcher (not per-store listing/PDP access). */
     multiStore: true,
     dealBadges: true,
     picksForYou: true
@@ -43,12 +49,13 @@
     return can(featureId);
   }
 
-  /** Whether the active adapter is allowed on the current plan. */
+  /**
+   * Whether the active adapter is a supported store.
+   * Free and Pro get the same listing/PDP access on every partner — no per-store gate.
+   */
   function canUseActiveStore() {
     const adapter = CSI.registry?.getActiveAdapter?.();
-    if (!adapter) return false;
-    if (adapter.id === 'sunnyside') return can('sunnysideStore');
-    return can('multiStore');
+    return !!adapter;
   }
 
   CSI.features = {

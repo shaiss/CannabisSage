@@ -2174,7 +2174,7 @@ assert(
 assert(CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, hasPro: true }) === false, 'pro does not see the prompt');
 assert(
   CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, storeAllowed: false }) === false,
-  'multi-store gate does not add the prompt'
+  'unsupported store does not add the prompt'
 );
 assert(CSI.ui.shouldOfferSoftUnlock({ ...readyOffer, dismissed: true }) === false, 'dismiss stays quiet');
 const softHtml = CSI.ui.buildSoftUnlockPrompt();
@@ -2210,14 +2210,25 @@ assert(
   'PDP keeps bridge chem when HTML fetch fails'
 );
 assert(!pdpSrc.includes('buildSoftUnlockPrompt'), 'product page does not mount the mid-browse prompt');
-const gateAt = listingSrc.indexOf('if (!CSI.features?.canUseActiveStore');
-const gateBlock = listingSrc.slice(gateAt, gateAt + 160);
-assert(gateBlock.includes('showStoreGateBanner();') && gateBlock.includes('return;'), 'store gate still returns early');
-assert(!gateBlock.includes('soft-unlock') && !gateBlock.includes('maybeOfferSoftUnlock'), 'store gate does not mount the soft prompt');
+assert(!listingSrc.includes('showStoreGateBanner'), 'no per-store Pro gate banner on listings');
+assert(!listingSrc.includes('Multi-store coverage requires Pro'), 'no multi-store coverage gate copy');
 assert(
-  listingSrc.indexOf('showStoreGateBanner();') < listingSrc.indexOf("addEventListener('scroll', onSoftUnlockScroll"),
-  'soft unlock is armed only after the store gate'
+  listingSrc.includes('tray?.updateTrayButton()') || listingSrc.includes('tray && tray.updateTrayButton'),
+  'listing enhance null-guards the compare tray'
 );
+const routerSrc = fs.readFileSync(path.join(ext, 'content-router.js'), 'utf8');
+assert(!routerSrc.includes('canUseActiveStore'), 'router does not gate PDP on per-store Pro');
+assert(routerSrc.includes('startPdp'), 'router still starts PDP');
+assert(
+  /function canUseActiveStore\(\)\s*\{[^}]*return !!adapter/s.test(featuresSrcPref) ||
+    featuresSrcPref.includes('return !!adapter'),
+  'canUseActiveStore allows any active partner adapter'
+);
+assert(
+  !/if \(adapter\.id === 'sunnyside'\) return can\('sunnysideStore'\)/.test(featuresSrcPref),
+  'canUseActiveStore no longer special-cases Sunnyside'
+);
+assert(!/return can\('multiStore'\)/.test(featuresSrcPref), 'canUseActiveStore no longer requires Pro multiStore');
 assert(/hoverTooltip:\s*true/.test(featuresSrcPref), 'hover stays free');
 assert(/compareTray:\s*true/.test(featuresSrcPref), 'compare stays free');
 assert(/pdpPanel:\s*true/.test(featuresSrcPref), 'product panel stays free');

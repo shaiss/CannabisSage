@@ -44,12 +44,12 @@ Defined in `extension/lib/csi-features.js` and mirrored for the landing page in 
 | Free | Pro |
 | --- | --- |
 | Hover tooltips | Taste-map match on listings and the product page |
-| Basic THC / terpene badges | More stores you shop (multi-store) |
-| Compare tray (≤3) | $/mg and deal badges |
-| PDP panel | Filters & sort |
-| Same-menu similar-by-chem (cached listed chem) | CSV / JSON export |
-| Core supported menus | Cross-store soft match + store switcher (cached other-store chem) |
-| Optional local taste profile (opt-in, device-only) | Picks for you across nearby supported menus (cached) |
+| Basic THC / terpene badges | $/mg and deal badges |
+| Compare tray (≤3) | Filters & sort |
+| PDP panel on every supported partner store | CSV / JSON export |
+| Same-menu similar-by-chem (cached listed chem) | Cross-store soft match + store switcher (cached other-store chem) |
+| All supported partner menus (same access as Pro) | Picks for you across nearby supported menus (cached) |
+| Optional local taste profile (opt-in, device-only) | |
 
 Taste prefs can still be edited in the popup on Free; they apply on listings and the product page only when `tasteMap` is enabled for the current plan (Pro today). The product page does not add a separate upgrade control for a missing match. The Free **taste profile** (`tasteProfile`) is a separate opt-in local record; it does not unlock Map match.
 
@@ -57,9 +57,9 @@ Taste prefs can still be edited in the popup on Free; they apply on listings and
 
 Same-menu similar-by-chem is Free. Neighbors use already-cached listed cannabinoids and terpenes on this host. Missing chem or too few neighbors is a quiet note — not an upgrade wall and not a guessed lab number.
 
-Cross-store soft match sits on the existing `multiStore` Pro gate (more stores you shop). It ranks already-cached products from other adapters — Sunnyside, Zen Leaf, TerraVida Malvern — using name, category/form, size, brand when present, and listed-chem closeness. It does not fetch a new host. Missing other-store cache is a quiet note. Free sees one soft Upgrade note (same `#pricing` deep link as the listing unlock), not a card form. v1.3.18 adds a Pro-only store switcher on that same panel: allowlisted **Open on {store}** links (and a compact chip strip when ≥2 other stores have cache) that open the store’s own product URL from cache — no new hosts, no cart/order actions.
+Cross-store soft match sits on the existing `multiStore` Pro gate (cached other-store matches — not a per-store access wall). Free and Pro get the same listing badges, hover, compare, and PDP panel on every supported partner store. `multiStore` ranks already-cached products from other adapters — Sunnyside, Zen Leaf, TerraVida Malvern, and other partners — using name, category/form, size, brand when present, and listed-chem closeness. It does not fetch a new host. Missing other-store cache is a quiet note. Free sees one soft Upgrade note (same `#pricing` deep link as the listing unlock), not a card form. v1.3.18 adds a Pro-only store switcher on that same panel: allowlisted **Open on {store}** links (and a compact chip strip when ≥2 other stores have cache) that open the store’s own product URL from cache — no new hosts, no cart/order actions.
 
-On a Free listing that this plan can already use, one dismissible note can appear after the shopper scrolls or hovers and at least three cards have chemistry. **Upgrade** uses the same deep link as the other Upgrade controls (`https://cannabissage.app/#pricing` → Stripe Checkout on the site). **Not now** stores `csi_soft_unlock_dismissed` locally. The note is omitted for Pro, on the multi-store gate, and before that browse signal. It does not hide hover, badges, compare, or the product panel.
+On a Free listing, one dismissible note can appear after the shopper scrolls or hovers and at least three cards have chemistry. **Upgrade** uses the same deep link as the other Upgrade controls (`https://cannabissage.app/#pricing` → Stripe Checkout on the site). **Not now** stores `csi_soft_unlock_dismissed` locally. The note is omitted for Pro and before that browse signal. It does not hide hover, badges, compare, or the product panel.
 
 ## Architecture
 
@@ -145,7 +145,7 @@ License rows live in Neon (`licenses`); Stripe subscription metadata remains the
 - [ ] Test-mode Checkout completes (annual **and** monthly) → success page shows `CSG-…` key
 - [ ] Webhook writes license; `/api/license/validate` returns `active: true`
 - [ ] Extension popup Activate → status Pro; filters unlock on Sunnyside
-- [ ] Free plan on Zen Leaf shows multi-store upgrade gate
-- [ ] Free Sunnyside listing: soft unlock note only after scroll or hover and three chem-ready cards; Upgrade opens the site; Not now hides it; badges and compare stay
+- [ ] Free plan on Zen Leaf / other partners: listing badges + PDP panel (same as Sunnyside); no “Multi-store coverage requires Pro” banner
+- [ ] Free listing: soft unlock note only after scroll or hover and three chem-ready cards; Upgrade opens the site; Not now hides it; badges and compare stay
 - [ ] Customer Portal opens from site `/account` or extension Manage
 - [ ] Cancel subscription → validate becomes inactive after webhook

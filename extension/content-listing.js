@@ -54,8 +54,128 @@
     return cardEl;
   }
 
+  /** Badge / select mount — adapters may redirect away from flex-row card roots. */
+  function chromeMount(cardEl) {
+    const adapter = CSI.registry?.getActiveAdapter?.();
+    if (typeof adapter?.listingMount === 'function') {
+      try {
+        const mount = adapter.listingMount(cardEl);
+        if (mount) return mount;
+      } catch {
+        /* fall through */
+      }
+    }
+    return cardHost(cardEl);
+  }
+
+  /** Light DOM + open shadow roots (recursive). */
+  function querySelectorAllDeep(selector, root) {
+    const start = root || document;
+    if (!start?.querySelectorAll) return [];
+    const out = [];
+    const visit = (node) => {
+      if (!node?.querySelectorAll) return;
+      try {
+        out.push(...node.querySelectorAll(selector));
+      } catch {
+        /* ignore */
+      }
+      let elements;
+      try {
+        elements = node.querySelectorAll('*');
+      } catch {
+        return;
+      }
+      for (const el of elements) {
+        if (el.shadowRoot) visit(el.shadowRoot);
+      }
+    };
+    visit(start);
+    return out;
+  }
+
+  let listingCssText = null;
+  let listingCssPromise = null;
+  const FALLBACK_LISTING_CSS = `
+.csi-badge-row{display:flex;flex-wrap:wrap;gap:4px;justify-content:center;margin:6px 4px 0;position:relative;z-index:15}
+.csi-badge{display:inline-block;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;background:#fff;border:1px solid #ddd;color:#2c3e50;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.csi-badge-thc{border-color:#ff6b35;color:#ff6b35}
+.csi-badge-terp{border-color:#6e7781;cursor:pointer}
+.csi-badge-match{background:#e8f5e9;border-color:#1f883d;color:#1f883d}
+.csi-badge-deal{background:#fff3e0;border-color:#ef6c00;color:#ef6c00}
+.csi-badge-loading{color:#666}
+.csi-badge-empty,.csi-badge-error{color:#b45309;border-color:#f0c36d}
+.cannabis-sage-select-btn{margin:8px auto;padding:6px 12px;background:#ff6b35;color:#fff;border:2px solid #2c3e50;border-radius:4px;cursor:pointer;font-size:11px;font-weight:600;display:block;width:auto;position:relative;z-index:20;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-shadow:0 2px 6px rgba(0,0,0,.2)}
+.cannabis-sage-select-btn:hover:not(:disabled){background:#e55a2b}
+.cannabis-sage-select-btn.is-selected{background:#28a745;border-color:#1f883d}
+.csi-listing-mount{flex:1 1 100%;width:100%;max-width:100%;box-sizing:border-box}
+`.trim();
+
+  function loadListingCss() {
+    if (listingCssText != null) return Promise.resolve(listingCssText);
+    if (listingCssPromise) return listingCssPromise;
+    listingCssPromise = fetch(chrome.runtime.getURL('content.css'))
+      .then((r) => (r.ok ? r.text() : FALLBACK_LISTING_CSS))
+      .then((t) => {
+        listingCssText = t || FALLBACK_LISTING_CSS;
+        return listingCssText;
+      })
+      .catch(() => {
+        listingCssText = FALLBACK_LISTING_CSS;
+        return listingCssText;
+      });
+    return listingCssPromise;
+  }
+
+  /** Chrome content_scripts CSS does not pierce open shadow roots — inject there. */
+  function shadowRootOf(elOrRoot) {
+    if (!elOrRoot) return null;
+    if (typeof ShadowRoot !== 'undefined' && elOrRoot instanceof ShadowRoot) return elOrRoot;
+    const root = elOrRoot.getRootNode?.();
+    if (typeof ShadowRoot !== 'undefined' && root instanceof ShadowRoot) return root;
+    return null;
+  }
+
+  function ensureListingStylesFor(elOrRoot) {
+    const root = shadowRootOf(elOrRoot);
+    if (!root) return;
+    if (root.querySelector?.('style[data-csi-listing-css]')) return;
+    const style = document.createElement('style');
+    style.setAttribute('data-csi-listing-css', '1');
+    style.textContent = listingCssText || FALLBACK_LISTING_CSS;
+    root.prepend(style);
+    if (listingCssText == null) {
+      loadListingCss().then((css) => {
+        if (style.isConnected) style.textContent = css;
+      });
+    }
+  }
+
+  const observedShadowRoots = new WeakSet();
+
+  function observeOpenShadowRoots(root) {
+    if (!mutationObserver) return;
+    const start = root || document;
+    if (!start?.querySelectorAll) return;
+    let elements;
+    try {
+      elements = start.querySelectorAll('*');
+    } catch {
+      return;
+    }
+    for (const el of elements) {
+      const sr = el.shadowRoot;
+      if (!sr || observedShadowRoots.has(sr)) continue;
+      observedShadowRoots.add(sr);
+      mutationObserver.observe(sr, { childList: true, subtree: true });
+      ensureListingStylesFor(sr);
+      observeOpenShadowRoots(sr);
+    }
+  }
+
   function ensureBadgeRow(cardEl) {
-    const host = cardHost(cardEl);
+    const host = chromeMount(cardEl);
+    ensureListingStylesFor(host);
     let row = host.querySelector(':scope > .csi-badge-row');
     if (!row) {
       row = document.createElement('div');
@@ -107,7 +227,7 @@
       const saved = await CSI.storage.setBoughtBeforeFlag(url, flag);
       if (!saved?.ok) return;
       state.profile = saved.value;
-      document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
+      querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
         const p = CSI.getElementProduct(card);
         if (!p) return;
         renderBadges(card, p, p.status || 'ok');
@@ -323,7 +443,7 @@
   }
 
   function syncSelectButtonForCard(cardEl) {
-    const host = cardHost(cardEl);
+    const host = chromeMount(cardEl);
     const btn = host?.querySelector?.('.cannabis-sage-select-btn');
     if (!btn) return;
     const url = cardEl.dataset.csiUrl;
@@ -337,7 +457,8 @@
   }
 
   function addSelectionButton(cardEl) {
-    const host = cardHost(cardEl);
+    const host = chromeMount(cardEl);
+    ensureListingStylesFor(host);
     if (host.querySelector('.cannabis-sage-select-btn')) {
       syncSelectButtonForCard(cardEl);
       return;
@@ -560,6 +681,7 @@
   async function enhanceProducts() {
     if (!document.body) return;
     ensureFilterBar();
+    observeOpenShadowRoots(document);
     const cards = findProductCards();
     CSI.log(`listing cards: ${cards.length}`);
     let n = 0;
@@ -626,12 +748,14 @@
           if (id.startsWith('cannabis-sage') || id.startsWith('csi-') || node.classList?.contains('cannabis-sage-select-btn')) {
             continue;
           }
+          if (node.shadowRoot) observeOpenShadowRoots(node.parentNode || document);
           scheduleEnhance();
           return;
         }
       }
     });
     mutationObserver.observe(document.body, { childList: true, subtree: true });
+    observeOpenShadowRoots(document);
   }
 
   function onListingPathChange() {
@@ -640,10 +764,12 @@
     if (location.pathname !== lastPath) {
       CSI.log('listing SPA path', lastPath, '->', location.pathname);
       lastPath = location.pathname;
-      document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
+      querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((el) => {
         delete el.dataset.csiEnhanced;
       });
-      document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
+      querySelectorAllDeep('.csi-badge-row, .cannabis-sage-select-btn, .csi-listing-mount').forEach((n) =>
+        n.remove()
+      );
     }
     scheduleEnhance();
   }
@@ -661,8 +787,10 @@
     window.removeEventListener('scroll', onSoftUnlockScroll);
     browseEngaged = false;
     filterBar = null;
-    document.querySelectorAll('.csi-badge-row, .cannabis-sage-select-btn').forEach((n) => n.remove());
-    document.querySelectorAll('[data-csi-enhanced="true"]').forEach((el) => {
+    querySelectorAllDeep('.csi-badge-row, .cannabis-sage-select-btn, .csi-listing-mount').forEach((n) =>
+      n.remove()
+    );
+    querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((el) => {
       delete el.dataset.csiEnhanced;
     });
     // Keep compare tray across PDP
@@ -680,7 +808,7 @@
     let n = 0;
     for (const card of findProductCards()) {
       if (card.dataset?.csiEnhanced !== 'true') continue;
-      const host = cardHost(card);
+      const host = chromeMount(card);
       const row = host?.querySelector?.('.csi-badge-row');
       if (!row) continue;
       const badges = row.querySelectorAll('.csi-badge');
@@ -792,7 +920,7 @@
           CSI.storage.loadTasteProfile().then(async (profile) => {
             state.profile = profile || { enabled: false };
             await refreshTasteMap();
-            document.querySelectorAll('[data-csi-enhanced="true"]').forEach((card) => {
+            querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
               const p = CSI.getElementProduct(card);
               if (!p) return;
               if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);

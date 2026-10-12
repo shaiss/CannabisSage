@@ -160,21 +160,50 @@
     }
   }
 
+  /**
+   * querySelectorAll across the light DOM and open shadow roots (recursive).
+   * Jane Boost menus (e.g. partner-hosted embeds) keep product cards inside
+   * an open shadow root on #shadow-host — document.querySelectorAll misses them.
+   */
+  function querySelectorAllDeep(selector, root) {
+    const start = root || (typeof document !== 'undefined' ? document : null);
+    if (!start?.querySelectorAll) return [];
+    const out = [];
+    const visit = (node) => {
+      if (!node?.querySelectorAll) return;
+      try {
+        out.push(...node.querySelectorAll(selector));
+      } catch {
+        /* invalid selector in this root */
+      }
+      let elements;
+      try {
+        elements = node.querySelectorAll('*');
+      } catch {
+        return;
+      }
+      for (const el of elements) {
+        if (el.shadowRoot) visit(el.shadowRoot);
+      }
+    };
+    visit(start);
+    return out;
+  }
+
   function findProductCards() {
-    const cards = Array.from(document.querySelectorAll('article[data-testid^="product-card-"]'));
+    const cards = querySelectorAllDeep('article[data-testid^="product-card-"]');
     if (cards.length) return cards;
     // RISE fallback: product-card-* test id roots
-    const roots = Array.from(document.querySelectorAll('[data-testid^="product-card-"]')).filter(
-      (el) => {
-        const id = el.getAttribute('data-testid') || '';
-        return /^product-card-\d+$/i.test(id);
-      }
-    );
+    const roots = querySelectorAllDeep('[data-testid^="product-card-"]').filter((el) => {
+      const id = el.getAttribute('data-testid') || '';
+      return /^product-card-\d+$/i.test(id);
+    });
     if (roots.length) return roots;
 
-    // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root
-    const links = Array.from(
-      document.querySelectorAll('a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]')
+    // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root.
+    // Links often live under open shadow roots (div#shadow-host).
+    const links = querySelectorAllDeep(
+      'a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]'
     );
     const bhCards = [];
     const seen = new Set();
@@ -577,6 +606,7 @@
     BH_PDP_RE,
     parseProductHtml,
     findProductCards,
+    querySelectorAllDeep,
     isLikelyProductCard,
     cardHost,
     resolveProductUrlFromDom,

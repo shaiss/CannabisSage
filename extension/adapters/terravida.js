@@ -69,6 +69,7 @@
     findProductCards: shared.findProductCards,
     isLikelyProductCard: shared.isLikelyProductCard,
     cardHost: shared.cardHost,
+    listingMount: shared.listingMount,
     resolveProductUrlFromDom: shared.resolveProductUrlFromDom,
     parseListingHints: shared.parseListingHints,
     isAllowedFetchUrl: shared.isAllowedFetchUrl,

@@ -10,7 +10,7 @@
  * [ ] parseProductHtml (and optional parseListingHints for on-card chem)
  * [ ] bridgeStrategy: reuse 'sunnyside' | 'zenleaf' (Sweed) | 'dutchie' | 'shopd' | 'none' or extend bridge.js
  * [ ] Register in adapters/registry.js BUILTIN_ORDER (specificity matters)
- * [ ] Add host_permissions + content_scripts matches + web_accessible_resources
+ * [ ] Add host_permissions + content_scripts matches (prefer no WAR; use CSI_FETCH_PACKAGED)
  *     matches in extension/manifest.json (CWS: new hosts need an extension update;
  *     optional_host_permissions is an alternative if you adopt that pattern later)
  * [ ] Justify hosts in STORE_LISTING.md + PRIVACY.md

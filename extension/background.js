@@ -6,13 +6,10 @@
  * never remote code. Adapters stay in-package.
  */
 
+importScripts('lib/csi-packaged-paths.js');
+
 /** Exact packaged paths content scripts may request (no page-origin WAR). */
-const PACKAGED_RESOURCE_ALLOWLIST = new Set([
-  'data/default-taste-map.json',
-  'data/terpene-glossary.json',
-  'data/config.json',
-  'content.css'
-]);
+const PACKAGED_RESOURCE_ALLOWLIST = self.CSI_PACKAGED_RESOURCE_ALLOWLIST;
 
 const ALLOWED_FETCH_RULES = [
   {
@@ -408,7 +405,7 @@ chrome.runtime.onStartup?.addListener?.(() => {
   getPartnersRecord(true).catch(() => {});
 });
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
   if (message.type === 'CSI_DENYLIST_CHECK') {
@@ -483,6 +480,11 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   if (message.type === 'CSI_FETCH_PACKAGED') {
+    // Same-extension only — reject other extensions / external senders.
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
     const path = typeof message.path === 'string' ? message.path : '';
     (async () => {
       try {

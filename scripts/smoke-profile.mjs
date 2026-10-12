@@ -67,7 +67,13 @@ sandbox.globalThis = sandbox;
 sandbox.window = sandbox;
 
 loadScripts(
-  ['lib/csi-core.js', 'lib/csi-profile.js', 'lib/csi-storage.js', 'lib/csi-fetch.js'],
+  [
+    'lib/csi-packaged-paths.js',
+    'lib/csi-core.js',
+    'lib/csi-profile.js',
+    'lib/csi-storage.js',
+    'lib/csi-fetch.js'
+  ],
   vm.createContext(sandbox)
 );
 

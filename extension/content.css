@@ -245,6 +245,15 @@
   border-radius: 6px;
 }
 
+.csi-listing-mount {
+  flex: 1 1 100%;
+  flex-basis: 100%;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
+
 .csi-badge-row {
   display: flex;
   flex-wrap: wrap;

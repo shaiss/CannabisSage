@@ -92,6 +92,58 @@
     );
   }
 
+  /**
+   * Mount point for badge row + Compare Select.
+   * Sweed product-card roots are often `display:flex; flex-direction:row`
+   * (`relative flex h-full w-full`). Appending chrome as a direct child turns
+   * it into a tall narrow column. Prefer the inner content column (title/price
+   * / ATC); otherwise use a full-width flex-basis:100% mount with wrap.
+   */
+  function listingMount(cardEl) {
+    const root = cardHost(cardEl);
+    if (!root) return cardEl;
+
+    const title =
+      root.querySelector?.('a[data-testid="product-card-title-link"]') ||
+      root.querySelector?.('a[href*="/menu/"]');
+    if (title) {
+      let col = title.parentElement;
+      while (col && col.parentElement && col.parentElement !== root) {
+        col = col.parentElement;
+      }
+      if (col && col !== root && root.contains?.(col)) {
+        return col;
+      }
+    }
+
+    let mount = root.querySelector?.(':scope > .csi-listing-mount');
+    if (!mount) {
+      mount = document.createElement('div');
+      mount.className = 'csi-listing-mount';
+      mount.style.cssText =
+        'flex:1 1 100%;flex-basis:100%;width:100%;max-width:100%;box-sizing:border-box;display:block;';
+      try {
+        const cs = typeof getComputedStyle === 'function' ? getComputedStyle(root) : null;
+        const rowFlex =
+          (cs &&
+            cs.display === 'flex' &&
+            (cs.flexDirection === 'row' || cs.flexDirection === 'row-reverse')) ||
+          (root.classList?.contains('flex') && !root.classList.contains('flex-col'));
+        if (rowFlex && !root.style.flexWrap) {
+          root.style.flexWrap = 'wrap';
+          root.setAttribute('data-csi-flex-wrap', '1');
+        }
+      } catch {
+        if (!root.style.flexWrap) {
+          root.style.flexWrap = 'wrap';
+          root.setAttribute('data-csi-flex-wrap', '1');
+        }
+      }
+      root.appendChild(mount);
+    }
+    return mount;
+  }
+
   function resolveProductUrlFromDom(cardEl) {
     const root = cardHost(cardEl);
     const link =
@@ -376,6 +428,7 @@
     findProductCards,
     isLikelyProductCard,
     cardHost,
+    listingMount,
     resolveProductUrlFromDom,
     parseListingHints,
     isAllowedFetchUrl,
@@ -398,6 +451,7 @@
     findProductCards,
     isLikelyProductCard,
     cardHost,
+    listingMount,
     resolveProductUrlFromDom,
     parseListingHints,
     buildProductUrl,

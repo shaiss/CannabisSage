@@ -1171,6 +1171,168 @@ assert(
   'bh listing hints parse CBD'
 );
 
+// v1.3.28: open shadow root listing cards (Jane Boost #shadow-host)
+{
+  const productHref =
+    '/pennsylvania-dispensaries/west-chester/medical-menu/menu/products/1580931/double-bear-jawa';
+  const shadowLink = {
+    getAttribute: (n) => (n === 'href' ? productHref : null),
+    href: `https://beyond-hello.com${productHref}`,
+    closest(sel) {
+      if (sel === 'article' || sel === 'li' || String(sel).includes('product')) return this;
+      return null;
+    },
+    parentElement: null,
+    matches: (sel) => String(sel).includes('/menu/products/'),
+    querySelector: () => null,
+    textContent: 'Jawa Lemon Crunch THC 93.23% $45'
+  };
+  shadowLink.parentElement = shadowLink;
+  const shadowRoot = {
+    querySelectorAll(sel) {
+      const s = String(sel);
+      if (s.includes('/menu/products/') || s.includes('a[href')) return [shadowLink];
+      if (s === '*') return [shadowLink];
+      return [];
+    },
+    querySelector: () => null
+  };
+  const shadowHost = {
+    id: 'shadow-host',
+    shadowRoot,
+    querySelectorAll: () => [],
+    querySelector: () => null
+  };
+  const prevDoc = sandbox.document;
+  const prevLoc = { ...sandbox.location };
+  sandbox.document = {
+    querySelectorAll(sel) {
+      if (String(sel) === '*') return [shadowHost];
+      return [];
+    },
+    querySelector: () => null,
+    body: null
+  };
+  sandbox.location.href =
+    'https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/menu';
+  sandbox.location.hostname = 'beyond-hello.com';
+  sandbox.location.pathname = '/pennsylvania-dispensaries/west-chester/medical-menu/menu';
+  const shadowCards = CSI.adapters.iheartjane.findProductCards();
+  assert(shadowCards.length >= 1, `shadow listing cards found (${shadowCards.length})`);
+  assert(
+    shadowCards.includes(shadowLink),
+    'shadow listing card is the in-shadow product link root'
+  );
+  assert(typeof CSI.querySelectorAllDeep === 'function', 'CSI.querySelectorAllDeep shared helper');
+  assert(
+    CSI.adapters._iheartjaneShared.querySelectorAllDeep === CSI.querySelectorAllDeep,
+    'iheartjane reuses CSI.querySelectorAllDeep (no duplicate)'
+  );
+  sandbox.document = prevDoc;
+  Object.assign(sandbox.location, prevLoc);
+}
+
+// v1.3.28: Sweed flex-row card — listingMount prefers content column / full-width mount
+{
+  const contentCol = {
+    className: 'flex flex-col grow',
+    parentElement: null,
+    querySelector: () => null,
+    contains(n) {
+      return n === this || n === titleLink;
+    }
+  };
+  const titleLink = {
+    getAttribute: () =>
+      '/locations/norristown/medical-menu/menu/flower-709/blue-dream-1',
+    parentElement: contentCol,
+    matches: () => false
+  };
+  const flexCard = {
+    classList: {
+      contains(c) {
+        return c === 'flex' || c === 'relative';
+      }
+    },
+    className: 'relative flex h-full w-full',
+    style: {},
+    closest(sel) {
+      return String(sel).includes('product-card') ? this : null;
+    },
+    querySelector(sel) {
+      const s = String(sel);
+      if (s.includes('product-card-title-link') || s.includes('/menu/')) return titleLink;
+      return null;
+    },
+    contains(n) {
+      return n === contentCol || n === titleLink;
+    },
+    appendChild() {}
+  };
+  contentCol.parentElement = flexCard;
+  const mountCol = CSI.adapters.zenleaf.listingMount(flexCard);
+  assert(mountCol === contentCol, 'zenleaf listingMount uses inner content column');
+  assert(
+    CSI.adapters.terravida.listingMount === CSI.adapters.zenleaf.listingMount ||
+      CSI.adapters.terravida.listingMount === CSI.adapters._sweedShared.listingMount,
+    'terravida shares listingMount'
+  );
+
+  const created = [];
+  const prevCreate = sandbox.document.createElement;
+  sandbox.document.createElement = (tag) => {
+    const el = {
+      tagName: String(tag).toUpperCase(),
+      className: '',
+      style: { cssText: '' },
+      setAttribute() {},
+      appendChild() {}
+    };
+    created.push(el);
+    return el;
+  };
+  const flexCardNoTitle = {
+    classList: {
+      contains(c) {
+        return c === 'flex';
+      }
+    },
+    style: {},
+    closest() {
+      return this;
+    },
+    querySelector(sel) {
+      if (String(sel).includes('csi-listing-mount')) return this._mount || null;
+      return null;
+    },
+    appendChild(el) {
+      this._mount = el;
+    },
+    contains() {
+      return true;
+    }
+  };
+  flexCardNoTitle.setAttribute = function (k, v) {
+    this.attrs = this.attrs || {};
+    this.attrs[k] = v;
+  };
+  flexCardNoTitle.getAttribute = function (k) {
+    return (this.attrs && this.attrs[k]) || null;
+  };
+  flexCardNoTitle.removeAttribute = function (k) {
+    if (this.attrs) delete this.attrs[k];
+  };
+  const mountWrap = CSI.adapters.zenleaf.listingMount(flexCardNoTitle);
+  assert(mountWrap && mountWrap.className === 'csi-listing-mount', 'fallback csi-listing-mount');
+  assert(/flex-basis:\s*100%/.test(mountWrap.style.cssText), 'fallback mount is flex-basis 100%');
+  assert(flexCardNoTitle.style.flexWrap === 'wrap', 'flex-row card gets flex-wrap');
+  assert(
+    flexCardNoTitle.getAttribute('data-csi-flex-wrap') === '1',
+    'flex-wrap patch is marked for teardown revert'
+  );
+  sandbox.document.createElement = prevCreate;
+}
+
 // Curaleaf / Sweed PDP fixture (shape verified from live KOP HTML — age-gated live fetch)
 const curaleafPdpHtml = `
 <script type="application/ld+json">{"@type":"ListItem","position":1,"item":{"@type":"Product","@id":"https://curaleaf.com/shop/pennsylvania/curaleaf-pa-king-of-prussia/menu/vape-1296/briq-hybrid-biscotti-briq-2g-100227","name":"Biscotti 2g BRIQ"}}</script>
@@ -1208,7 +1370,28 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.27', 'version bump');
+assert(manifest.version === '1.3.28', 'version bump');
+{
+  const listingMd = fs.readFileSync(path.join(root, 'STORE_LISTING.md'), 'utf8');
+  const notesMatch = listingMd.match(
+    /## Release notes \(v1\.3\.28\)\s*\n\n([\s\S]*?)\n\n## Release notes/
+  );
+  assert(notesMatch, 'STORE_LISTING has v1.3.28 release notes');
+  const notes = notesMatch[1];
+  assert(
+    !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|beyond\s*hello|iheartjane|dutchie|liberty|trulieve|shopd|curaleaf/i.test(
+      notes
+    ),
+    'v1.3.28 public notes have no store names'
+  );
+  assert(
+    !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(
+      notes
+    ),
+    'v1.3.28 public notes have no medical claims'
+  );
+  assert(/shadow/i.test(notes) && /flex|layout|column|mount/i.test(notes), 'notes mention the fixes');
+}
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -1383,7 +1566,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.27', 'core version 1.3.27');
+assert(CSI.VERSION === '1.3.28', 'core version 1.3.28');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');

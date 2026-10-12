@@ -161,20 +161,20 @@
   }
 
   function findProductCards() {
-    const cards = Array.from(document.querySelectorAll('article[data-testid^="product-card-"]'));
+    const deep = CSI.querySelectorAllDeep;
+    const cards = deep('article[data-testid^="product-card-"]');
     if (cards.length) return cards;
     // RISE fallback: product-card-* test id roots
-    const roots = Array.from(document.querySelectorAll('[data-testid^="product-card-"]')).filter(
-      (el) => {
-        const id = el.getAttribute('data-testid') || '';
-        return /^product-card-\d+$/i.test(id);
-      }
-    );
+    const roots = deep('[data-testid^="product-card-"]').filter((el) => {
+      const id = el.getAttribute('data-testid') || '';
+      return /^product-card-\d+$/i.test(id);
+    });
     if (roots.length) return roots;
 
-    // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root
-    const links = Array.from(
-      document.querySelectorAll('a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]')
+    // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root.
+    // Links often live under open shadow roots (div#shadow-host).
+    const links = deep(
+      'a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]'
     );
     const bhCards = [];
     const seen = new Set();
@@ -577,6 +577,7 @@
     BH_PDP_RE,
     parseProductHtml,
     findProductCards,
+    querySelectorAllDeep: CSI.querySelectorAllDeep,
     isLikelyProductCard,
     cardHost,
     resolveProductUrlFromDom,

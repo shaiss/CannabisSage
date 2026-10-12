@@ -87,6 +87,7 @@ Checks per listing:
 | Filter bar shows **TerraVida (Zen Leaf Malvern)** (Malvern uses TerraVida alias) | | |
 | Cards enhance with THC badge from on-card ranges | | |
 | Compare Select + hover tooltip | | |
+| **v1.3.28+:** badge row + Compare Select do not squeeze the card into tall narrow columns (content column / flex-basis mount) | | |
 | Open a product PDP from a card (`.../menu/<category>/<slug>`) | | |
 | PDP panel loads chem / empty / error (never silent) | | |
 | Non-Malvern Zen Leaf (e.g. Abington) shows **Zen Leaf** in filter title | https://zenleafdispensaries.com/locations/abington/medical-menu/menu | |
@@ -130,10 +131,11 @@ Checks per listing:
 | Beyond Hello West Chester medical menu listing | https://beyond-hello.com/pennsylvania-dispensaries/west-chester/medical-menu/ | |
 | Filter bar shows **Beyond Hello West Chester** | | |
 | Cards enhance; on-card `THC XX%` present (duplicate THC badge suppressed) | | |
+| **v1.3.28+:** listing cards inside open `#shadow-host` still get `.csi-badge-row` + Compare Select (styles injected into the shadow root) | | |
 | Open a product PDP (`.../medical-menu/menu/products/<id>/<slug>`) | | |
 | PDP panel shows named terp percents from description / og:description | | |
 | Unverified BH location fails closed (no injection / unsupported) | e.g. `.../pennsylvania-dispensaries/pittsburgh/medical-menu/` | |
-| `node scripts/smoke-adapters.mjs` includes Beyond Hello parse + fail-closed fixtures | | |
+| `node scripts/smoke-adapters.mjs` includes Beyond Hello parse + fail-closed + shadow-card fixtures | | |
 
 ## Compare tray persistence
 
@@ -286,7 +288,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.28.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -382,7 +384,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.28.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -400,7 +402,7 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.27.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.28.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

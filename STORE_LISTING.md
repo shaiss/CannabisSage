@@ -7,10 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.27 |
+| **Version** | 1.3.28 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
+
+## Release notes (v1.3.28)
+
+Listing cards that render inside open shadow roots are found again, with badge and select chrome (and styles) injected into that root. On flex-row product cards, the badge row and Compare Select sit in the content column or a full-width mount so the card layout is not squeezed into narrow columns.
 
 ## Release notes (v1.3.27)
 
@@ -131,7 +135,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.27.zip` (includes Curaleaf KOP Sweed + iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
+4. Upload `dist/cannabis-sage-1.3.28.zip` (includes Curaleaf KOP Sweed + iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

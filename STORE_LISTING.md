@@ -14,7 +14,7 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 
 ## Release notes (v1.3.29)
 
-Chrome Web Store hardening: omit a host from web_accessible_resources where content scripts already load packaged taste-map, glossary, and config JSON via chrome.runtime.getURL. MV3 cannot path-scope those matches (origin plus /* only), so omitting avoids unnecessary site-wide page exposure. Host permissions and content-script injection paths are unchanged.
+Chrome Web Store hardening: omit a host from web_accessible_resources. Content scripts load packaged taste-map, glossary, config, and listing CSS through the extension service worker instead of page-origin chrome-extension:// fetches (MV3 cannot path-scope WAR matches). Host permissions and content-script injection paths are unchanged.
 
 ## Release notes (v1.3.28)
 

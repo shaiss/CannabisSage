@@ -127,14 +127,10 @@
           : DEFAULT_TASTE.avoidTerpenes
       };
     }
-    // Try bundled default
+    // Try bundled default (via SW — no page-origin WAR required)
     try {
-      const url = chrome.runtime.getURL('data/default-taste-map.json');
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        return { ...DEFAULT_TASTE, ...json };
-      }
+      const json = await CSI.fetchPackagedJson('data/default-taste-map.json');
+      return { ...DEFAULT_TASTE, ...json };
     } catch (e) {
       CSI.log('default taste map fetch skipped', e);
     }

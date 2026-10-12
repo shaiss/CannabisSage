@@ -90,8 +90,7 @@
   function loadListingCss() {
     if (listingCssText != null) return Promise.resolve(listingCssText);
     if (listingCssPromise) return listingCssPromise;
-    listingCssPromise = fetch(chrome.runtime.getURL('content.css'))
-      .then((r) => (r.ok ? r.text() : FALLBACK_LISTING_CSS))
+    listingCssPromise = CSI.fetchPackagedText('content.css')
       .then((t) => {
         listingCssText = t || FALLBACK_LISTING_CSS;
         return listingCssText;

@@ -16,9 +16,7 @@
   async function loadConfig() {
     if (cachedConfig) return cachedConfig;
     try {
-      const url = chrome.runtime.getURL(CONFIG_URL);
-      const res = await fetch(url);
-      cachedConfig = res.ok ? await res.json() : {};
+      cachedConfig = await CSI.fetchPackagedJson(CONFIG_URL);
     } catch {
       cachedConfig = {};
     }

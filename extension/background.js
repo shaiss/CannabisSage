@@ -6,6 +6,14 @@
  * never remote code. Adapters stay in-package.
  */
 
+/** Exact packaged paths content scripts may request (no page-origin WAR). */
+const PACKAGED_RESOURCE_ALLOWLIST = new Set([
+  'data/default-taste-map.json',
+  'data/terpene-glossary.json',
+  'data/config.json',
+  'content.css'
+]);
+
 const ALLOWED_FETCH_RULES = [
   {
     hosts: ['www.sunnyside.shop', 'sunnyside.shop'],
@@ -468,6 +476,30 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         sendResponse({
           ok: false,
           error: err && err.message ? err.message : 'partners refresh failed'
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'CSI_FETCH_PACKAGED') {
+    const path = typeof message.path === 'string' ? message.path : '';
+    (async () => {
+      try {
+        if (!PACKAGED_RESOURCE_ALLOWLIST.has(path)) {
+          sendResponse({ ok: false, error: 'Blocked: packaged path is not allowlisted.' });
+          return;
+        }
+        const res = await fetch(chrome.runtime.getURL(path));
+        if (!res.ok) {
+          sendResponse({ ok: false, error: `Packaged fetch HTTP ${res.status}` });
+          return;
+        }
+        sendResponse({ ok: true, text: await res.text() });
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: err && err.message ? err.message : 'packaged fetch failed'
         });
       }
     })();

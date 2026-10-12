@@ -1391,8 +1391,8 @@ assert(manifest.version === '1.3.29', 'version bump');
     'v1.3.29 public notes have no medical claims'
   );
   assert(
-    /web_accessible|getURL|hardening/i.test(notes),
-    'notes mention WAR / getURL hardening'
+    /web_accessible|hardening|service worker/i.test(notes),
+    'notes mention WAR / service-worker hardening'
   );
 }
 
@@ -1504,42 +1504,61 @@ assert(
 );
 const warMatches = manifest.web_accessible_resources?.[0]?.matches || [];
 // Chrome MV3 WAR matches are origin-only: path must be exactly /* (path-scoped
-// patterns like /shopd/* are rejected as "Invalid match pattern"). Content
-// scripts load taste-map/glossary/config via chrome.runtime.getURL and do not
-// need WAR, so Trulieve is omitted — no site-wide page exposure on trulieve.com.
+// patterns like /shopd/* are rejected as "Invalid match pattern"). Content-script
+// fetch(getURL) also requires WAR, so Trulieve is omitted and packaged files are
+// loaded via the service worker instead — no site-wide page exposure on trulieve.com.
 assert(
   !warMatches.some((m) => /trulieve\.com/i.test(m)),
-  'WAR omits Trulieve (MV3 cannot path-scope; content scripts do not need WAR)'
+  'WAR omits Trulieve (MV3 cannot path-scope; SW packaged fetch replaces WAR)'
 );
 assert(
   warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
   'every WAR match pattern has path /* (Chrome MV3 requirement)'
 );
-// Content scripts (isolated world) load WAR-listed JSON via chrome.runtime.getURL —
-// that path does not require the page origin in web_accessible_resources. Confirm
-// the loaders still use getURL (not page-injected <script>/<link> to extension URLs).
+// Content scripts load packaged JSON/CSS via CSI_FETCH_PACKAGED (SW), not
+// page-origin fetch(chrome.runtime.getURL) — so Trulieve needs no WAR match.
 {
   const warResources = manifest.web_accessible_resources?.[0]?.resources || [];
   assert(
     warResources.includes('data/default-taste-map.json') &&
       warResources.includes('data/terpene-glossary.json') &&
       warResources.includes('data/config.json'),
-    'WAR resources are the three bundled JSON files'
+    'WAR resources are the three bundled JSON files (other hosts)'
   );
+  const coreSrc = fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8');
+  const bgSrcPackaged = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
   const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
   const glossarySrc = fs.readFileSync(path.join(ext, 'lib/csi-glossary.js'), 'utf8');
   const entitlementSrc = fs.readFileSync(path.join(ext, 'lib/csi-entitlement.js'), 'utf8');
+  const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
   assert(
-    /chrome\.runtime\.getURL\(\s*['"]data\/default-taste-map\.json['"]\s*\)/.test(storageSrc),
-    'taste-map loader uses chrome.runtime.getURL (no page WAR needed)'
+    /CSI_FETCH_PACKAGED/.test(coreSrc) && /fetchPackaged(?:Text|Json)/.test(coreSrc),
+    'core exposes SW packaged fetch helpers'
   );
   assert(
-    /chrome\.runtime\.getURL\(\s*['"]data\/terpene-glossary\.json['"]\s*\)/.test(glossarySrc),
-    'glossary loader uses chrome.runtime.getURL (no page WAR needed)'
+    /CSI_FETCH_PACKAGED/.test(bgSrcPackaged) &&
+      /PACKAGED_RESOURCE_ALLOWLIST/.test(bgSrcPackaged),
+    'SW handles CSI_FETCH_PACKAGED with allowlist'
   );
   assert(
-    /chrome\.runtime\.getURL\(/.test(entitlementSrc),
-    'config loader uses chrome.runtime.getURL (no page WAR needed)'
+    /fetchPackagedJson\(\s*['"]data\/default-taste-map\.json['"]\s*\)/.test(storageSrc),
+    'taste-map loader uses CSI.fetchPackagedJson (no page WAR)'
+  );
+  assert(
+    /fetchPackagedJson\(\s*['"]data\/terpene-glossary\.json['"]\s*\)/.test(glossarySrc),
+    'glossary loader uses CSI.fetchPackagedJson (no page WAR)'
+  );
+  assert(
+    /fetchPackagedJson\(CONFIG_URL\)/.test(entitlementSrc),
+    'config loader uses CSI.fetchPackagedJson (no page WAR)'
+  );
+  assert(
+    /fetchPackagedText\(\s*['"]content\.css['"]\s*\)/.test(listingSrc),
+    'listing CSS loader uses CSI.fetchPackagedText (no page WAR)'
+  );
+  assert(
+    !/chrome\.runtime\.getURL\(\s*['"]data\/terpene-glossary\.json['"]\s*\)/.test(glossarySrc),
+    'glossary no longer page-fetches getURL (would need WAR)'
   );
   // shopd adapter + content scripts still match Trulieve listing/PDP without WAR
   // (explicit store_id so resolve does not depend on sandbox location / localStorage).

@@ -77,7 +77,7 @@ Checks per listing:
 | Open a PDP; panel shows named terpene % (Top Terpenes) | e.g. `/shopd/product/avenue-gsh-mnts-whole-flower-132538` | |
 | Non-Limerick shopd store_id does not activate adapter | | |
 | `all_frames` still Dutchie embedded-menu only (Trulieve top-frame) | | |
-| **v1.3.29+:** Trulieve omitted from WAR; listing/PDP still load taste-map / glossary / config via `chrome.runtime.getURL` (no blocked extension resource) | | |
+| **v1.3.29+:** Trulieve omitted from WAR; listing/PDP load taste-map / glossary / config / listing CSS via service worker `CSI_FETCH_PACKAGED` (no blocked `chrome-extension://` page fetch) | | |
 | `node scripts/smoke-adapters.mjs` covers shopd parse + store allowlist | | |
 
 ## Zen Leaf — smoke

@@ -36,15 +36,11 @@
   async function ensureGlossary() {
     if (loaded) return glossary;
     try {
-      const url = chrome.runtime.getURL('data/terpene-glossary.json');
-      const res = await fetch(url);
-      if (res.ok) {
-        const json = await res.json();
-        glossary = {
-          disclaimer: json.disclaimer || FALLBACK.disclaimer,
-          entries: { ...FALLBACK.entries, ...(json.entries || {}) }
-        };
-      }
+      const json = await CSI.fetchPackagedJson('data/terpene-glossary.json');
+      glossary = {
+        disclaimer: json.disclaimer || FALLBACK.disclaimer,
+        entries: { ...FALLBACK.entries, ...(json.entries || {}) }
+      };
     } catch (e) {
       CSI.log('glossary load fallback', e);
     }

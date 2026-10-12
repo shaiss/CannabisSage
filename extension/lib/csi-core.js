@@ -25,6 +25,60 @@
     console.error('CannabisSage:', ...args);
   }
 
+  /**
+   * Packaged extension files content scripts may read. Keep in sync with
+   * background.js PACKAGED_RESOURCE_ALLOWLIST. Loaded via the service worker
+   * so page hosts do not need web_accessible_resources (MV3 content-script
+   * fetch(getURL) requires WAR and exposes the file to the page origin).
+   */
+  const PACKAGED_RESOURCE_ALLOWLIST = new Set([
+    'data/default-taste-map.json',
+    'data/terpene-glossary.json',
+    'data/config.json',
+    'content.css'
+  ]);
+
+  async function fetchPackagedText(path) {
+    if (!PACKAGED_RESOURCE_ALLOWLIST.has(path)) {
+      throw new Error(`Packaged path not allowlisted: ${path}`);
+    }
+    if (typeof chrome !== 'undefined' && chrome.runtime?.sendMessage) {
+      try {
+        const res = await new Promise((resolve, reject) => {
+          try {
+            chrome.runtime.sendMessage({ type: 'CSI_FETCH_PACKAGED', path }, (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              resolve(response);
+            });
+          } catch (e) {
+            reject(e);
+          }
+        });
+        if (res?.ok && typeof res.text === 'string') return res.text;
+        if (res && res.ok === false) {
+          throw new Error(res.error || 'packaged fetch failed');
+        }
+      } catch (e) {
+        log('CSI_FETCH_PACKAGED via SW failed, trying direct getURL', e);
+      }
+    }
+    // Extension pages (popup) and WAR-listed hosts can still fetch directly.
+    if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) {
+      throw new Error('chrome.runtime unavailable for packaged fetch');
+    }
+    const http = await fetch(chrome.runtime.getURL(path));
+    if (!http.ok) throw new Error(`packaged fetch HTTP ${http.status}`);
+    return http.text();
+  }
+
+  async function fetchPackagedJson(path) {
+    const text = await fetchPackagedText(path);
+    return JSON.parse(text);
+  }
+
   function escapeHtml(value) {
     return String(value ?? '')
       .replace(/&/g, '&amp;')
@@ -1353,6 +1407,9 @@
     ACCENT_DARK,
     DEBUG,
     TERPENE_CANON,
+    PACKAGED_RESOURCE_ALLOWLIST,
+    fetchPackagedText,
+    fetchPackagedJson,
     log,
     warn,
     error,

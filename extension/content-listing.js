@@ -68,31 +68,7 @@
     return cardHost(cardEl);
   }
 
-  /** Light DOM + open shadow roots (recursive). */
-  function querySelectorAllDeep(selector, root) {
-    const start = root || document;
-    if (!start?.querySelectorAll) return [];
-    const out = [];
-    const visit = (node) => {
-      if (!node?.querySelectorAll) return;
-      try {
-        out.push(...node.querySelectorAll(selector));
-      } catch {
-        /* ignore */
-      }
-      let elements;
-      try {
-        elements = node.querySelectorAll('*');
-      } catch {
-        return;
-      }
-      for (const el of elements) {
-        if (el.shadowRoot) visit(el.shadowRoot);
-      }
-    };
-    visit(start);
-    return out;
-  }
+  const querySelectorAllDeep = (...args) => CSI.querySelectorAllDeep(...args);
 
   let listingCssText = null;
   let listingCssPromise = null;
@@ -151,7 +127,9 @@
     }
   }
 
-  const observedShadowRoots = new WeakSet();
+  // Recreated with each MutationObserver lifetime — must not survive teardown,
+  // or shadow roots still mounted across listing↔PDP are skipped on re-entry.
+  let observedShadowRoots = new WeakSet();
 
   function observeOpenShadowRoots(root) {
     if (!mutationObserver) return;
@@ -171,6 +149,14 @@
       ensureListingStylesFor(sr);
       observeOpenShadowRoots(sr);
     }
+  }
+
+  /** Undo inline flex-wrap we set on Sweed flex-row card roots. */
+  function revertFlexWrapPatches() {
+    querySelectorAllDeep('[data-csi-flex-wrap]').forEach((el) => {
+      if (el.style?.flexWrap === 'wrap') el.style.flexWrap = '';
+      el.removeAttribute?.('data-csi-flex-wrap');
+    });
   }
 
   function ensureBadgeRow(cardEl) {
@@ -740,6 +726,7 @@
 
   function setupObserver() {
     if (!document.body || mutationObserver) return;
+    observedShadowRoots = new WeakSet();
     mutationObserver = new MutationObserver((mutations) => {
       for (const m of mutations) {
         for (const node of m.addedNodes) {
@@ -770,6 +757,7 @@
       querySelectorAllDeep('.csi-badge-row, .cannabis-sage-select-btn, .csi-listing-mount').forEach((n) =>
         n.remove()
       );
+      revertFlexWrapPatches();
     }
     scheduleEnhance();
   }
@@ -780,6 +768,8 @@
       mutationObserver.disconnect();
       mutationObserver = null;
     }
+    // Allow the same still-mounted shadow roots to be observed again on re-entry.
+    observedShadowRoots = new WeakSet();
     clearTimeout(enhanceTimer);
     document.getElementById('csi-filter-bar')?.remove();
     document.getElementById('csi-store-gate')?.remove();
@@ -790,6 +780,7 @@
     querySelectorAllDeep('.csi-badge-row, .cannabis-sage-select-btn, .csi-listing-mount').forEach((n) =>
       n.remove()
     );
+    revertFlexWrapPatches();
     querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((el) => {
       delete el.dataset.csiEnhanced;
     });

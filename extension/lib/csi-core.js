@@ -38,6 +38,36 @@
     return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
+  /**
+   * querySelectorAll across the light DOM and open shadow roots (recursive).
+   * Partner menus may keep product cards inside an open shadow root
+   * (e.g. #shadow-host) — document.querySelectorAll misses them.
+   */
+  function querySelectorAllDeep(selector, root) {
+    const start = root || (typeof document !== 'undefined' ? document : null);
+    if (!start?.querySelectorAll) return [];
+    const out = [];
+    const visit = (node) => {
+      if (!node?.querySelectorAll) return;
+      try {
+        out.push(...node.querySelectorAll(selector));
+      } catch {
+        /* invalid selector in this root */
+      }
+      let elements;
+      try {
+        elements = node.querySelectorAll('*');
+      } catch {
+        return;
+      }
+      for (const el of elements) {
+        if (el.shadowRoot) visit(el.shadowRoot);
+      }
+    };
+    visit(start);
+    return out;
+  }
+
   const TERPENE_CANON = [
     { name: 'Beta-Caryophyllene', keys: ['beta-caryophyllene', 'b-caryophyllene', 'beta caryophyllene', 'caryophyllene'] },
     { name: 'Limonene', keys: ['limonene'] },
@@ -1328,6 +1358,7 @@
     error,
     escapeHtml,
     escapeRegExp,
+    querySelectorAllDeep,
     canonicalizeTerpeneName,
     parsePercent,
     parsePrice,

@@ -1223,9 +1223,10 @@ assert(
     shadowCards.includes(shadowLink),
     'shadow listing card is the in-shadow product link root'
   );
+  assert(typeof CSI.querySelectorAllDeep === 'function', 'CSI.querySelectorAllDeep shared helper');
   assert(
-    typeof CSI.adapters._iheartjaneShared.querySelectorAllDeep === 'function',
-    'iheartjane exports querySelectorAllDeep'
+    CSI.adapters._iheartjaneShared.querySelectorAllDeep === CSI.querySelectorAllDeep,
+    'iheartjane reuses CSI.querySelectorAllDeep (no duplicate)'
   );
   sandbox.document = prevDoc;
   Object.assign(sandbox.location, prevLoc);
@@ -1311,10 +1312,24 @@ assert(
       return true;
     }
   };
+  flexCardNoTitle.setAttribute = function (k, v) {
+    this.attrs = this.attrs || {};
+    this.attrs[k] = v;
+  };
+  flexCardNoTitle.getAttribute = function (k) {
+    return (this.attrs && this.attrs[k]) || null;
+  };
+  flexCardNoTitle.removeAttribute = function (k) {
+    if (this.attrs) delete this.attrs[k];
+  };
   const mountWrap = CSI.adapters.zenleaf.listingMount(flexCardNoTitle);
   assert(mountWrap && mountWrap.className === 'csi-listing-mount', 'fallback csi-listing-mount');
   assert(/flex-basis:\s*100%/.test(mountWrap.style.cssText), 'fallback mount is flex-basis 100%');
   assert(flexCardNoTitle.style.flexWrap === 'wrap', 'flex-row card gets flex-wrap');
+  assert(
+    flexCardNoTitle.getAttribute('data-csi-flex-wrap') === '1',
+    'flex-wrap patch is marked for teardown revert'
+  );
   sandbox.document.createElement = prevCreate;
 }
 

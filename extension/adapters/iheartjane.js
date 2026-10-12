@@ -160,41 +160,12 @@
     }
   }
 
-  /**
-   * querySelectorAll across the light DOM and open shadow roots (recursive).
-   * Jane Boost menus (e.g. partner-hosted embeds) keep product cards inside
-   * an open shadow root on #shadow-host — document.querySelectorAll misses them.
-   */
-  function querySelectorAllDeep(selector, root) {
-    const start = root || (typeof document !== 'undefined' ? document : null);
-    if (!start?.querySelectorAll) return [];
-    const out = [];
-    const visit = (node) => {
-      if (!node?.querySelectorAll) return;
-      try {
-        out.push(...node.querySelectorAll(selector));
-      } catch {
-        /* invalid selector in this root */
-      }
-      let elements;
-      try {
-        elements = node.querySelectorAll('*');
-      } catch {
-        return;
-      }
-      for (const el of elements) {
-        if (el.shadowRoot) visit(el.shadowRoot);
-      }
-    };
-    visit(start);
-    return out;
-  }
-
   function findProductCards() {
-    const cards = querySelectorAllDeep('article[data-testid^="product-card-"]');
+    const deep = CSI.querySelectorAllDeep;
+    const cards = deep('article[data-testid^="product-card-"]');
     if (cards.length) return cards;
     // RISE fallback: product-card-* test id roots
-    const roots = querySelectorAllDeep('[data-testid^="product-card-"]').filter((el) => {
+    const roots = deep('[data-testid^="product-card-"]').filter((el) => {
       const id = el.getAttribute('data-testid') || '';
       return /^product-card-\d+$/i.test(id);
     });
@@ -202,7 +173,7 @@
 
     // Beyond Hello Jane Boost: hashed CSS modules — card = product PDP link root.
     // Links often live under open shadow roots (div#shadow-host).
-    const links = querySelectorAllDeep(
+    const links = deep(
       'a[href*="/medical-menu/menu/products/"], a[href*="/menu/products/"]'
     );
     const bhCards = [];
@@ -606,7 +577,7 @@
     BH_PDP_RE,
     parseProductHtml,
     findProductCards,
-    querySelectorAllDeep,
+    querySelectorAllDeep: CSI.querySelectorAllDeep,
     isLikelyProductCard,
     cardHost,
     resolveProductUrlFromDom,

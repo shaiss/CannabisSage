@@ -129,9 +129,15 @@
             cs.display === 'flex' &&
             (cs.flexDirection === 'row' || cs.flexDirection === 'row-reverse')) ||
           (root.classList?.contains('flex') && !root.classList.contains('flex-col'));
-        if (rowFlex && !root.style.flexWrap) root.style.flexWrap = 'wrap';
+        if (rowFlex && !root.style.flexWrap) {
+          root.style.flexWrap = 'wrap';
+          root.setAttribute('data-csi-flex-wrap', '1');
+        }
       } catch {
-        if (!root.style.flexWrap) root.style.flexWrap = 'wrap';
+        if (!root.style.flexWrap) {
+          root.style.flexWrap = 'wrap';
+          root.setAttribute('data-csi-flex-wrap', '1');
+        }
       }
       root.appendChild(mount);
     }

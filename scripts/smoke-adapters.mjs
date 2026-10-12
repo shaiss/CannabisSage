@@ -1500,18 +1500,31 @@ assert(
   'WAR matches dutchie'
 );
 const warMatches = manifest.web_accessible_resources?.[0]?.matches || [];
+// MV3 WAR `matches` must end in /*; Chrome rejects path-scoped patterns and only
+// uses the origin anyway. Trulieve inject paths are /shopd/* + Limerick landing;
+// isolated content scripts load bundled JSON via chrome.runtime.getURL without WAR.
+const trulieveInjectMatches = [
+  'https://trulieve.com/shopd',
+  'https://www.trulieve.com/shopd',
+  'https://trulieve.com/shopd/*',
+  'https://www.trulieve.com/shopd/*',
+  'https://trulieve.com/dispensaries/pennsylvania/limerick*',
+  'https://www.trulieve.com/dispensaries/pennsylvania/limerick*'
+];
 assert(
-  warMatches.includes('https://trulieve.com/*') && warMatches.includes('https://www.trulieve.com/*'),
-  'WAR matches Trulieve origins (MV3 WAR path must be /*)'
+  trulieveInjectMatches.every((pat) =>
+    manifest.content_scripts.some((cs) => (cs.matches || []).includes(pat))
+  ),
+  'Trulieve content_scripts cover shopd + Limerick landing inject paths'
+);
+assert(
+  !warMatches.some((m) => /trulieve\.com/i.test(m)),
+  'Trulieve not in WAR (avoid site-wide trulieve.com/*; CS fetch needs no WAR)'
 );
 // Chrome rejects WAR match patterns whose path is not exactly /*.
 assert(
   warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
   'every WAR match pattern has path /* (Chrome MV3 requirement)'
-);
-assert(
-  !warMatches.some((m) => /trulieve\.com\/(?!\*$)/.test(m)),
-  'WAR has no path-scoped Trulieve patterns'
 );
 assert(
   manifest.host_permissions.includes('https://cannabissage.app/*'),

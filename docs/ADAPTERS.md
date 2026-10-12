@@ -138,6 +138,7 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 | Cards | `a[href*="/shopd/product/"]` with on-card `XX.X% THC \| X.XX Terps.` (totals only) |
 | Chem source | Live DOM scrape (`bridgeStrategy: 'shopd'`) + optional parse of public `api.trulieve.com/api/v2/products/…` / menu JSON the page already calls. Named terpene % on PDP Top Terpenes panel. |
 | Not Dutchie embed | Do **not** reuse `adapters/dutchie.js`. Inventory API `source` may say `"dutchie"`, but shoppers use Trulieve's own `/shopd` UI (no `dutchie.com/embedded-menu` iframe for this menu). |
+| `web_accessible_resources` | **Not listed** for Trulieve. Chrome MV3 WAR `matches` must use path `/*` (path-scoped patterns are rejected), which would expose bundled JSON on every `trulieve.com` page. Isolated content scripts load `data/*.json` via `chrome.runtime.getURL` without WAR. |
 
 ## How to add a store (community PR)
 

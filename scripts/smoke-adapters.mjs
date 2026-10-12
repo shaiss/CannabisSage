@@ -1208,7 +1208,7 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.26', 'version bump');
+assert(manifest.version === '1.3.27', 'version bump');
 
 const mockCard = {
   textContent: 'Blue Dream THC 24.5% $45',
@@ -1383,7 +1383,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.26', 'core version 1.3.26');
+assert(CSI.VERSION === '1.3.27', 'core version 1.3.27');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -2219,16 +2219,9 @@ assert(
 const routerSrc = fs.readFileSync(path.join(ext, 'content-router.js'), 'utf8');
 assert(!routerSrc.includes('canUseActiveStore'), 'router does not gate PDP on per-store Pro');
 assert(routerSrc.includes('startPdp'), 'router still starts PDP');
-assert(
-  /function canUseActiveStore\(\)\s*\{[^}]*return !!adapter/s.test(featuresSrcPref) ||
-    featuresSrcPref.includes('return !!adapter'),
-  'canUseActiveStore allows any active partner adapter'
-);
-assert(
-  !/if \(adapter\.id === 'sunnyside'\) return can\('sunnysideStore'\)/.test(featuresSrcPref),
-  'canUseActiveStore no longer special-cases Sunnyside'
-);
-assert(!/return can\('multiStore'\)/.test(featuresSrcPref), 'canUseActiveStore no longer requires Pro multiStore');
+assert(!featuresSrcPref.includes('canUseActiveStore'), 'canUseActiveStore removed (no per-store gate)');
+assert(!featuresSrcPref.includes('sunnysideStore'), 'sunnysideStore flag removed');
+assert(!listingSrc.includes('canUseActiveStore'), 'listing soft-unlock does not call canUseActiveStore');
 assert(/hoverTooltip:\s*true/.test(featuresSrcPref), 'hover stays free');
 assert(/compareTray:\s*true/.test(featuresSrcPref), 'compare stays free');
 assert(/pdpPanel:\s*true/.test(featuresSrcPref), 'product panel stays free');

@@ -18,8 +18,6 @@
     compareTray: true,
     pdpPanel: true,
     similarByChem: true,
-    /** @deprecated Access is no longer Sunnyside-only; kept for label/docs parity. */
-    sunnysideStore: true,
     tasteProfile: true
   };
 
@@ -49,21 +47,11 @@
     return can(featureId);
   }
 
-  /**
-   * Whether the active adapter is a supported store.
-   * Free and Pro get the same listing/PDP access on every partner — no per-store gate.
-   */
-  function canUseActiveStore() {
-    const adapter = CSI.registry?.getActiveAdapter?.();
-    return !!adapter;
-  }
-
   CSI.features = {
     FREE_FEATURES,
     PRO_FEATURES,
     hasPro,
     can,
-    requirePro,
-    canUseActiveStore
+    requirePro
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

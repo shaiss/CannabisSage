@@ -715,7 +715,7 @@
     if (document.getElementById('csi-soft-unlock')) return;
     const offer = CSI.ui?.shouldOfferSoftUnlock?.({
       hasPro: !!CSI.features?.hasPro?.(),
-      storeAllowed: CSI.features?.canUseActiveStore?.() !== false,
+      storeAllowed: true,
       enrichedCount: countChemReadyCards(),
       engaged: browseEngaged,
       dismissed: softUnlockDismissed

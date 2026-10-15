@@ -1502,9 +1502,9 @@ assert(
 // Packaged JSON/CSS load via CSI_FETCH_PACKAGED (SW) on every host — no
 // web_accessible_resources (MV3 WAR is origin-only and exposes files to the page).
 assert(
-  !manifest.web_accessible_resources ||
-    !manifest.web_accessible_resources.length ||
-    !(manifest.web_accessible_resources[0]?.resources || []).length,
+  !(manifest.web_accessible_resources || []).some(
+    (entry) => (entry?.resources || []).length
+  ),
   'web_accessible_resources omitted (SW packaged fetch replaces WAR)'
 );
 {

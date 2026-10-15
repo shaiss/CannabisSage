@@ -539,6 +539,14 @@ assert(
   popupHtmlSrc.includes('id="picks-section"') && popupHtmlSrc.includes('id="profile-section"'),
   'popup keeps neutral settings sections when site is unsupported'
 );
+{
+  const packagedIdx = popupHtmlSrc.indexOf('csi-packaged-paths.js');
+  const coreIdx = popupHtmlSrc.indexOf('csi-core.js');
+  assert(
+    packagedIdx !== -1 && coreIdx !== -1 && packagedIdx < coreIdx,
+    'popup loads csi-packaged-paths.js before csi-core.js'
+  );
+}
 
 Object.assign(sandbox.location, prevLoc);
 sandbox.localStorage.getItem = () => null;
@@ -1502,9 +1510,7 @@ assert(
 // Packaged JSON/CSS load via CSI_FETCH_PACKAGED (SW) on every host — no
 // web_accessible_resources (MV3 WAR is origin-only and exposes files to the page).
 assert(
-  !(manifest.web_accessible_resources || []).some(
-    (entry) => (entry?.resources || []).length
-  ),
+  !manifest.web_accessible_resources,
   'web_accessible_resources omitted (SW packaged fetch replaces WAR)'
 );
 {

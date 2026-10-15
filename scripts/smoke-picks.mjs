@@ -90,6 +90,7 @@ sandbox.window = sandbox;
 
 loadScripts(
   [
+    'lib/csi-packaged-paths.js',
     'lib/csi-core.js',
     'adapters/interface.js',
     'adapters/sunnyside.js',

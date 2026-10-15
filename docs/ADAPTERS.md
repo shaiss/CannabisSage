@@ -147,7 +147,7 @@ The `terravida` adapter therefore **aliases Zen Leaf Malvern paths only** (displ
 4. Extend `extension/manifest.json`:
    - `content_scripts[].matches` (listing + PDP globs)
    - `host_permissions` (only hosts you fetch/inject on)
-   - `web_accessible_resources[].matches` only if a **web page** (or content-script `fetch(getURL)`) must load extension resources; MV3 WAR matches are origin-only (`https://host/*` — Chrome rejects path-scoped patterns). Prefer omitting WAR and loading packaged JSON/CSS via the service worker (`CSI_FETCH_PACKAGED` / `CSI.fetchPackaged*`) — Trulieve shopd does this.
+   - Prefer **no** `web_accessible_resources`: load packaged JSON/CSS via the service worker (`CSI_FETCH_PACKAGED` / `CSI.fetchPackaged*`, allowlist in `lib/csi-packaged-paths.js`). MV3 WAR matches are origin-only (`https://host/*`) and expose files to the page — only add WAR if a **web page** must load an extension resource.
 5. Mirror PDP allow rules in `extension/background.js` `ALLOWED_FETCH_RULES`.
 6. If React/client state differs, extend `bridge.js` with a new `bridgeStrategy`.
 7. Justify each host in `STORE_LISTING.md` and `PRIVACY.md`.

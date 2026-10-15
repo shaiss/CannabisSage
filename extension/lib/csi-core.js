@@ -26,17 +26,14 @@
   }
 
   /**
-   * Packaged extension files content scripts may read. Keep in sync with
-   * background.js PACKAGED_RESOURCE_ALLOWLIST. Loaded via the service worker
-   * so page hosts do not need web_accessible_resources (MV3 content-script
-   * fetch(getURL) requires WAR and exposes the file to the page origin).
+   * Packaged extension files content scripts may read. Shared constant from
+   * csi-packaged-paths.js (also importScripts'd by the service worker). Loaded
+   * via SW so page hosts do not need web_accessible_resources.
    */
-  const PACKAGED_RESOURCE_ALLOWLIST = new Set([
-    'data/default-taste-map.json',
-    'data/terpene-glossary.json',
-    'data/config.json',
-    'content.css'
-  ]);
+  const PACKAGED_RESOURCE_ALLOWLIST = global.CSI_PACKAGED_RESOURCE_ALLOWLIST;
+  if (!PACKAGED_RESOURCE_ALLOWLIST) {
+    throw new Error('CSI_PACKAGED_RESOURCE_ALLOWLIST missing — load csi-packaged-paths.js first');
+  }
 
   async function fetchPackagedText(path) {
     if (!PACKAGED_RESOURCE_ALLOWLIST.has(path)) {
@@ -65,7 +62,7 @@
         log('CSI_FETCH_PACKAGED via SW failed, trying direct getURL', e);
       }
     }
-    // Extension pages (popup) and WAR-listed hosts can still fetch directly.
+    // Extension pages (popup) can still fetch packaged files directly.
     if (typeof chrome === 'undefined' || !chrome.runtime?.getURL) {
       throw new Error('chrome.runtime unavailable for packaged fetch');
     }

@@ -82,6 +82,7 @@
         "https://www.trulieve.com/dispensaries/pennsylvania/limerick*"
       ],
       "js": [
+        "lib/csi-packaged-paths.js",
         "lib/csi-core.js",
         "adapters/interface.js",
         "adapters/sunnyside.js",
@@ -115,6 +116,7 @@
         "https://www.dutchie.com/embedded-menu/*"
       ],
       "js": [
+        "lib/csi-packaged-paths.js",
         "lib/csi-core.js",
         "adapters/interface.js",
         "adapters/sunnyside.js",
@@ -169,30 +171,5 @@
   "optional_host_permissions": [
     "https://*.vercel.app/*"
   ],
-  "permissions": ["storage"],
-  "web_accessible_resources": [
-    {
-      "resources": [
-        "data/default-taste-map.json",
-        "data/terpene-glossary.json",
-        "data/config.json"
-      ],
-      "matches": [
-        "https://www.sunnyside.shop/*",
-        "https://sunnyside.shop/*",
-        "https://zenleafdispensaries.com/*",
-        "https://www.zenleafdispensaries.com/*",
-        "https://curaleaf.com/*",
-        "https://www.curaleaf.com/*",
-        "https://risecannabis.com/*",
-        "https://www.risecannabis.com/*",
-        "https://beyond-hello.com/*",
-        "https://www.beyond-hello.com/*",
-        "https://dutchie.com/*",
-        "https://www.dutchie.com/*",
-        "https://libertycannabis.com/*",
-        "https://www.libertycannabis.com/*"
-      ]
-    }
-  ]
+  "permissions": ["storage"]
 }

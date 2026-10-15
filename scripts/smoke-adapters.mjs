@@ -47,6 +47,7 @@ sandbox.window = sandbox;
 
 loadScripts(
   [
+    'lib/csi-packaged-paths.js',
     'lib/csi-core.js',
     'adapters/interface.js',
     'adapters/sunnyside.js',
@@ -538,6 +539,14 @@ assert(
   popupHtmlSrc.includes('id="picks-section"') && popupHtmlSrc.includes('id="profile-section"'),
   'popup keeps neutral settings sections when site is unsupported'
 );
+{
+  const packagedIdx = popupHtmlSrc.indexOf('csi-packaged-paths.js');
+  const coreIdx = popupHtmlSrc.indexOf('csi-core.js');
+  assert(
+    packagedIdx !== -1 && coreIdx !== -1 && packagedIdx < coreIdx,
+    'popup loads csi-packaged-paths.js before csi-core.js'
+  );
+}
 
 Object.assign(sandbox.location, prevLoc);
 sandbox.localStorage.getItem = () => null;
@@ -1498,39 +1507,50 @@ assert(
   mainScripts.some((cs) => (cs.matches || []).some((m) => m.includes('dutchie.com/embedded-menu'))),
   'bridge matches dutchie embedded-menu'
 );
+// Packaged JSON/CSS load via CSI_FETCH_PACKAGED (SW) on every host — no
+// web_accessible_resources (MV3 WAR is origin-only and exposes files to the page).
 assert(
-  manifest.web_accessible_resources?.[0]?.matches?.some((m) => m.includes('dutchie.com')),
-  'WAR matches dutchie'
+  !manifest.web_accessible_resources,
+  'web_accessible_resources omitted (SW packaged fetch replaces WAR)'
 );
-const warMatches = manifest.web_accessible_resources?.[0]?.matches || [];
-// Chrome MV3 WAR matches are origin-only: path must be exactly /* (path-scoped
-// patterns like /shopd/* are rejected as "Invalid match pattern"). Content-script
-// fetch(getURL) also requires WAR, so Trulieve is omitted and packaged files are
-// loaded via the service worker instead — no site-wide page exposure on trulieve.com.
-assert(
-  !warMatches.some((m) => /trulieve\.com/i.test(m)),
-  'WAR omits Trulieve (MV3 cannot path-scope; SW packaged fetch replaces WAR)'
-);
-assert(
-  warMatches.every((m) => /^(?:\*|https?):\/\/[^/]+\/\*$/.test(m)),
-  'every WAR match pattern has path /* (Chrome MV3 requirement)'
-);
-// Content scripts load packaged JSON/CSS via CSI_FETCH_PACKAGED (SW), not
-// page-origin fetch(chrome.runtime.getURL) — so Trulieve needs no WAR match.
 {
-  const warResources = manifest.web_accessible_resources?.[0]?.resources || [];
+  const warBlob = JSON.stringify(manifest.web_accessible_resources || []);
   assert(
-    warResources.includes('data/default-taste-map.json') &&
-      warResources.includes('data/terpene-glossary.json') &&
-      warResources.includes('data/config.json'),
-    'WAR resources are the three bundled JSON files (other hosts)'
+    !/default-taste-map|terpene-glossary|data\/config\.json/.test(warBlob),
+    'bundled JSON files are not web_accessible_resources'
   );
+  const pathsSrc = fs.readFileSync(path.join(ext, 'lib/csi-packaged-paths.js'), 'utf8');
   const coreSrc = fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8');
   const bgSrcPackaged = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
   const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
   const glossarySrc = fs.readFileSync(path.join(ext, 'lib/csi-glossary.js'), 'utf8');
   const entitlementSrc = fs.readFileSync(path.join(ext, 'lib/csi-entitlement.js'), 'utf8');
   const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
+  assert(
+    /CSI_PACKAGED_RESOURCE_ALLOWLIST/.test(pathsSrc) &&
+      /default-taste-map\.json/.test(pathsSrc) &&
+      /terpene-glossary\.json/.test(pathsSrc) &&
+      /config\.json/.test(pathsSrc) &&
+      /content\.css/.test(pathsSrc),
+    'shared packaged-path allowlist lists JSON + content.css'
+  );
+  assert(
+    /importScripts\(\s*['"]lib\/csi-packaged-paths\.js['"]\s*\)/.test(bgSrcPackaged),
+    'SW importScripts shared packaged-path allowlist'
+  );
+  assert(
+    /CSI_PACKAGED_RESOURCE_ALLOWLIST/.test(coreSrc) &&
+      !/new Set\(\s*\[\s*['"]data\/default-taste-map/.test(coreSrc),
+    'core uses shared allowlist (does not redefine path Set)'
+  );
+  assert(
+    (manifest.content_scripts || []).every(
+      (cs) =>
+        !(cs.js || []).includes('lib/csi-core.js') ||
+        (cs.js || []).includes('lib/csi-packaged-paths.js')
+    ),
+    'content scripts load csi-packaged-paths.js before csi-core.js'
+  );
   assert(
     /CSI_FETCH_PACKAGED/.test(coreSrc) && /fetchPackaged(?:Text|Json)/.test(coreSrc),
     'core exposes SW packaged fetch helpers'
@@ -1539,6 +1559,10 @@ assert(
     /CSI_FETCH_PACKAGED/.test(bgSrcPackaged) &&
       /PACKAGED_RESOURCE_ALLOWLIST/.test(bgSrcPackaged),
     'SW handles CSI_FETCH_PACKAGED with allowlist'
+  );
+  assert(
+    /sender\.id\s*!==\s*chrome\.runtime\.id/.test(bgSrcPackaged),
+    'SW CSI_FETCH_PACKAGED rejects unless sender.id === chrome.runtime.id'
   );
   assert(
     /fetchPackagedJson\(\s*['"]data\/default-taste-map\.json['"]\s*\)/.test(storageSrc),
@@ -2621,9 +2645,10 @@ assert(
   'Curaleaf content scripts are not broad host/path wildcards'
 );
 assert(
-  manifest.web_accessible_resources?.[0]?.matches?.includes('https://curaleaf.com/*') &&
-    manifest.web_accessible_resources?.[0]?.matches?.includes('https://www.curaleaf.com/*'),
-  'WAR matches Curaleaf origins (MV3 WAR path must be /*)'
+  (manifest.content_scripts || []).some((cs) =>
+    (cs.matches || []).some((m) => m.includes('curaleaf.com'))
+  ),
+  'content scripts match Curaleaf (packaged assets via SW, not WAR)'
 );
 assert(
   bgSrc.includes("hosts: ['curaleaf.com', 'www.curaleaf.com']"),
@@ -2661,13 +2686,16 @@ assert(
   );
 }
 assert(
-  manifest.web_accessible_resources?.[0]?.matches?.includes('https://risecannabis.com/*'),
-  'WAR matches RISE'
+  (manifest.content_scripts || []).some((cs) =>
+    (cs.matches || []).some((m) => m.includes('risecannabis.com'))
+  ),
+  'content scripts match RISE (packaged assets via SW, not WAR)'
 );
 assert(
-  manifest.web_accessible_resources?.[0]?.matches?.includes('https://beyond-hello.com/*') &&
-    manifest.web_accessible_resources?.[0]?.matches?.includes('https://www.beyond-hello.com/*'),
-  'WAR matches Beyond Hello origins (MV3 WAR path must be /*)'
+  (manifest.content_scripts || []).some((cs) =>
+    (cs.matches || []).some((m) => m.includes('beyond-hello.com'))
+  ),
+  'content scripts match Beyond Hello (packaged assets via SW, not WAR)'
 );
 assert(
   bgSrc.includes("hosts: ['beyond-hello.com', 'www.beyond-hello.com']"),

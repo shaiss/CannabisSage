@@ -37,6 +37,19 @@ jobs:
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          # On a tag push, github.sha is the commit that tag pointed at when
+          # this run was created. Check out that commit, not the tag ref.
+          ref: ${{ github.sha }}
+
+      - name: Verify HEAD is the tag commit
+        run: |
+          set -euo pipefail
+          HEAD="$(git rev-parse HEAD)"
+          if [[ "${HEAD}" != "${GITHUB_SHA}" ]]; then
+            echo "error: HEAD '${HEAD}' != tag commit '${GITHUB_SHA}'" >&2
+            exit 1
+          fi
+          echo "HEAD ${HEAD} matches tag commit ${GITHUB_SHA}"
 
       - name: Verify tag matches manifest version
         if: startsWith(github.ref, 'refs/tags/')
@@ -87,6 +100,62 @@ jobs:
 
       - name: Pack extension
         run: ./scripts/pack-extension.sh
+
+      - name: Log zip and per-entry sha256
+        run: |
+          set -euo pipefail
+          VERSION="$(python3 -c "import json; print(json.load(open('extension/manifest.json'))['version'])")"
+          ZIP="dist/cannabis-sage-${VERSION}.zip"
+          if [[ ! -f "${ZIP}" ]]; then
+            echo "error: expected pack output missing: ${ZIP}" >&2
+            exit 1
+          fi
+          HASH_LIST="dist/cannabis-sage-${VERSION}.sha256"
+          TMP="$(mktemp -d)"
+          unzip -q "${ZIP}" -d "${TMP}/unpacked"
+          unzip -Z1 "${ZIP}" | sort > "${TMP}/zip-entries.txt"
+          echo "whole-zip sha256:"
+          sha256sum "${ZIP}" | tee "${HASH_LIST}"
+          echo "per-entry sha256, sorted by path:"
+          python3 - "${TMP}/unpacked" "${TMP}/zip-entries.txt" << 'PY' | tee -a "${HASH_LIST}"
+          import hashlib
+          import sys
+          from pathlib import Path
+
+          root = Path(sys.argv[1])
+          listed = Path(sys.argv[2]).read_text().splitlines()
+          rows = []
+          for path in root.rglob("*"):
+              rel = path.relative_to(root).as_posix()
+              if path.is_dir():
+                  rel += "/"
+                  data = b""
+              elif path.is_file():
+                  data = path.read_bytes()
+              else:
+                  continue
+              rows.append((rel, hashlib.sha256(data).hexdigest()))
+          rows.sort(key=lambda row: row[0])
+          got = [rel for rel, _digest in rows]
+          if got != sorted(listed):
+              missing = sorted(set(listed) - set(got))
+              extra = sorted(set(got) - set(listed))
+              print(f"error: hashed entries do not match zip entries; missing={missing} extra={extra}", file=sys.stderr)
+              sys.exit(1)
+          for rel, digest in rows:
+              print(f"{digest}  {rel}")
+          PY
+
+      - name: Upload zip and per-entry hashes
+        # Pin to actions/upload-artifact@v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: cws-zip-${{ github.sha }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          retention-days: 90
+          if-no-files-found: error
 
       - name: Publish to Chrome Web Store
         env:

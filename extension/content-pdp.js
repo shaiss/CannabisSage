@@ -209,13 +209,23 @@
 
   function pdpStockText() {
     const bits = [];
-    document.querySelectorAll('button, [role="button"]').forEach((el) => {
-      if (el.closest('#csi-pdp-panel, [data-csi-pdp], .cannabis-sage-save-btn')) return;
-      if (el.closest('article, [data-testid="product-card"], [data-landmark="product-card"]')) return;
-      const text = (el.innerText || el.textContent || '').trim();
-      if (text && text.length < 80) bits.push(text);
+    const heading = document.querySelector('h1');
+    if (heading) bits.push((heading.innerText || heading.textContent || '').trim());
+    const root = document.querySelector('main') || document.body;
+    if (!root?.querySelectorAll) return bits.filter(Boolean).join('\n');
+    root.querySelectorAll('button, [role="button"]').forEach((el) => {
+      if (
+        el.closest(
+          '#csi-pdp-panel, [data-csi-pdp], .cannabis-sage-save-btn, article, [data-testid*="product-card"], [data-landmark="product-card"], [class*="related" i], [class*="recommend" i], [class*="carousel" i]'
+        )
+      ) {
+        return;
+      }
+      const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+      // Whole label only, so a different size or a related control does not mark this product.
+      if (/^(sold[\s-]*out|out\s+of\s+stock)[.!]?$/i.test(text)) bits.push(text);
     });
-    return bits.join('\n');
+    return bits.filter(Boolean).join('\n');
   }
 
   async function notePdpSavedObservation(product) {
@@ -479,6 +489,11 @@
         saveBtn.disabled = false;
         if (!result?.ok && result?.error === 'list full') {
           saveBtn.textContent = CSI.digest.COPY.listFull;
+          setTimeout(() => {
+            CSI.storage.loadSavedItems().then((items) => {
+              paint(!!savedUrl && items.some((item) => item.url === savedUrl));
+            });
+          }, 1800);
           return;
         }
         paint(!!result?.saved);

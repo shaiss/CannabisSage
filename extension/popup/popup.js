@@ -485,7 +485,7 @@
       renderDigestResult({ status: 'locked', message: CSI.digest.COPY.locked }, savedItems);
       return;
     }
-    const result = await CSI.storage.commitSavedDigest(Date.now());
+    const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
     renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
   }
 

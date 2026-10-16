@@ -147,6 +147,8 @@ assert(popupSrc.includes('digest-upgrade'), 'popup upsell control');
 assert(popupSrc.includes('openUpgrade'), 'popup upsell uses the site upgrade link');
 const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
 assert(bgSrc.includes('CSI_SET_DIGEST_BADGE'), 'badge is local action text');
+assert(bgSrc.includes('CSI_SAVED_WATCH'), 'saved-watch writes are serialized in the service worker');
+assert(bgSrc.includes('ensureSavedWatchModules'), 'worker loads the digest modules for watch writes');
 assert(!/FETCH_PRODUCT_HTML[\s\S]{0,200}CSI_SET_DIGEST_BADGE/.test(bgSrc), 'badge handler is not a product fetch');
 
 function obs(overrides) {
@@ -359,7 +361,16 @@ assert(committed.view.status === 'digest', 'storage commit returns the digest');
 assert(committed.view.items[0].priceTo === 21, 'stored digest price is the observed one');
 const removed = await CSI.storage.removeSavedItem(canonical);
 assert(removed.saved === false, 'remove drops the saved item');
+const removedAgain = await CSI.storage.removeSavedItem(canonical);
+assert(removedAgain.saved === false, 'a second remove does not re-save');
 assert((await CSI.storage.loadSavedItems()).length === 0, 'saved list empty');
+
+let outRec = CSI.digest.applyObservation(null, obs({ inStock: false, price: 40, seenAt: 1 }));
+outRec = CSI.digest.applyObservation(outRec, obs({ inStock: null, price: null, seenAt: 2 }));
+const keptOut = CSI.digest.commitRecord(outRec);
+assert(keptOut.outSinceDigest === true, 'unknown stock does not clear an out-of-stock sighting');
+const back = CSI.digest.applyObservation(keptOut, obs({ inStock: true, price: 40, seenAt: 3 }));
+assert(CSI.digest.diffRecord(back).kinds.includes('restock'), 'restock still counts after an unknown reading');
 
 const blocked = await CSI.storage.toggleSavedItem({ url: 'https://example.com/product/nope', name: 'Nope' });
 assert(blocked.ok === false, 'unsupported host is not saved');

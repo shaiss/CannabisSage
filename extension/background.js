@@ -8,6 +8,29 @@
 
 importScripts('lib/csi-packaged-paths.js');
 
+let savedWatchModulesReady = false;
+
+/** One writer for csi_saved_watch. Content scripts and the popup send ops here. */
+function ensureSavedWatchModules() {
+  if (savedWatchModulesReady) return;
+  importScripts(
+    'lib/csi-core.js',
+    'adapters/interface.js',
+    'adapters/sunnyside.js',
+    'adapters/zenleaf.js',
+    'adapters/terravida.js',
+    'adapters/curaleaf.js',
+    'adapters/iheartjane.js',
+    'adapters/dutchie.js',
+    'adapters/shopd.js',
+    'adapters/registry.js',
+    'lib/csi-profile.js',
+    'lib/csi-digest.js',
+    'lib/csi-storage.js'
+  );
+  savedWatchModulesReady = true;
+}
+
 /** Exact packaged paths content scripts may request (no page-origin WAR). */
 const PACKAGED_RESOURCE_ALLOWLIST = self.CSI_PACKAGED_RESOURCE_ALLOWLIST;
 
@@ -502,6 +525,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({
           ok: false,
           error: err && err.message ? err.message : 'packaged fetch failed'
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'CSI_SAVED_WATCH') {
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
+    (async () => {
+      try {
+        ensureSavedWatchModules();
+        const payload = message.payload || {};
+        let result;
+        if (message.op === 'toggle') result = await self.CSI.storage.toggleSavedItem(payload);
+        else if (message.op === 'remove') result = await self.CSI.storage.removeSavedItem(payload.url);
+        else if (message.op === 'record') {
+          result = await self.CSI.storage.recordSavedObservation(payload.url, payload.observation);
+        } else if (message.op === 'commit') {
+          result = await self.CSI.storage.commitSavedDigest(payload.now, { isPro: payload.isPro === true });
+        } else result = { ok: false, error: 'unknown watch op' };
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: err && err.message ? err.message : 'watch update failed'
         });
       }
     })();

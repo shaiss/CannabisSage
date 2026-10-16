@@ -491,6 +491,38 @@
 
   let savedWatchWrite = Promise.resolve();
 
+  /**
+   * Content scripts and the popup each have their own JS heap. Saved-watch
+   * writes go through the service worker so two tabs cannot clobber one blob.
+   * Tests and the worker itself run the queue locally (no runtime.id, or this
+   * is the worker).
+   */
+  function savedWatchUsesLocalQueue() {
+    if (typeof ServiceWorkerGlobalScope !== 'undefined') return true;
+    try {
+      return !chrome.runtime?.id;
+    } catch {
+      return true;
+    }
+  }
+
+  function proxySavedWatch(op, payload) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'CSI_SAVED_WATCH', op, payload: payload || {} }, (response) => {
+          const err = chrome.runtime.lastError;
+          if (err || !response) {
+            resolve({ ok: false, error: (err && err.message) || 'watch update failed' });
+            return;
+          }
+          resolve(response);
+        });
+      } catch (e) {
+        resolve({ ok: false, error: (e && e.message) || 'watch update failed' });
+      }
+    });
+  }
+
   function enqueueSavedWatch(mutator) {
     const run = savedWatchWrite.then(mutator, mutator);
     savedWatchWrite = run.then(
@@ -522,6 +554,7 @@
   }
 
   async function toggleSavedItem(raw) {
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('toggle', raw);
     return enqueueSavedWatch(async () => {
       const url = CSI.digest?.allowlistedUrl?.(raw && raw.url) || '';
       if (!url) return { ok: false, error: 'unsupported product URL', saved: false, items: [] };
@@ -556,16 +589,24 @@
   }
 
   async function removeSavedItem(url) {
-    const current = await loadSavedWatch();
-    const canonical = CSI.digest?.allowlistedUrl?.(url) || '';
-    if (!canonical) return { ok: false, error: 'unsupported product URL', items: current.items || [] };
-    if (!(current.items || []).some((item) => item.url === canonical)) {
-      return { ok: true, saved: false, items: current.items || [] };
-    }
-    return toggleSavedItem({ url: canonical });
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('remove', { url });
+    return enqueueSavedWatch(async () => {
+      const canonical = CSI.digest?.allowlistedUrl?.(url) || '';
+      const watch = await loadSavedWatch();
+      if (!canonical) return { ok: false, error: 'unsupported product URL', saved: false, items: watch.items || [] };
+      if (!(watch.items || []).some((item) => item.url === canonical)) {
+        return { ok: true, saved: false, items: watch.items || [] };
+      }
+      const items = watch.items.filter((item) => item.url !== canonical);
+      const byUrl = { ...(watch.byUrl || {}) };
+      delete byUrl[canonical];
+      const next = await writeSavedWatch({ ...watch, items, byUrl });
+      return { ok: true, saved: false, items: next.items };
+    });
   }
 
   async function recordSavedObservation(url, observation) {
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('record', { url, observation });
     return enqueueSavedWatch(async () => {
       const canonical = CSI.digest?.allowlistedUrl?.(url) || '';
       if (!canonical || !CSI.digest?.applyObservation) return { ok: false, recorded: false };
@@ -588,11 +629,18 @@
     });
   }
 
-  async function commitSavedDigest(now) {
+  async function commitSavedDigest(now, opts) {
+    const isProFlag =
+      opts && typeof opts.isPro === 'boolean'
+        ? opts.isPro
+        : !!(CSI.features && CSI.features.can && CSI.features.can(CSI.digest.FEATURE_ID));
+    if (!savedWatchUsesLocalQueue()) {
+      return proxySavedWatch('commit', { now: now || Date.now(), isPro: isProFlag });
+    }
     return enqueueSavedWatch(async () => {
       const watch = await loadSavedWatch();
       if (!CSI.digest?.evaluate) return { view: { status: 'empty', items: [] }, watch };
-      const isPro = !!(CSI.features && CSI.features.can && CSI.features.can(CSI.digest.FEATURE_ID));
+      const isPro = isProFlag;
       const result = CSI.digest.evaluate({
         savedItems: watch.items,
         digest: watch,

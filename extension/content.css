@@ -230,7 +230,7 @@
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-.cannabis-sage-save-btn:hover:not(:disabled) {
+.cannabis-sage-save-btn:hover:not(:disabled):not(.is-saved) {
   background: #f7f5f2;
 }
 

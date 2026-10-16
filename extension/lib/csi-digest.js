@@ -195,9 +195,12 @@
       onSaleAtDigest: latest.onSale === true,
       belowMedianAtDigest:
         latest.belowMedian === true ? true : latest.belowMedian === false ? false : record.belowMedianAtDigest ?? null,
-      outSinceDigest: latest.inStock === false,
+      // Unknown stock or median must not erase a sighting we already recorded.
+      outSinceDigest:
+        latest.inStock === false ? true : latest.inStock === true ? false : record.outSinceDigest === true,
       offSaleSinceDigest: latest.onSale === false,
-      aboveMedianSinceDigest: latest.belowMedian === false,
+      aboveMedianSinceDigest:
+        latest.belowMedian === false ? true : latest.belowMedian === true ? false : record.aboveMedianSinceDigest === true,
       latest
     };
   }

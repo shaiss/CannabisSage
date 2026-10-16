@@ -402,7 +402,9 @@
       CSI.storeElementProduct(card, product);
       if (prevKey !== nextKey) renderBadges(card, product, product.status || 'ok');
     });
-    await noteSavedObservations(keyed);
+    // A partial card set changes the median. Record saved observations only once
+    // every card on this pass has finished, so an early false cannot become a deal.
+    if (!stillEnriching) await noteSavedObservations(keyed);
     if (stillEnriching || !seen.size || !CSI.storage?.saveCategoryMedians || !location.hostname) return;
     const adapter = CSI.registry?.getActiveAdapter?.();
     await CSI.storage.saveCategoryMedians({

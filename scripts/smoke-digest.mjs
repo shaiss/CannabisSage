@@ -143,6 +143,10 @@ assert(listingSrc.includes('cannabis-sage-save-btn'), 'listing save control');
 assert(pdpSrc.includes('csi-pdp-save'), 'pdp save control');
 assert(!/savedItemDigest[\s\S]{0,120}adapter\.id/.test(listingSrc), 'listing digest gate is not per-adapter');
 assert(!listingSrc.includes("can?.('savedItemDigest')"), 'save stays available without the Pro gate');
+assert(
+  /if\s*\(\s*!stillEnriching\s*\)\s*await noteSavedObservations/.test(listingSrc),
+  'saved observations wait until listing cards finish loading'
+);
 assert(popupSrc.includes('digest-upgrade'), 'popup upsell control');
 assert(popupSrc.includes('openUpgrade'), 'popup upsell uses the site upgrade link');
 const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');

@@ -508,6 +508,28 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     return true;
   }
 
+  if (message.type === 'CSI_SET_DIGEST_BADGE') {
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
+    const count = Number(message.count);
+    const text = Number.isFinite(count) && count > 0 ? (count > 9 ? '9+' : String(Math.floor(count))) : '';
+    const done = () => sendResponse({ ok: true, text });
+    try {
+      chrome.action.setBadgeBackgroundColor({ color: '#FF6B35' }, () => {
+        void chrome.runtime.lastError;
+        chrome.action.setBadgeText({ text }, () => {
+          void chrome.runtime.lastError;
+          done();
+        });
+      });
+    } catch {
+      done();
+    }
+    return true;
+  }
+
   if (message.type !== 'FETCH_PRODUCT_HTML') {
     return false;
   }

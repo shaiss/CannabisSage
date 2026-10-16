@@ -506,7 +506,7 @@ assert(
 );
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.30', 'manifest 1.3.30');
+assert(manifest.version === '1.3.31', 'manifest 1.3.31');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
 assert(
   (manifest.content_scripts || []).some(

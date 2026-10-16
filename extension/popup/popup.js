@@ -108,6 +108,7 @@
     }
     setTasteEnabled(!!CSI.features?.can?.('tasteMap'));
     await loadPicksUi();
+    await loadDigestUi();
   }
 
   async function loadTaste() {
@@ -409,6 +410,94 @@
     if (requestVersion !== picksLoadVersion) return;
     renderPicksResult(result);
   }
+
+  function renderDigestResult(view, savedItems) {
+    const lockedEl = document.getElementById('digest-locked');
+    const statusEl = document.getElementById('digest-status');
+    const listEl = document.getElementById('digest-list');
+    const disclaimer = document.getElementById('digest-disclaimer');
+    const savedWrap = document.getElementById('digest-saved');
+    const savedList = document.getElementById('digest-saved-list');
+    lockedEl.hidden = true;
+    statusEl.hidden = true;
+    listEl.hidden = true;
+    listEl.innerHTML = '';
+    disclaimer.hidden = true;
+    savedWrap.hidden = true;
+    savedList.innerHTML = '';
+
+    const copy = (CSI.digest && CSI.digest.COPY) || {};
+    if (!view || view.status === 'locked') {
+      lockedEl.hidden = false;
+    } else if (view.status === 'digest' && Array.isArray(view.items) && view.items.length) {
+      listEl.hidden = false;
+      disclaimer.hidden = false;
+      view.items.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'digest-item';
+        const href = CSI.digest.allowlistedUrl(item.url) ? escapeHtml(item.url) : '';
+        const lines = (CSI.digest.reasons(item) || []).map((line) => `<li>${escapeHtml(line)}</li>`).join('');
+        const link = href
+          ? `<a class="digest-open" href="${href}" target="_blank" rel="noopener noreferrer">${escapeHtml(copy.open || 'Open product')}</a>`
+          : '';
+        li.innerHTML = `
+          <div class="digest-item-head">
+            <strong class="digest-name">${escapeHtml(item.name || copy.productFallback || 'Saved product')}</strong>
+            ${link}
+          </div>
+          <ul class="digest-reasons">${lines}</ul>
+        `;
+        listEl.appendChild(li);
+      });
+    } else {
+      statusEl.hidden = false;
+      statusEl.textContent = (view && view.message) || copy.quiet || '';
+    }
+
+    const saved = Array.isArray(savedItems) ? savedItems : [];
+    if (saved.length) {
+      savedWrap.hidden = false;
+      saved.forEach((item) => {
+        const li = document.createElement('li');
+        li.className = 'digest-saved-item';
+        const href = CSI.digest.allowlistedUrl(item.url) ? escapeHtml(item.url) : '';
+        const link = href
+          ? `<a class="digest-open" href="${href}" target="_blank" rel="noopener noreferrer">${escapeHtml(copy.open || 'Open product')}</a>`
+          : '';
+        li.innerHTML = `
+          <div class="digest-saved-head">
+            <span class="digest-name">${escapeHtml(item.name || copy.productFallback || 'Saved product')}</span>
+            ${link}
+            <button type="button" class="digest-remove" data-url="${escapeHtml(item.url)}">${escapeHtml(copy.remove || 'Remove')}</button>
+          </div>
+        `;
+        savedList.appendChild(li);
+      });
+    }
+    CSI.digest?.syncBadge?.(view && view.status === 'digest' ? CSI.digest.badgeCount(view) : 0);
+  }
+
+  async function loadDigestUi() {
+    if (!CSI.digest || !CSI.storage?.commitSavedDigest) return;
+    const savedItems = await CSI.storage.loadSavedItems();
+    const isPro = !!CSI.features?.can?.(CSI.digest.FEATURE_ID);
+    if (!isPro) {
+      renderDigestResult({ status: 'locked', message: CSI.digest.COPY.locked }, savedItems);
+      return;
+    }
+    const result = await CSI.storage.commitSavedDigest(Date.now());
+    renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
+  }
+
+  document.getElementById('digest-upgrade').addEventListener('click', () => {
+    CSI.entitlement.openUpgrade();
+  });
+  document.getElementById('digest-saved-list').addEventListener('click', async (event) => {
+    const btn = event.target.closest('.digest-remove');
+    if (!btn) return;
+    await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
+    await loadDigestUi();
+  });
 
   document.getElementById('picks-upgrade').addEventListener('click', () => {
     CSI.entitlement.openUpgrade();

@@ -209,7 +209,59 @@ fieldset:disabled {
   font-weight: 600;
 }
 
-.picks-locked {
+.picks-locked,
+.digest-locked {
   margin-top: 6px;
+}
+
+.digest-list,
+.digest-saved-list {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+.digest-item,
+.digest-saved-item {
+  margin: 0 0 10px;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.digest-item:first-child,
+.digest-saved-item:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.digest-item-head,
+.digest-saved-head {
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.digest-name {
+  font-size: 12px;
+}
+
+.digest-open,
+.digest-remove {
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+
+.digest-reasons {
+  margin: 4px 0 0;
+  padding-left: 16px;
+  color: #445;
+  font-size: 11px;
 }
 

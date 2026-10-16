@@ -1379,29 +1379,29 @@ assert(
 
 // Manifest hosts
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.30', 'version bump');
+assert(manifest.version === '1.3.31', 'version bump');
 {
   const listingMd = fs.readFileSync(path.join(root, 'STORE_LISTING.md'), 'utf8');
   const notesMatch = listingMd.match(
-    /## Release notes \(v1\.3\.30\)\s*\n\n([\s\S]*?)\n\n## Release notes/
+    /## Release notes \(v1\.3\.31\)\s*\n\n([\s\S]*?)\n\n## Release notes/
   );
-  assert(notesMatch, 'STORE_LISTING has v1.3.30 release notes');
+  assert(notesMatch, 'STORE_LISTING has v1.3.31 release notes');
   const notes = notesMatch[1];
   assert(
     !/sunnyside|zen\s*leaf|zenleaf|terravida|rise|beyond\s*hello|iheartjane|dutchie|liberty|trulieve|shopd|curaleaf/i.test(
       notes
     ),
-    'v1.3.30 public notes have no store names'
+    'v1.3.31 public notes have no store names'
   );
   assert(
     !/\b(medical|effects?|cure|cures|treat|treats|treatment|relief|pain|anxiety|euphoria)\b/i.test(
       notes
     ),
-    'v1.3.30 public notes have no medical claims'
+    'v1.3.31 public notes have no medical claims'
   );
   assert(
-    /packaged|allowlist|popup/i.test(notes),
-    'notes mention packaged assets / allowlist / popup fix'
+    /digest|saved|popup/i.test(notes),
+    'notes mention the saved-item digest'
   );
 }
 
@@ -1652,7 +1652,7 @@ assert(
 
 // What CannabisSage adds chip (v1.3.7) — listing chrome + PDP header, not per-card
 loadScripts(['lib/csi-ui.js'], sandbox);
-assert(CSI.VERSION === '1.3.30', 'core version 1.3.30');
+assert(CSI.VERSION === '1.3.31', 'core version 1.3.31');
 const adds = CSI.ui.WHAT_SAGE_ADDS;
 const addsCopy = `${adds.summary} ${adds.detail}`;
 assert(/chem badges/i.test(addsCopy) && /compare/i.test(addsCopy), 'chip mentions badges and compare');
@@ -2351,9 +2351,10 @@ assert(
   'landing Roadmap Now copy includes cross-store match, local profile, and Pro picks'
 );
 assert(
-  landingSrc.includes('Restock and deal alerts') &&
+  landingSrc.includes('once-a-day restock and deal digest') &&
+    landingSrc.includes('listed batch chemistry shifts') &&
     !landingSrc.includes('Picks that match that profile across nearby supported menus, and restock'),
-  'landing Roadmap Next copy is restock/deal alerts after picks shipped'
+  'landing Roadmap Now includes the digest; Next is batch chemistry and menu age'
 );
 assert(
   landingSrc.includes('Ask Sage, a chat guide that') &&

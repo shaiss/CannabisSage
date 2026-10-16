@@ -6,29 +6,31 @@
  * never remote code. Adapters stay in-package.
  */
 
-importScripts('lib/csi-packaged-paths.js');
+importScripts(
+  'lib/csi-packaged-paths.js',
+  'lib/csi-core.js',
+  'adapters/interface.js',
+  'adapters/sunnyside.js',
+  'adapters/zenleaf.js',
+  'adapters/terravida.js',
+  'adapters/curaleaf.js',
+  'adapters/iheartjane.js',
+  'adapters/dutchie.js',
+  'adapters/shopd.js',
+  'adapters/registry.js',
+  'lib/csi-profile.js',
+  'lib/csi-digest.js',
+  'lib/csi-storage.js'
+);
 
-let savedWatchModulesReady = false;
-
-/** One writer for csi_saved_watch. Content scripts and the popup send ops here. */
+/**
+ * Saved-watch writes from content scripts and the popup run here.
+ * Modules are imported at worker startup. MV3 rejects importScripts() later.
+ */
 function ensureSavedWatchModules() {
-  if (savedWatchModulesReady) return;
-  importScripts(
-    'lib/csi-core.js',
-    'adapters/interface.js',
-    'adapters/sunnyside.js',
-    'adapters/zenleaf.js',
-    'adapters/terravida.js',
-    'adapters/curaleaf.js',
-    'adapters/iheartjane.js',
-    'adapters/dutchie.js',
-    'adapters/shopd.js',
-    'adapters/registry.js',
-    'lib/csi-profile.js',
-    'lib/csi-digest.js',
-    'lib/csi-storage.js'
-  );
-  savedWatchModulesReady = true;
+  if (!self.CSI?.storage?.toggleSavedItem || !self.CSI?.digest) {
+    throw new Error('saved watch modules missing');
+  }
 }
 
 /** Exact packaged paths content scripts may request (no page-origin WAR). */

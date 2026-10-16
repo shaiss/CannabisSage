@@ -153,6 +153,15 @@ const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
 assert(bgSrc.includes('CSI_SET_DIGEST_BADGE'), 'badge is local action text');
 assert(bgSrc.includes('CSI_SAVED_WATCH'), 'saved-watch writes are serialized in the service worker');
 assert(bgSrc.includes('ensureSavedWatchModules'), 'worker loads the digest modules for watch writes');
+const workerStartup = bgSrc.split('chrome.runtime.onMessage')[0];
+assert(
+  workerStartup.includes("'lib/csi-digest.js'") && workerStartup.includes("'lib/csi-storage.js'"),
+  'digest modules import at worker startup, not inside a message handler'
+);
+assert(
+  !/function ensureSavedWatchModules\(\)\s*\{[^}]*importScripts/.test(bgSrc),
+  'ensureSavedWatchModules does not call importScripts'
+);
 assert(!/FETCH_PRODUCT_HTML[\s\S]{0,200}CSI_SET_DIGEST_BADGE/.test(bgSrc), 'badge handler is not a product fetch');
 
 function obs(overrides) {

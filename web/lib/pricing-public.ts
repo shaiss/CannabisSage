@@ -56,6 +56,7 @@ export const FEATURE_GATES = {
     '$/mg and deal badges',
     'Listing filters & sort',
     'CSV / JSON export',
-    'Picks for you across nearby supported menus (cached)'
+    'Picks for you across nearby supported menus (cached)',
+    'One daily restock and deal digest for saved items'
   ]
 };

@@ -30,7 +30,9 @@
     /** Cross-store soft match + store switcher (not per-store listing/PDP access). */
     multiStore: true,
     dealBadges: true,
-    picksForYou: true
+    picksForYou: true,
+    /** One daily restock / price-drop / deal digest for saved items. Same gate on every store. */
+    savedItemDigest: true
   };
 
   function hasPro() {

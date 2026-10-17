@@ -423,29 +423,55 @@ assert(!JSON.stringify(store).includes('example.com'), 'rejected host is not sto
   const workerChrome = {
     runtime: {
       id: 'csi-test-extension',
-      getURL: (p) => p,
+      getURL:
+        /** @param {string} p Packaged path. @returns {string} The same path. */
+        (p) => p,
       lastError: null,
-      onInstalled: { addListener() {} },
-      onStartup: { addListener() {} },
+      onInstalled: {
+        /** Ignore install in the worker mock. */
+        addListener() {}
+      },
+      onStartup: {
+        /** Ignore startup in the worker mock. */
+        addListener() {}
+      },
       onMessage: {
+        /**
+         * Record the service worker's message listener.
+         * @param {Function} fn
+         */
         addListener(fn) {
           listeners.push(fn);
         }
       },
+      /**
+       * Accept a runtime message from the worker mock.
+       * @param {object} _msg
+       * @param {Function} [cb]
+       */
       sendMessage(_msg, cb) {
         if (cb) cb({ ok: true });
       }
     },
     storage: {
       local: {
+        /**
+         * Read keys from the in-memory extension storage mock.
+         * @param {string|string[]|object|null} keys
+         * @param {Function} [cb]
+         * @returns {Promise<object>|undefined}
+         */
         get(keys, cb) {
           const out = {};
           if (keys == null) Object.assign(out, workerStore);
           else {
             const list = Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys);
-            list.forEach((k) => {
-              if (Object.prototype.hasOwnProperty.call(workerStore, k)) out[k] = workerStore[k];
-            });
+            list.forEach(
+              /** @param {string} k Storage key to copy. */
+              (k) => {
+                if (Object.prototype.hasOwnProperty.call(workerStore, k)) out[k] = workerStore[k];
+              }
+            );
           }
           if (typeof cb === 'function') {
             cb(out);
@@ -453,22 +479,47 @@ assert(!JSON.stringify(store).includes('example.com'), 'rejected host is not sto
           }
           return Promise.resolve(out);
         },
+        /**
+         * Write values into the in-memory extension storage mock.
+         * @param {object} obj
+         * @param {Function} [cb]
+         * @returns {Promise<void>|undefined}
+         */
         set(obj, cb) {
           Object.assign(workerStore, obj);
           if (typeof cb === 'function') cb();
           else return Promise.resolve();
         },
+        /**
+         * Delete keys from the in-memory extension storage mock.
+         * @param {string|string[]} keys
+         * @param {Function} [cb]
+         * @returns {Promise<void>|undefined}
+         */
         remove(keys, cb) {
-          (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete workerStore[k]);
+          (Array.isArray(keys) ? keys : [keys]).forEach(
+            /** @param {string} k Storage key to delete. */
+            (k) => delete workerStore[k]
+          );
           if (typeof cb === 'function') cb();
           else return Promise.resolve();
         }
       }
     },
     action: {
+      /**
+       * Ignore badge color updates in the worker mock.
+       * @param {object} _detail
+       * @param {Function} [cb]
+       */
       setBadgeBackgroundColor(_detail, cb) {
         if (cb) cb();
       },
+      /**
+       * Ignore badge text updates in the worker mock.
+       * @param {object} _detail
+       * @param {Function} [cb]
+       */
       setBadgeText(_detail, cb) {
         if (cb) cb();
       }
@@ -477,12 +528,19 @@ assert(!JSON.stringify(store).includes('example.com'), 'rejected host is not sto
   const workerSandbox = {
     console,
     URL,
-    fetch: () => Promise.reject(new Error('worker digest commit must not fetch')),
-    XMLHttpRequest: function XMLHttpRequest() {
-      throw new Error('worker digest commit must not XHR');
-    },
+    fetch:
+      /** @returns {Promise<never>} Network is out of bounds for this commit test. */
+      () => Promise.reject(new Error('worker digest commit must not fetch')),
+    XMLHttpRequest:
+      /** @returns {never} XHR is out of bounds for this commit test. */
+      function XMLHttpRequest() {
+        throw new Error('worker digest commit must not XHR');
+      },
     chrome: workerChrome,
-    ServiceWorkerGlobalScope: function ServiceWorkerGlobalScope() {},
+    ServiceWorkerGlobalScope:
+      /** Mark the realm as a service worker. */
+      function ServiceWorkerGlobalScope() {},
+    /** Ignore late imports; modules are loaded before background.js. */
     importScripts() {},
     globalThis: null,
     window: null,
@@ -530,11 +588,25 @@ assert(!JSON.stringify(store).includes('example.com'), 'rejected host is not sto
   });
   assert(listeners.length === 1, 'worker registers one message listener');
 
+  /**
+   * Send one message through the worker listener from background.js.
+   * Commit derives Pro from the stored license and ignores payload isPro.
+   * @param {object} message
+   * @returns {Promise<object|undefined>}
+   */
   function dispatch(message) {
-    return new Promise((resolve) => {
-      const keep = listeners[0](message, { id: workerChrome.runtime.id }, (value) => resolve(value));
-      if (keep !== true) resolve(undefined);
-    });
+    return new Promise(
+      /** @param {function(object|undefined): void} resolve */
+      (resolve) => {
+        const keep = listeners[0](
+          message,
+          { id: workerChrome.runtime.id },
+          /** @param {object} value Reply from sendResponse. */
+          (value) => resolve(value)
+        );
+        if (keep !== true) resolve(undefined);
+      }
+    );
   }
 
   const denied = await dispatch({

@@ -653,6 +653,132 @@ assert(
 );
 assert(CSI.adapters.dutchie.bridgeStrategy === 'dutchie', 'dutchie bridge strategy');
 
+// Menu-home carousel tiles (Dutchie consumer bundle 2026-10-15): the product
+// link wraps photo + potency only. Price is a sibling, so matching the anchor
+// alone fails the price check and drops the card.
+{
+  function dutchieEl({ testId, href, text, children = [], tag = 'div' }) {
+    const el = {
+      tag,
+      children,
+      parentElement: null,
+      textContent: '',
+      href: href || '',
+      getAttribute: (name) => (name === 'href' ? href || null : null),
+      matches(sel) {
+        return String(sel)
+          .split(',')
+          .some((part) => {
+            const s = part.trim();
+            if (testId && s === `[data-testid="${testId}"]`) return true;
+            if (tag !== 'a' || !s.startsWith('a')) return false;
+            if (s.includes('card-link') && testId === 'card-link') return true;
+            if (!href) return false;
+            const needsEmbed = s.includes('/embedded-menu/');
+            const needsProduct = s.includes('/product/');
+            if (needsEmbed && !href.includes('/embedded-menu/')) return false;
+            if (needsProduct && !href.includes('/product/')) return false;
+            return needsEmbed || needsProduct;
+          });
+      },
+      closest(sel) {
+        if (this.matches(sel)) return this;
+        return this.parentElement ? this.parentElement.closest(sel) : null;
+      },
+      querySelector(sel) {
+        for (const child of this.children) {
+          if (child.matches(sel)) return child;
+          const found = child.querySelector(sel);
+          if (found) return found;
+        }
+        return null;
+      },
+      querySelectorAll(sel) {
+        const out = [];
+        for (const child of this.children) {
+          if (child.matches(sel)) out.push(child);
+          out.push(...child.querySelectorAll(sel));
+        }
+        return out;
+      }
+    };
+    for (const child of children) child.parentElement = el;
+    el.textContent = [text, ...children.map((child) => child.textContent)].filter(Boolean).join(' ');
+    return el;
+  }
+
+  const carouselHref = '/embedded-menu/liberty-norristown/product/finger-lime-haze-flower-14g';
+  const carouselLink = dutchieEl({
+    tag: 'a',
+    testId: 'card-link',
+    href: carouselHref,
+    children: [
+      dutchieEl({ tag: 'img', text: '' }),
+      dutchieEl({ text: 'THC: 36.9%' }),
+      dutchieEl({ text: 'TERPS: 2.10%' })
+    ]
+  });
+  const carouselCard = dutchieEl({
+    testId: 'carousel-product-card',
+    children: [carouselLink, dutchieEl({ text: '$91.00 $130.00 30% off' })]
+  });
+  const gridCard = dutchieEl({
+    testId: 'product-list-item',
+    text: 'Grid THC: 20% $10.00',
+    children: [
+      dutchieEl({
+        tag: 'a',
+        href: '/embedded-menu/liberty-norristown/product/grid-item',
+        text: 'THC: 20% $10.00'
+      })
+    ]
+  });
+  const prevDoc = sandbox.document;
+  sandbox.document = {
+    querySelectorAll(sel) {
+      return [carouselCard, gridCard].flatMap((node) => {
+        const hits = [];
+        if (node.matches(sel)) hits.push(node);
+        hits.push(...node.querySelectorAll(sel));
+        return hits;
+      });
+    },
+    querySelector: () => null,
+    body: null
+  };
+  const found = CSI.adapters.dutchie.findProductCards();
+  assert(
+    found.includes(carouselCard),
+    'dutchie menu-home carousel card is a listing card'
+  );
+  assert(found.includes(gridCard), 'dutchie product-list-item still found beside carousels');
+  assert(
+    !found.includes(carouselLink),
+    'dutchie does not treat the price-less photo link as the card'
+  );
+  assert(
+    CSI.adapters.dutchie.isLikelyProductCard(carouselCard),
+    'carousel card passes product check'
+  );
+  assert(
+    CSI.adapters.dutchie.isLikelyProductCard(carouselLink),
+    'photo link inside a carousel card still counts'
+  );
+  assert(
+    CSI.adapters.dutchie.cardHost(carouselLink) === carouselCard,
+    'carousel chrome mounts on the full tile (price included)'
+  );
+  assert(
+    CSI.adapters.dutchie.resolveProductUrlFromDom(carouselCard) ===
+      `https://dutchie.com${carouselHref}`,
+    'carousel card resolves embedded product url'
+  );
+  const carouselHints = CSI.adapters.dutchie.parseListingHints(carouselCard);
+  assert(carouselHints.cannabinoids?.THC === 36.9, 'carousel card hint thc');
+  assert(carouselHints.price === 91, `carousel card hint price ${carouselHints.price}`);
+  sandbox.document = prevDoc;
+}
+
 // CBDV must not collapse to CBD (prefix order)
 const dutchieCbdvHtml = `
 <script type="application/json">

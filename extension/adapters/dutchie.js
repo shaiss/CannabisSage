@@ -10,6 +10,9 @@
  * - Listing cards: `div[data-testid="product-list-item"]` with potency spans
  *   `THC: 31.86%` / `TERPS: 1.89%` (CBD when present). Named terps are NOT on cards
  *   (optional marketing badge like "High Limonene" is presence-only).
+ * - Menu home carousels (2026-10-15 Dutchie consumer bundle): cards are
+ *   `[data-testid="carousel-product-card"]`. The product `<a>` wraps the photo
+ *   and potency only; price sits outside that link.
  * - PDP: info chips for THC/TERPS plus expandable cannabinoid + named terpene
  *   breakdowns (e.g. Linalool 0.57%, Beta Caryophyllene 0.51%).
  * - GraphQL `filteredProducts` (dutchie.com/api-1/graphql) confirms listing
@@ -163,20 +166,44 @@
     }
   }
 
+  const CARD_SELECTOR =
+    '[data-testid="product-list-item"], [data-testid="carousel-product-card"]';
+
+  function listingCardRoot(el) {
+    return (
+      el?.closest?.('[data-testid="product-list-item"]') ||
+      el?.closest?.('[data-testid="carousel-product-card"]') ||
+      null
+    );
+  }
+
   function findProductCards() {
-    const cards = Array.from(document.querySelectorAll('[data-testid="product-list-item"]'));
-    if (cards.length) return cards;
-    // Fallback: product anchors inside the embed
+    const cards = Array.from(document.querySelectorAll(CARD_SELECTOR));
+    if (cards.length) {
+      // A carousel tile nested in a grid card is the same product — keep the grid root.
+      return cards.filter((el) => {
+        if (!el.matches?.('[data-testid="carousel-product-card"]')) return true;
+        const grid = el.closest?.('[data-testid="product-list-item"]');
+        return !grid || grid === el;
+      });
+    }
+    // Fallback: product anchors inside the embed. Climb to the card so price
+    // (sibling of the photo link on carousel tiles) stays in scope.
     const links = Array.from(document.querySelectorAll('a[href*="/embedded-menu/"][href*="/product/"]'));
     return links
-      .map((a) => a.closest('[data-testid="product-list-item"]') || a.closest('[class*="product-item"]') || a)
+      .map(
+        (a) =>
+          listingCardRoot(a) ||
+          a.closest('[class*="product-item"]') ||
+          a
+      )
       .filter(Boolean);
   }
 
   function isLikelyProductCard(element) {
     if (!element) return false;
-    if (element.matches?.('[data-testid="product-list-item"]')) return true;
-    if (element.closest?.('[data-testid="product-list-item"]')) return true;
+    if (element.matches?.(CARD_SELECTOR)) return true;
+    if (listingCardRoot(element)) return true;
     if (element.closest?.('#csi-filter-bar, [class*="filter"], aside')) return false;
     const text = element.textContent || '';
     return /\$\s*\d/.test(text) && (/\bTHC\s*:/i.test(text) || !!element.querySelector?.('img'));
@@ -184,7 +211,7 @@
 
   function cardHost(cardEl) {
     return (
-      cardEl.closest?.('[data-testid="product-list-item"]') ||
+      listingCardRoot(cardEl) ||
       cardEl.closest?.('[class*="product-item-list"]') ||
       cardEl
     );
@@ -193,6 +220,7 @@
   function resolveProductUrlFromDom(cardEl) {
     const root = cardHost(cardEl);
     const link =
+      root.querySelector?.('a[data-testid="card-link"]') ||
       root.querySelector?.('a[href*="/embedded-menu/"][href*="/product/"]') ||
       root.querySelector?.('a[href*="/product/"]');
     if (!link) return null;
@@ -446,7 +474,7 @@
     matchesUrl,
     routeMode,
     listingSelectors: {
-      card: '[data-testid="product-list-item"]',
+      card: '[data-testid="product-list-item"], [data-testid="carousel-product-card"]',
       link: 'a[href*="/embedded-menu/"][href*="/product/"]'
     },
     pdpSelectors: {

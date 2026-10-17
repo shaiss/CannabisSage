@@ -601,6 +601,80 @@ assert(
 );
 assert(dutchieParsed.onSale === true, 'dutchie sale from % off');
 
+// Menu-home carousels (Liberty shop embed, 2026-10): price is on the wrapper,
+// not the card-link anchor. Anchors alone fail isLikelyProductCard.
+{
+  const carouselLink = {
+    getAttribute: (n) =>
+      n === 'href' ? '/embedded-menu/liberty-norristown/product/mule-fuel-1g' : n === 'data-testid' ? 'card-link' : null,
+    href: 'https://dutchie.com/embedded-menu/liberty-norristown/product/mule-fuel-1g',
+    matches: () => false,
+    closest(sel) {
+      return String(sel).includes('carousel-product-card') ? carouselCard : null;
+    },
+    querySelector: () => null,
+    textContent: 'Mule Fuel | 1g Strane Indica THC: 87.39% TERPS: 6.48%'
+  };
+  const carouselCard = {
+    getAttribute: (n) => (n === 'data-testid' ? 'carousel-product-card' : null),
+    matches: (sel) => String(sel).includes('carousel-product-card'),
+    closest(sel) {
+      return String(sel).includes('carousel-product-card') ? this : null;
+    },
+    querySelector(sel) {
+      return String(sel).includes('/product/') ? carouselLink : null;
+    },
+    textContent: 'Mule Fuel | 1g THC: 87.39% TERPS: 6.48% $31.50 $45.00 30% off'
+  };
+  const gridCard = {
+    getAttribute: (n) => (n === 'data-testid' ? 'product-list-item' : null),
+    matches: (sel) => String(sel).includes('product-list-item'),
+    closest(sel) {
+      return String(sel).includes('product-list-item') ? this : null;
+    },
+    querySelector: () => null,
+    textContent: 'THC: 30% $26.00'
+  };
+  const prevDoc = sandbox.document;
+  sandbox.document = {
+    querySelectorAll(sel) {
+      const s = String(sel);
+      if (s.includes('product-list-item') && s.includes('carousel-product-card')) return [gridCard, carouselCard];
+      if (s.includes('carousel-product-card')) return [carouselCard];
+      if (s.includes('product-list-item')) return [];
+      if (s.includes('/embedded-menu/') && s.includes('/product/')) return [carouselLink];
+      return [];
+    },
+    querySelector: () => null,
+    body: null
+  };
+  const homeCards = CSI.adapters.dutchie.findProductCards();
+  assert(homeCards.length === 1 && homeCards[0] === carouselCard, 'dutchie homepage carousel uses wrapper not anchor');
+  assert(CSI.adapters.dutchie.isLikelyProductCard(carouselCard), 'carousel wrapper is a product card');
+  assert(
+    CSI.adapters.dutchie.cardHost(carouselLink) === carouselCard,
+    'cardHost climbs to carousel-product-card'
+  );
+  assert(
+    CSI.adapters.dutchie.resolveProductUrlFromDom(carouselCard) ===
+      'https://dutchie.com/embedded-menu/liberty-norristown/product/mule-fuel-1g',
+    'carousel card resolves embed PDP url'
+  );
+  sandbox.document = {
+    querySelectorAll(sel) {
+      const s = String(sel);
+      if (s.includes('product-list-item')) return [gridCard];
+      if (s.includes('carousel-product-card')) return [];
+      return [];
+    },
+    querySelector: () => null,
+    body: null
+  };
+  const gridCards = CSI.adapters.dutchie.findProductCards();
+  assert(gridCards.length === 1 && gridCards[0] === gridCard, 'dutchie grid still uses product-list-item');
+  sandbox.document = prevDoc;
+}
+
 const dutchiePdpHtml = `
 <html><body>
 <span data-testid="info-chip"><b>THC:</b> 32.09%</span>

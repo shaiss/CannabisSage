@@ -44,6 +44,7 @@ function ensureSavedWatchModules() {
  * Pro for a saved digest is the stored license, same gate as the popup
  * (CSI.features.can(savedItemDigest) after CSI.entitlement.refreshIsPro).
  * Message payload isPro is not an input.
+ * @returns {Promise<boolean>}
  */
 async function savedDigestIsProFromLicense() {
   await self.CSI.entitlement.refreshIsPro();
@@ -447,7 +448,15 @@ chrome.runtime.onStartup?.addListener?.(() => {
   getPartnersRecord(true).catch(() => {});
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(
+  /**
+   * Route same-extension messages, including saved-watch writes.
+   * @param {object} message
+   * @param {chrome.runtime.MessageSender} sender
+   * @param {function} sendResponse
+   * @returns {boolean|undefined} True when the reply is sent asynchronously.
+   */
+  (message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
   if (message.type === 'CSI_DENYLIST_CHECK') {
@@ -555,7 +564,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
       return false;
     }
-    (async () => {
+    (/**
+     * Run a CSI_SAVED_WATCH op. Commit derives Pro from the stored license
+     * via CSI.entitlement.refreshIsPro and CSI.features.can, and ignores any payload isPro.
+     * @returns {Promise<void>}
+     */
+    async () => {
       try {
         ensureSavedWatchModules();
         const payload = message.payload || {};

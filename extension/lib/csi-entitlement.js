@@ -2,7 +2,11 @@
  * Entitlement — license activate/validate against CannabisSage web API.
  * No card collection in the extension; upgrade deep-links to Stripe Checkout on the site.
  */
-(function (global) {
+(/**
+ * License storage and Pro checks shared by the popup and the service worker.
+ * @param {typeof globalThis} global Realm that holds `CSI`.
+ */
+function (global) {
   'use strict';
   const CSI = global.CSI;
   if (!CSI) throw new Error('CSI core missing');
@@ -36,12 +40,19 @@
     return cachedConfig;
   }
 
+  /**
+   * Return the cached entitlement, loading chrome.storage when the cache is empty.
+   * @returns {Promise<object|null>}
+   */
   async function readStored() {
     if (cachedEntitlement) return cachedEntitlement;
     return reloadStored();
   }
 
-  /** Always re-read chrome.storage. The in-memory cache is per JS context. */
+  /**
+   * Always re-read chrome.storage. The in-memory cache is per JS context.
+   * @returns {Promise<object|null>}
+   */
   async function reloadStored() {
     try {
       const data = await chrome.storage.local.get([STORAGE_KEY]);
@@ -75,6 +86,11 @@
     return isProFromRecord(cachedEntitlement);
   }
 
+  /**
+   * Reload the stored license and report whether it is Pro.
+   * Saved-digest commit uses this so a license written in another context is visible.
+   * @returns {Promise<boolean>}
+   */
   async function refreshIsPro() {
     await reloadStored();
     return isPro();

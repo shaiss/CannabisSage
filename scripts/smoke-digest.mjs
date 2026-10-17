@@ -159,6 +159,12 @@ assert(
   'digest modules import at worker startup, not inside a message handler'
 );
 assert(
+  workerStartup.includes("'lib/csi-entitlement.js'") && workerStartup.includes("'lib/csi-features.js'"),
+  'license and feature modules import at worker startup'
+);
+assert(!bgSrc.includes('payload.isPro'), 'commit op does not read payload isPro');
+assert(bgSrc.includes('savedDigestIsProFromLicense'), 'commit op derives Pro from the stored license');
+assert(
   !/function ensureSavedWatchModules\(\)\s*\{[^}]*importScripts/.test(bgSrc),
   'ensureSavedWatchModules does not call importScripts'
 );
@@ -409,5 +415,151 @@ assert(overflow.ok === false && overflow.error === 'list full', 'saved list caps
 
 assert(chromeApi.sends.length === 0 || chromeApi.sends.every((msg) => msg.type === 'CSI_SET_DIGEST_BADGE'), 'only local badge messages');
 assert(!JSON.stringify(store).includes('example.com'), 'rejected host is not stored');
+
+// Service worker: CSI_SAVED_WATCH commit ignores payload.isPro and uses stored license.
+{
+  const workerStore = {};
+  const listeners = [];
+  const workerChrome = {
+    runtime: {
+      id: 'csi-test-extension',
+      getURL: (p) => p,
+      lastError: null,
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: {
+        addListener(fn) {
+          listeners.push(fn);
+        }
+      },
+      sendMessage(_msg, cb) {
+        if (cb) cb({ ok: true });
+      }
+    },
+    storage: {
+      local: {
+        get(keys, cb) {
+          const out = {};
+          if (keys == null) Object.assign(out, workerStore);
+          else {
+            const list = Array.isArray(keys) ? keys : typeof keys === 'string' ? [keys] : Object.keys(keys);
+            list.forEach((k) => {
+              if (Object.prototype.hasOwnProperty.call(workerStore, k)) out[k] = workerStore[k];
+            });
+          }
+          if (typeof cb === 'function') {
+            cb(out);
+            return undefined;
+          }
+          return Promise.resolve(out);
+        },
+        set(obj, cb) {
+          Object.assign(workerStore, obj);
+          if (typeof cb === 'function') cb();
+          else return Promise.resolve();
+        },
+        remove(keys, cb) {
+          (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete workerStore[k]);
+          if (typeof cb === 'function') cb();
+          else return Promise.resolve();
+        }
+      }
+    },
+    action: {
+      setBadgeBackgroundColor(_detail, cb) {
+        if (cb) cb();
+      },
+      setBadgeText(_detail, cb) {
+        if (cb) cb();
+      }
+    }
+  };
+  const workerSandbox = {
+    console,
+    URL,
+    fetch: () => Promise.reject(new Error('worker digest commit must not fetch')),
+    XMLHttpRequest: function XMLHttpRequest() {
+      throw new Error('worker digest commit must not XHR');
+    },
+    chrome: workerChrome,
+    ServiceWorkerGlobalScope: function ServiceWorkerGlobalScope() {},
+    importScripts() {},
+    globalThis: null,
+    window: null,
+    self: null,
+    location: { href: 'https://chrome-extension.invalid/background' }
+  };
+  workerSandbox.globalThis = workerSandbox;
+  workerSandbox.window = workerSandbox;
+  workerSandbox.self = workerSandbox;
+  const workerContext = vm.createContext(workerSandbox);
+  loadScripts(
+    [
+      'lib/csi-packaged-paths.js',
+      'lib/csi-core.js',
+      'adapters/interface.js',
+      'adapters/sunnyside.js',
+      'adapters/zenleaf.js',
+      'adapters/terravida.js',
+      'adapters/curaleaf.js',
+      'adapters/iheartjane.js',
+      'adapters/dutchie.js',
+      'adapters/shopd.js',
+      'adapters/registry.js',
+      'lib/csi-entitlement.js',
+      'lib/csi-features.js',
+      'lib/csi-storage.js',
+      'lib/csi-profile.js',
+      'lib/csi-digest.js'
+    ],
+    workerContext
+  );
+  const W = workerSandbox.CSI;
+  const wurl = W.profile.productKeyFromUrl('https://www.sunnyside.shop/product/listed-flower');
+  let wrec = W.digest.applyObservation(null, obs({ price: 40, seenAt: 1000 }));
+  wrec = W.digest.applyObservation(wrec, obs({ price: 30, seenAt: 6000 }));
+  workerStore.csi_saved_watch = W.digest.normalizeWatch({
+    items: [{ url: wurl, name: 'Listed flower', adapterId: 'sunnyside', savedAt: 1 }],
+    byUrl: { [wurl]: wrec },
+    lastIssuedAt: null,
+    issued: null
+  });
+  workerStore.csi_entitlement = { active: false, status: 'inactive', plan: 'free' };
+  vm.runInContext(fs.readFileSync(path.join(ext, 'background.js'), 'utf8'), workerContext, {
+    filename: 'background.js'
+  });
+  assert(listeners.length === 1, 'worker registers one message listener');
+
+  function dispatch(message) {
+    return new Promise((resolve) => {
+      const keep = listeners[0](message, { id: workerChrome.runtime.id }, (value) => resolve(value));
+      if (keep !== true) resolve(undefined);
+    });
+  }
+
+  const denied = await dispatch({
+    type: 'CSI_SAVED_WATCH',
+    op: 'commit',
+    payload: { now: 10_000, isPro: true }
+  });
+  assert(denied && denied.view && denied.view.status === 'locked', 'non-Pro stored license ignores payload isPro true');
+  assert(!denied.view.items.length, 'spoofed isPro does not list digest rows');
+  assert(workerStore.csi_saved_watch.lastIssuedAt == null, 'spoofed isPro does not issue a digest');
+
+  workerStore.csi_entitlement = {
+    active: true,
+    status: 'active',
+    plan: 'pro',
+    expiresAt: '2099-01-01T00:00:00.000Z'
+  };
+  const opened = await dispatch({
+    type: 'CSI_SAVED_WATCH',
+    op: 'commit',
+    payload: { now: 10_000, isPro: false }
+  });
+  assert(opened && opened.view && opened.view.status === 'digest', 'stored Pro license still issues a digest');
+  assert(opened.view.items[0].priceTo === 30, 'Pro digest uses the stored price drop');
+  assert(workerStore.csi_saved_watch.lastIssuedAt === 10_000, 'Pro commit writes the digest');
+}
 
 console.log('smoke-digest: OK');

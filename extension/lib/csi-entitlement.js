@@ -38,6 +38,11 @@
 
   async function readStored() {
     if (cachedEntitlement) return cachedEntitlement;
+    return reloadStored();
+  }
+
+  /** Always re-read chrome.storage. The in-memory cache is per JS context. */
+  async function reloadStored() {
     try {
       const data = await chrome.storage.local.get([STORAGE_KEY]);
       cachedEntitlement = data[STORAGE_KEY] || null;
@@ -71,7 +76,7 @@
   }
 
   async function refreshIsPro() {
-    await readStored();
+    await reloadStored();
     return isPro();
   }
 

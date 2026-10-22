@@ -1535,7 +1535,7 @@ assert(
     'shared packaged-path allowlist lists JSON + content.css'
   );
   assert(
-    /importScripts\(\s*['"]lib\/csi-packaged-paths\.js['"]\s*\)/.test(bgSrcPackaged),
+    /importScripts\([^)]*['"]lib\/csi-packaged-paths\.js['"]\s*[,)]/.test(bgSrcPackaged),
     'SW importScripts shared packaged-path allowlist'
   );
   assert(

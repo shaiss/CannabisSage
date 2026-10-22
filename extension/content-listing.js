@@ -9,8 +9,9 @@
     return;
   }
 
-  const state = {
+    const state = {
     selection: [],
+    savedUrls: new Set(),
     tasteMap: null,
     profile: { enabled: false },
     filters: { ...CSI.storage.DEFAULT_FILTERS },
@@ -387,6 +388,9 @@
     const medians = CSI.summarizeCategoryPriceMedians(entries);
     keyed.forEach(({ card, product, categoryKey }) => {
       const stats = categoryKey ? medians[categoryKey] : null;
+      product.listedBelowMedian = CSI.digest?.belowMedianState
+        ? CSI.digest.belowMedianState(product.price, stats && stats.median, stats && stats.sampleCount)
+        : null;
       const next = pro
         ? CSI.dealVsCategoryMedian(product.price, stats && stats.median, stats && stats.sampleCount)
         : null;
@@ -398,6 +402,9 @@
       CSI.storeElementProduct(card, product);
       if (prevKey !== nextKey) renderBadges(card, product, product.status || 'ok');
     });
+    // A partial card set changes the median. Record saved observations only once
+    // every card on this pass has finished, so an early false cannot become a deal.
+    if (!stillEnriching) await noteSavedObservations(keyed);
     if (stillEnriching || !seen.size || !CSI.storage?.saveCategoryMedians || !location.hostname) return;
     const adapter = CSI.registry?.getActiveAdapter?.();
     await CSI.storage.saveCategoryMedians({
@@ -504,6 +511,138 @@
     });
 
     host.appendChild(btn);
+  }
+
+  function canonicalSavedUrl(raw) {
+    return CSI.digest?.allowlistedUrl?.(raw) || '';
+  }
+
+  function listedMenuText(el) {
+    if (!el) return '';
+    try {
+      const clone = el.cloneNode(true);
+      clone
+        .querySelectorAll?.(
+          '.csi-badge-row, .cannabis-sage-select-btn, .cannabis-sage-save-btn, .csi-bought, script, style'
+        )
+        .forEach((node) => node.remove());
+      return clone.innerText || clone.textContent || '';
+    } catch {
+      return el.innerText || el.textContent || '';
+    }
+  }
+
+  function listedProductName(product, cardEl) {
+    const direct = product && product.name ? String(product.name).trim() : '';
+    if (direct) return direct.slice(0, 80);
+    const line = String(cardEl?.innerText || '')
+      .split('\n')
+      .map((part) => part.trim())
+      .find((part) => part.length > 2 && !/^(save|saved|compare select|selected ✓)$/i.test(part));
+    return line ? line.slice(0, 80) : '';
+  }
+
+  function observationFromProduct(product, text) {
+    const price = product && product.price;
+    return {
+      price,
+      onSale: !!(product && product.onSale),
+      belowMedian: product && product.listedBelowMedian != null ? product.listedBelowMedian : null,
+      inStock: CSI.digest?.inStockFromListed
+        ? CSI.digest.inStockFromListed({ text, price })
+        : null,
+      name: listedProductName(product, null),
+      seenAt: Date.now()
+    };
+  }
+
+  async function refreshSavedUrls() {
+    const items = (await CSI.storage.loadSavedItems?.()) || [];
+    state.savedUrls = new Set(items.map((item) => item.url));
+    findProductCards().forEach((card) => syncSaveButtonForCard(card));
+  }
+
+  function syncSaveButtonForCard(cardEl) {
+    const host = chromeMount(cardEl);
+    const btn = host?.querySelector?.('.cannabis-sage-save-btn');
+    if (!btn) return;
+    const url = canonicalSavedUrl(cardEl.dataset.csiUrl || '');
+    const saved = !!(url && state.savedUrls.has(url));
+    btn.textContent = saved ? CSI.digest?.COPY?.saved || 'Saved' : CSI.digest?.COPY?.save || 'Save';
+    btn.classList.toggle('is-saved', saved);
+    btn.title = CSI.digest?.COPY?.saveTitle || 'Saved on this device. Restock and deal digest is a Pro tool.';
+  }
+
+  function addSaveButton(cardEl) {
+    if (!CSI.storage?.toggleSavedItem || !CSI.digest) return;
+    const host = chromeMount(cardEl);
+    ensureListingStylesFor(host);
+    if (host.querySelector('.cannabis-sage-save-btn')) {
+      syncSaveButtonForCard(cardEl);
+      return;
+    }
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cannabis-sage-save-btn';
+    btn.textContent = CSI.digest.COPY.save;
+    btn.title = CSI.digest.COPY.saveTitle;
+    syncSaveButtonForCard(cardEl);
+    CSI.resolveProductUrl(cardEl)
+      .then(() => syncSaveButtonForCard(cardEl))
+      .catch(() => {});
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      e.preventDefault();
+      btn.disabled = true;
+      const url = canonicalSavedUrl(await CSI.resolveProductUrl(cardEl));
+      btn.disabled = false;
+      if (!url) {
+        btn.textContent = 'Unavailable';
+        setTimeout(() => syncSaveButtonForCard(cardEl), 1500);
+        return;
+      }
+      const product = CSI.getElementProduct(cardEl) || {};
+      const result = await CSI.storage.toggleSavedItem({
+        url,
+        name: listedProductName(product, cardEl),
+        adapterId: CSI.registry?.getActiveAdapter?.()?.id || '',
+        observation: observationFromProduct({ ...product, name: listedProductName(product, cardEl) }, listedMenuText(cardHost(cardEl)))
+      });
+      if (!result?.ok && result?.error === 'list full') {
+        btn.textContent = CSI.digest.COPY.listFull;
+        setTimeout(() => syncSaveButtonForCard(cardEl), 1800);
+        return;
+      }
+      await refreshSavedUrls();
+      await refreshDigestBadge();
+    });
+    host.appendChild(btn);
+  }
+
+  async function noteSavedObservations(keyed) {
+    if (!CSI.storage?.recordSavedObservation || !state.savedUrls.size) return;
+    let recorded = false;
+    for (const row of keyed || []) {
+      const url = canonicalSavedUrl(row.url || row.product?.url || '');
+      if (!url || !state.savedUrls.has(url)) continue;
+      const obs = observationFromProduct(
+        { ...row.product, name: listedProductName(row.product, row.card) },
+        listedMenuText(cardHost(row.card))
+      );
+      const result = await CSI.storage.recordSavedObservation(url, obs);
+      if (result?.recorded) recorded = true;
+    }
+    if (recorded) await refreshDigestBadge();
+  }
+
+  async function refreshDigestBadge() {
+    if (!CSI.digest?.syncBadge) return;
+    if (!CSI.features?.can?.(CSI.digest.FEATURE_ID)) {
+      CSI.digest.syncBadge(0);
+      return;
+    }
+    const view = await CSI.storage.previewSavedDigest?.(Date.now());
+    CSI.digest.syncBadge(CSI.digest.badgeCount(view));
   }
 
   async function handleHover(event, cardEl) {
@@ -693,6 +832,7 @@
       });
 
       addSelectionButton(card);
+      addSaveButton(card);
       // Fire-and-forget enrichment for badges; re-sync compare label once URL is known
       enrichCard(card).then(() => {
         syncSelectButtonForCard(card);
@@ -702,7 +842,10 @@
     }
     CSI.log(`newly enhanced: ${n}`);
     // Re-sync all buttons against persisted selection (covers cards skipped as already enhanced)
-    findProductCards().forEach((card) => syncSelectButtonForCard(card));
+    findProductCards().forEach((card) => {
+      syncSelectButtonForCard(card);
+      syncSaveButtonForCard(card);
+    });
     await refreshCategoryDealFlags();
     tray?.updateTrayButton();
     applyFiltersAndSort();
@@ -875,6 +1018,8 @@
 
     await CSI.storage.pruneExpiredCache();
     state.selection = await CSI.storage.loadCompare();
+    await refreshSavedUrls();
+    await refreshDigestBadge();
     state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
     await refreshTasteMap();
     state.filters = await CSI.storage.loadFilters();
@@ -919,6 +1064,9 @@
             });
             applyFiltersAndSort();
           });
+        }
+        if (changes.csi_saved_watch) {
+          refreshSavedUrls();
         }
         if (changes.csi_compare) {
           CSI.storage.loadCompare().then((list) => {

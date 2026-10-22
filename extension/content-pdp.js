@@ -184,8 +184,8 @@
    */
   async function attachDealVsMedian(product) {
     product.belowCategoryMedian = null;
-    if (!CSI.features?.can?.('dealBadges')) return;
-    if (!CSI.storage?.loadCategoryMedians || !CSI.dealVsCategoryMedian) return;
+    product.listedBelowMedian = null;
+    if (!CSI.storage?.loadCategoryMedians) return;
     const snap = await CSI.storage.loadCategoryMedians(location.hostname);
     if (!snap || !snap.categories) return;
     let categoryKey = CSI.categoryKeyFromPath(location.pathname);
@@ -196,11 +196,58 @@
     }
     const stats = categoryKey ? snap.categories[categoryKey] : null;
     product.categoryKey = categoryKey || null;
+    product.listedBelowMedian = CSI.digest?.belowMedianState
+      ? CSI.digest.belowMedianState(product.price, stats && stats.median, stats && stats.sampleCount)
+      : null;
+    if (!CSI.features?.can?.('dealBadges') || !CSI.dealVsCategoryMedian) return;
     product.belowCategoryMedian = CSI.dealVsCategoryMedian(
       product.price,
       stats && stats.median,
       stats && stats.sampleCount
     );
+  }
+
+  function pdpStockText() {
+    const bits = [];
+    const heading = document.querySelector('h1');
+    if (heading) bits.push((heading.innerText || heading.textContent || '').trim());
+    const root = document.querySelector('main') || document.body;
+    if (!root?.querySelectorAll) return bits.filter(Boolean).join('\n');
+    root.querySelectorAll('button, [role="button"]').forEach((el) => {
+      if (
+        el.closest(
+          '#csi-pdp-panel, [data-csi-pdp], .cannabis-sage-save-btn, article, [data-testid*="product-card"], [data-landmark="product-card"], [class*="related" i], [class*="recommend" i], [class*="carousel" i]'
+        )
+      ) {
+        return;
+      }
+      const text = (el.innerText || el.textContent || '').replace(/\s+/g, ' ').trim();
+      // Whole label only, so a different size or a related control does not mark this product.
+      if (/^(sold[\s-]*out|out\s+of\s+stock)[.!]?$/i.test(text)) bits.push(text);
+    });
+    return bits.filter(Boolean).join('\n');
+  }
+
+  async function notePdpSavedObservation(product) {
+    if (!CSI.storage?.recordSavedObservation || !CSI.digest || !product) return;
+    const url = CSI.digest.allowlistedUrl(product.url || location.href);
+    if (!url) return;
+    const saved = await CSI.storage.loadSavedItems();
+    if (!saved.some((item) => item.url === url)) return;
+    await CSI.storage.recordSavedObservation(url, {
+      price: product.price,
+      onSale: !!product.onSale,
+      belowMedian: product.listedBelowMedian != null ? product.listedBelowMedian : null,
+      inStock: CSI.digest.inStockFromListed({ text: pdpStockText(), price: product.price }),
+      name: product.name,
+      seenAt: Date.now()
+    });
+    if (!CSI.features?.can?.(CSI.digest.FEATURE_ID)) {
+      CSI.digest.syncBadge(0);
+      return;
+    }
+    const view = await CSI.storage.previewSavedDigest(Date.now());
+    CSI.digest.syncBadge(CSI.digest.badgeCount(view));
   }
 
   /**
@@ -369,6 +416,7 @@
       <div class="csi-pdp-body">${body}</div>
       <div class="csi-pdp-actions">
         <button type="button" class="csi-pdp-compare">Add to compare</button>
+        <button type="button" class="csi-pdp-save">${CSI.escapeHtml(CSI.digest?.COPY?.save || 'Save')}</button>
       </div>
       <p class="csi-pdp-footnote">* $/mg uses listed price and estimated THC% × package weight when available. Not medical advice.</p>
     `;
@@ -412,6 +460,51 @@
       await CSI.storage.saveCompare(list);
       panel.querySelector('.csi-pdp-compare').textContent = 'Added ✓';
     });
+    const saveBtn = panel.querySelector('.csi-pdp-save');
+    if (saveBtn && CSI.digest && CSI.storage?.toggleSavedItem) {
+      const savedUrl = CSI.digest.allowlistedUrl(product.url || location.href);
+      const paint = (saved) => {
+        saveBtn.textContent = saved ? CSI.digest.COPY.saved : CSI.digest.COPY.save;
+        saveBtn.title = CSI.digest.COPY.saveTitle;
+      };
+      CSI.storage.loadSavedItems().then((items) => {
+        paint(!!savedUrl && items.some((item) => item.url === savedUrl));
+      });
+      saveBtn.addEventListener('click', async () => {
+        if (!savedUrl) return;
+        saveBtn.disabled = true;
+        const result = await CSI.storage.toggleSavedItem({
+          url: savedUrl,
+          name: product.name,
+          adapterId: product.adapterId || CSI.registry?.getActiveAdapter?.()?.id || '',
+          observation: {
+            price: product.price,
+            onSale: !!product.onSale,
+            belowMedian: product.listedBelowMedian != null ? product.listedBelowMedian : null,
+            inStock: CSI.digest.inStockFromListed({ text: pdpStockText(), price: product.price }),
+            name: product.name,
+            seenAt: Date.now()
+          }
+        });
+        saveBtn.disabled = false;
+        if (!result?.ok && result?.error === 'list full') {
+          saveBtn.textContent = CSI.digest.COPY.listFull;
+          setTimeout(() => {
+            CSI.storage.loadSavedItems().then((items) => {
+              paint(!!savedUrl && items.some((item) => item.url === savedUrl));
+            });
+          }, 1800);
+          return;
+        }
+        paint(!!result?.saved);
+        if (!CSI.features?.can?.(CSI.digest.FEATURE_ID)) {
+          CSI.digest.syncBadge(0);
+          return;
+        }
+        const view = await CSI.storage.previewSavedDigest(Date.now());
+        CSI.digest.syncBadge(CSI.digest.badgeCount(view));
+      });
+    }
   }
 
   function teardownPdp() {
@@ -451,6 +544,7 @@
         .then((product) => {
           if (!active) return;
           renderPanel(product);
+          notePdpSavedObservation(product);
         })
         .catch((e) => {
           CSI.error(e);

@@ -28,7 +28,7 @@ Creates `dist/cannabis-sage-<version>.zip`.
 
 **Free:** hover tooltips, basic badges, compare tray, PDP panel on supported dispensary menus, optional on-device taste profile.
 
-**Pro (launch promo $9/yr or $4/mo for 30 days after `LAUNCH_DATE`, then $59/yr or $9/mo):** taste-map match, filters/sort, export, deal badges, chem insights across more stores you shop, picks for you from your local profile + cached menus.
+**Pro (launch promo $9/yr or $4/mo for 30 days after `LAUNCH_DATE`, then $59/yr or $9/mo):** taste-map match, filters/sort, export, deal badges, chem insights across more stores you shop, picks for you from your local profile + cached menus, and one daily restock and deal digest for products saved on this device.
 
 **P0–P2:** compare, PDP, badges, TTL cache, taste-map/filters/sort/glossary/export/deals, in-repo store adapters.
 
@@ -69,6 +69,7 @@ node scripts/smoke-adapters.mjs
 node scripts/smoke-partners.mjs
 node scripts/smoke-profile.mjs
 node scripts/smoke-picks.mjs
+node scripts/smoke-digest.mjs
 node web/scripts/smoke-monetization.mjs
 ```
 

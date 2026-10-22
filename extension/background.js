@@ -6,7 +6,32 @@
  * never remote code. Adapters stay in-package.
  */
 
-importScripts('lib/csi-packaged-paths.js');
+importScripts(
+  'lib/csi-packaged-paths.js',
+  'lib/csi-core.js',
+  'adapters/interface.js',
+  'adapters/sunnyside.js',
+  'adapters/zenleaf.js',
+  'adapters/terravida.js',
+  'adapters/curaleaf.js',
+  'adapters/iheartjane.js',
+  'adapters/dutchie.js',
+  'adapters/shopd.js',
+  'adapters/registry.js',
+  'lib/csi-profile.js',
+  'lib/csi-digest.js',
+  'lib/csi-storage.js'
+);
+
+/**
+ * Saved-watch writes from content scripts and the popup run here.
+ * Modules are imported at worker startup. MV3 rejects importScripts() later.
+ */
+function ensureSavedWatchModules() {
+  if (!self.CSI?.storage?.toggleSavedItem || !self.CSI?.digest) {
+    throw new Error('saved watch modules missing');
+  }
+}
 
 /** Exact packaged paths content scripts may request (no page-origin WAR). */
 const PACKAGED_RESOURCE_ALLOWLIST = self.CSI_PACKAGED_RESOURCE_ALLOWLIST;
@@ -505,6 +530,56 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         });
       }
     })();
+    return true;
+  }
+
+  if (message.type === 'CSI_SAVED_WATCH') {
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
+    (async () => {
+      try {
+        ensureSavedWatchModules();
+        const payload = message.payload || {};
+        let result;
+        if (message.op === 'toggle') result = await self.CSI.storage.toggleSavedItem(payload);
+        else if (message.op === 'remove') result = await self.CSI.storage.removeSavedItem(payload.url);
+        else if (message.op === 'record') {
+          result = await self.CSI.storage.recordSavedObservation(payload.url, payload.observation);
+        } else if (message.op === 'commit') {
+          result = await self.CSI.storage.commitSavedDigest(payload.now, { isPro: payload.isPro === true });
+        } else result = { ok: false, error: 'unknown watch op' };
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: err && err.message ? err.message : 'watch update failed'
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'CSI_SET_DIGEST_BADGE') {
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
+    const count = Number(message.count);
+    const text = Number.isFinite(count) && count > 0 ? (count > 9 ? '9+' : String(Math.floor(count))) : '';
+    const done = () => sendResponse({ ok: true, text });
+    try {
+      chrome.action.setBadgeBackgroundColor({ color: '#FF6B35' }, () => {
+        void chrome.runtime.lastError;
+        chrome.action.setBadgeText({ text }, () => {
+          void chrome.runtime.lastError;
+          done();
+        });
+      });
+    } catch {
+      done();
+    }
     return true;
   }
 

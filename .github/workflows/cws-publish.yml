@@ -32,7 +32,6 @@ jobs:
     name: Pack and publish
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # environment: cws-production  # awaiting Shai's decision before enabling GitHub Environment protection
     steps:
       - name: Checkout
         # Pin to actions/checkout@v4.2.2

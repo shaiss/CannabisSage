@@ -31,6 +31,8 @@ jobs:
   publish:
     name: Pack and publish
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # environment: cws-production  # awaiting Shai's decision before enabling GitHub Environment protection
     steps:
       - name: Checkout
         # Pin to actions/checkout@v4.2.2
@@ -40,6 +42,23 @@ jobs:
           # On a tag push, github.sha is the commit that tag pointed at when
           # this run was created. Check out that commit, not the tag ref.
           ref: ${{ github.sha }}
+
+      # Fail closed for workflow_dispatch (and any other trigger) off a v* tag
+      # before pack/upload/publish can run.
+      - name: Require v* tag ref
+        env:
+          REF: ${{ github.ref }}
+        run: |
+          set -euo pipefail
+          case "${REF}" in
+            refs/tags/v*)
+              echo "Ref ${REF} is a v* tag"
+              ;;
+            *)
+              echo "error: refusing to publish: github.ref must start with refs/tags/v (got '${REF}')" >&2
+              exit 1
+              ;;
+          esac
 
       - name: Verify HEAD is the tag commit
         run: |

@@ -53,12 +53,20 @@
   }
 
   function storageSet(obj) {
-    return new Promise((resolve) => {
+    return new Promise((resolve, reject) => {
       try {
-        chrome.storage.local.set(obj, () => resolve());
+        chrome.storage.local.set(obj, () => {
+          const err = chrome.runtime && chrome.runtime.lastError;
+          if (err) {
+            CSI.warn('storageSet failed', err);
+            reject(new Error(err.message || 'storage write failed'));
+            return;
+          }
+          resolve();
+        });
       } catch (e) {
         CSI.warn('storageSet failed', e);
-        resolve();
+        reject(e);
       }
     });
   }
@@ -438,35 +446,39 @@
       return { ok: false, error: (parsed && parsed.error) || 'invalid profile' };
     }
 
-    // Opt-in write: first save must be enabled.
-    if (parsed.value && parsed.value.enabled === true) {
-      await storageSet({ [KEYS.PROFILE]: parsed.value });
-      return { ok: true, value: parsed.value };
-    }
-
-    // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
-    const existingData = await storageGet([KEYS.PROFILE]);
-    const existing = CSI.profile?.normalize?.(existingData[KEYS.PROFILE]);
-    const hadStored =
-      existing && existing.ok && CSI.profile.isStoredProfile(existing.value);
-
-    if (CSI.profile.isStoredProfile(parsed.value)) {
-      // Full disabled payload — write only if a profile already exists (nothing until opt-in).
-      if (!hadStored) {
-        return { ok: true, value: { enabled: false } };
+    try {
+      // Opt-in write: first save must be enabled.
+      if (parsed.value && parsed.value.enabled === true) {
+        await storageSet({ [KEYS.PROFILE]: parsed.value });
+        return { ok: true, value: parsed.value };
       }
-      await storageSet({ [KEYS.PROFILE]: parsed.value });
-      return { ok: true, value: parsed.value };
-    }
 
-    // Bare { enabled: false }: flip the stored record off without wiping fields.
-    if (hadStored) {
-      const disabled = { ...existing.value, enabled: false, updatedAt: now };
-      await storageSet({ [KEYS.PROFILE]: disabled });
-      return { ok: true, value: disabled };
-    }
+      // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
+      const existingData = await storageGet([KEYS.PROFILE]);
+      const existing = CSI.profile?.normalize?.(existingData[KEYS.PROFILE]);
+      const hadStored =
+        existing && existing.ok && CSI.profile.isStoredProfile(existing.value);
 
-    return { ok: true, value: { enabled: false } };
+      if (CSI.profile.isStoredProfile(parsed.value)) {
+        // Full disabled payload — write only if a profile already exists (nothing until opt-in).
+        if (!hadStored) {
+          return { ok: true, value: { enabled: false } };
+        }
+        await storageSet({ [KEYS.PROFILE]: parsed.value });
+        return { ok: true, value: parsed.value };
+      }
+
+      // Bare { enabled: false }: flip the stored record off without wiping fields.
+      if (hadStored) {
+        const disabled = { ...existing.value, enabled: false, updatedAt: now };
+        await storageSet({ [KEYS.PROFILE]: disabled });
+        return { ok: true, value: disabled };
+      }
+
+      return { ok: true, value: { enabled: false } };
+    } catch (e) {
+      return { ok: false, error: (e && e.message) || 'storage write failed' };
+    }
   }
 
   async function deleteTasteProfile() {
@@ -510,7 +522,11 @@
     if (!CSI.profile.isStoredProfile(parsed.value)) {
       return { ok: false, error: 'import must be a full profile' };
     }
-    await storageSet({ [KEYS.PROFILE]: parsed.value });
+    try {
+      await storageSet({ [KEYS.PROFILE]: parsed.value });
+    } catch (e) {
+      return { ok: false, error: (e && e.message) || 'storage write failed' };
+    }
     return { ok: true, value: parsed.value };
   }
 

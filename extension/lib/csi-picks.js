@@ -423,9 +423,6 @@
         );
       }
       if (gate.flag === 'rebuy') filterReasons.push(COPY.rebuy);
-      if (profile.dealsOnly === true && product.onSale) {
-        filterReasons.push(COPY.priceSale);
-      }
 
       const reasons = [
         ...filterReasons,

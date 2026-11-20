@@ -19,9 +19,10 @@ function loadScripts(files, sandbox) {
   }
 }
 
-function makeChrome(store) {
+function makeChrome(store, opts = {}) {
+  const runtime = { getURL: (p) => p, lastError: null };
   return {
-    runtime: { getURL: (p) => p },
+    runtime,
     storage: {
       local: {
         get: (keys, cb) => {
@@ -41,6 +42,13 @@ function makeChrome(store) {
           cb(out);
         },
         set: (obj, cb) => {
+          if (opts.failNextSet) {
+            runtime.lastError = { message: 'QUOTA_BYTES quota exceeded' };
+            opts.failNextSet = false;
+            cb && cb();
+            runtime.lastError = null;
+            return;
+          }
           Object.assign(store, obj);
           cb && cb();
         },
@@ -56,10 +64,11 @@ function makeChrome(store) {
 }
 
 const store = {};
+const chromeOpts = { failNextSet: false };
 const sandbox = {
   console,
   URL,
-  chrome: makeChrome(store),
+  chrome: makeChrome(store, chromeOpts),
   globalThis: null,
   window: null
 };
@@ -420,6 +429,19 @@ assert(
   CSI.profile.isStoredProfile(loadedDisabledImport) && loadedDisabledImport.enabled === false,
   'load returns full disabled imported profile'
 );
+
+// Storage write failures must surface as import errors (not false success).
+await CSI.storage.deleteTasteProfile();
+chromeOpts.failNextSet = true;
+const failedImport = await CSI.storage.importTasteProfile({
+  ...CSI.profile.emptyEnabled(),
+  enabled: true,
+  watchedStores: ['sunnyside'],
+  updatedAt: 7
+});
+assert(!failedImport.ok, 'import fails when storage write fails');
+assert(/quota|storage write failed/i.test(failedImport.error || ''), 'import reports write failure');
+assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'failed import leaves storage empty');
 
 // Preserve schema-v2-only fields across a partial (popup-style) save.
 const rich = await CSI.storage.saveTasteProfile({

@@ -433,6 +433,13 @@ assert(
   dealsOnlyRanked.picks.some((p) => p.url === saleUrl),
   'dealsOnly still surfaces a sale-listed pick'
 );
+assert(
+  dealsOnlyRanked.picks.every((p) => {
+    const saleLines = (p.reasons || []).filter((r) => /sale listed/i.test(String(r)));
+    return saleLines.length <= 1;
+  }),
+  'dealsOnly does not duplicate the sale reason'
+);
 
 // Detailed format IDs map onto productFormKey buckets
 const detailedVapeProfile = CSI.profile.normalize({

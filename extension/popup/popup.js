@@ -178,7 +178,10 @@
   async function listedBrands(profile) {
     const entries = (await CSI.storage.listPdpCache?.()) || [];
     const fromCache = CSI.profile.brandsFromCacheEntries(entries);
-    const extra = [...(profile.brandLoyal || []), ...(profile.brandAvoid || [])];
+    const extra = [
+      ...(profile.brandLoves || profile.brandLoyal || []),
+      ...(profile.brandAvoids || profile.brandAvoid || [])
+    ];
     const seen = new Set(fromCache.map((b) => b.toLowerCase()));
     extra.forEach((b) => {
       if (b && !seen.has(b.toLowerCase())) {
@@ -195,10 +198,11 @@
     setProfileEnabled(enabled);
     // Reload stored fields even when disabled so re-enable is not a blank rewrite.
     const p = stored ? profile : CSI.profile.emptyEnabled();
+    const formatIds = CSI.profile.formatIds(p);
     fillChecks(
       document.getElementById('profile-forms'),
       CSI.profile.FORMS.map((id) => ({ id, label: id })),
-      p.forms
+      formatIds
     );
     fillChecks(
       document.getElementById('profile-sizes'),
@@ -220,21 +224,23 @@
     const terps = CSI.profile.terpeneIds().map((id) => ({ id, label: id }));
     fillChecks(document.getElementById('profile-liked'), terps, p.likedTerpenes);
     fillChecks(document.getElementById('profile-avoid'), terps, p.avoidTerpenes);
-    document.getElementById('profile-budget').value = p.tripBudgetUsd || '';
+    const budgetMax = CSI.profile.budgetMax(p);
+    document.getElementById('profile-budget').value = budgetMax != null ? budgetMax : '';
+    const watched = Array.isArray(p.watchedStores) ? p.watchedStores : [];
     fillSelect(
       document.getElementById('profile-home'),
       CSI.profile.STORE_IDS.map((id) => [id, STORE_LABELS[id] || id]),
-      p.homeStore,
+      watched[0] || null,
       true
     );
     fillChecks(
       document.getElementById('profile-secondary'),
       CSI.profile.STORE_IDS.map((id) => ({ id, label: STORE_LABELS[id] || id })),
-      p.secondaryStores
+      watched.slice(1)
     );
     const brandItems = brands.map((id) => ({ id, label: id }));
-    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoyal);
-    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoid);
+    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoves || []);
+    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoids || []);
     document.getElementById('profile-brands-empty').hidden = brands.length > 0;
     fillSelect(
       document.getElementById('profile-deal'),
@@ -247,19 +253,31 @@
   function readProfileForm() {
     const enabled = document.getElementById('profile-enable').checked;
     const budgetRaw = document.getElementById('profile-budget').value;
+    const home = document.getElementById('profile-home').value || null;
+    const secondary = readChecks(document.getElementById('profile-secondary'));
+    const watchedStores = [];
+    const seen = new Set();
+    [home, ...secondary].forEach((id) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      watchedStores.push(id);
+    });
+    const formatIds = readChecks(document.getElementById('profile-forms'));
     return {
       enabled,
-      forms: readChecks(document.getElementById('profile-forms')),
+      formats: formatIds.map((id) => ({ id, slot: null })),
       sizes: readChecks(document.getElementById('profile-sizes')),
       cannabinoidRatio: document.getElementById('profile-ratio').value || null,
       potencyBandThc: document.getElementById('profile-potency').value || null,
       likedTerpenes: readChecks(document.getElementById('profile-liked')),
       avoidTerpenes: readChecks(document.getElementById('profile-avoid')),
-      tripBudgetUsd: budgetRaw === '' ? null : Number(budgetRaw),
-      homeStore: document.getElementById('profile-home').value || null,
-      secondaryStores: readChecks(document.getElementById('profile-secondary')),
-      brandLoyal: readChecks(document.getElementById('profile-brand-loyal')),
-      brandAvoid: readChecks(document.getElementById('profile-brand-avoid')),
+      budget:
+        budgetRaw === ''
+          ? null
+          : { min: null, max: Number(budgetRaw), currency: 'USD' },
+      watchedStores,
+      brandLoves: readChecks(document.getElementById('profile-brand-loyal')),
+      brandAvoids: readChecks(document.getElementById('profile-brand-avoid')),
       dealTier: document.getElementById('profile-deal').value || 'any'
     };
   }
@@ -268,7 +286,7 @@
     const profile = await CSI.storage.loadTasteProfile();
     const brandSource = CSI.profile.isStoredProfile(profile)
       ? profile
-      : { brandLoyal: [], brandAvoid: [] };
+      : { brandLoves: [], brandAvoids: [] };
     const brands = await listedBrands(brandSource);
     fillProfileForm(profile, brands);
   }
@@ -317,9 +335,71 @@
     out.value = dumped.json;
     showStatus('Exported below');
   });
+
+  let pendingImport = null;
+
+  function hideImportPreview() {
+    pendingImport = null;
+    const preview = document.getElementById('profile-import-preview');
+    const diff = document.getElementById('profile-import-diff');
+    const fileInput = document.getElementById('profile-import-file');
+    preview.hidden = true;
+    diff.textContent = '';
+    if (fileInput) fileInput.value = '';
+  }
+
+  document.getElementById('profile-import').addEventListener('click', () => {
+    document.getElementById('profile-import-file').click();
+  });
+  document.getElementById('profile-import-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      hideImportPreview();
+      showStatus('Could not read file');
+      return;
+    }
+    const preview = await CSI.storage.previewTasteProfileImport(text);
+    if (!preview.ok) {
+      hideImportPreview();
+      showStatus(preview.error || 'Invalid import');
+      return;
+    }
+    pendingImport = preview.value;
+    const box = document.getElementById('profile-import-preview');
+    const diff = document.getElementById('profile-import-diff');
+    diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
+    box.hidden = false;
+    showStatus('Review import changes, then Apply');
+  });
+  document.getElementById('profile-import-confirm').addEventListener('click', async () => {
+    if (!pendingImport) {
+      showStatus('Nothing to import');
+      return;
+    }
+    const saved = await CSI.storage.saveTasteProfile(pendingImport);
+    if (!saved.ok) {
+      showStatus(saved.error || 'Import failed');
+      return;
+    }
+    hideImportPreview();
+    document.getElementById('profile-export-out').hidden = true;
+    await loadProfileUi();
+    await loadPicksUi();
+    showStatus('Profile imported');
+  });
+  document.getElementById('profile-import-cancel').addEventListener('click', () => {
+    hideImportPreview();
+    showStatus('Import cancelled');
+  });
+
   document.getElementById('profile-delete').addEventListener('click', async () => {
     await CSI.storage.deleteTasteProfile();
     document.getElementById('profile-export-out').hidden = true;
+    hideImportPreview();
     await loadProfileUi();
     await loadPicksUi();
     showStatus('Profile deleted');

@@ -115,7 +115,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.31', 'core version 1.3.31');
+assert(CSI.VERSION === '1.3.32', 'core version 1.3.32');
 assert(CSI.picks, 'picks module');
 assert(CSI.picks.FEATURE_ID === 'picksForYou', 'feature id');
 assert(CSI.features.PRO_FEATURES.picksForYou === true, 'picksForYou is Pro');
@@ -150,17 +150,16 @@ function cacheRow(url, data, fetchedAt, adapterId) {
 
 const baseProfile = CSI.profile.normalize({
   enabled: true,
-  forms: ['flower'],
+  formats: [{ id: 'flower', slot: null }],
   sizes: ['3.5g'],
   cannabinoidRatio: 'thc-forward',
   potencyBandThc: '15-25',
   likedTerpenes: ['Limonene'],
   avoidTerpenes: ['Linalool'],
-  tripBudgetUsd: 60,
-  homeStore: 'sunnyside',
-  secondaryStores: ['zenleaf'],
-  brandLoyal: [],
-  brandAvoid: ['Skip Brand Co'],
+  budget: { min: null, max: 60, currency: 'USD' },
+  watchedStores: ['sunnyside', 'zenleaf'],
+  brandLoves: [],
+  brandAvoids: ['Skip Brand Co'],
   dealTier: 'any',
   boughtBefore: {
     [neverUrl]: 'never',
@@ -285,7 +284,7 @@ assert(/taste profile/i.test(off.message || ''), 'profile off tells shopper what
 
 // Empty: no stores
 const noStores = CSI.picks.rankPicks({
-  profile: { ...baseProfile, homeStore: null, secondaryStores: [] },
+  profile: { ...baseProfile, watchedStores: [] },
   cacheEntries,
   isPro: true
 });
@@ -293,7 +292,7 @@ assert(noStores.status === 'no_stores', 'missing stores empty state');
 
 // Empty: no cache for profile stores
 const noCache = CSI.picks.rankPicks({
-  profile: { ...baseProfile, homeStore: 'terravida', secondaryStores: [] },
+  profile: { ...baseProfile, watchedStores: ['terravida'] },
   cacheEntries,
   isPro: true
 });
@@ -346,7 +345,7 @@ const nearTiePlainUrl = 'https://www.sunnyside.shop/product/near-tie-plain';
 const nearTieBoostUrl = 'https://www.sunnyside.shop/product/near-tie-boost';
 const boostProfile = CSI.profile.normalize({
   ...baseProfile,
-  brandLoyal: [],
+  brandLoves: [],
   boughtBefore: {
     [weakRebuyUrl]: 'rebuy',
     [nearTieBoostUrl]: 'rebuy'
@@ -388,7 +387,12 @@ assert(
 
 // Deal preference: sale only
 const saleOnly = CSI.picks.rankPicks({
-  profile: { ...baseProfile, dealTier: 'sale', tripBudgetUsd: 100, boughtBefore: {} },
+  profile: {
+    ...baseProfile,
+    dealTier: 'sale',
+    budget: { min: null, max: 100, currency: 'USD' },
+    boughtBefore: {}
+  },
   cacheEntries,
   isPro: true,
   now
@@ -418,7 +422,12 @@ const mediansByHost = {
   }
 };
 const below = CSI.picks.rankPicks({
-  profile: { ...baseProfile, dealTier: 'below-median', tripBudgetUsd: 100, boughtBefore: {} },
+  profile: {
+    ...baseProfile,
+    dealTier: 'below-median',
+    budget: { min: null, max: 100, currency: 'USD' },
+    boughtBefore: {}
+  },
   cacheEntries,
   mediansByHost,
   isPro: true,
@@ -485,7 +494,7 @@ for (const row of cacheEntries) {
 store.csi_taste_profile = {
   ...baseProfile,
   dealTier: 'below-median',
-  tripBudgetUsd: 100,
+  budget: { min: null, max: 100, currency: 'USD' },
   boughtBefore: {}
 };
 const multiHostBelow = await CSI.picks.loadAndRank({ isPro: true, now });
@@ -536,7 +545,12 @@ assert(byHostLegacy && byHostLegacy.categories.flower.median === 42, 'legacy byH
 
 // Budget preference alone
 const budgeted = CSI.picks.rankPicks({
-  profile: { ...baseProfile, tripBudgetUsd: 39, dealTier: 'any', boughtBefore: {} },
+  profile: {
+    ...baseProfile,
+    budget: { min: null, max: 39, currency: 'USD' },
+    dealTier: 'any',
+    boughtBefore: {}
+  },
   cacheEntries,
   isPro: true,
   now
@@ -619,8 +633,7 @@ assert(
 
 const shopdProfile = CSI.profile.normalize({
   ...baseProfile,
-  homeStore: 'shopd',
-  secondaryStores: [],
+  watchedStores: ['shopd'],
   boughtBefore: {}
 }).value;
 const unprovenShopdCache = [
@@ -693,7 +706,7 @@ assert(
 assert(provenPicks.picks[0].url === provenShopdPdp, 'popup: proven pick keeps store_id=109 URL');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.31', 'manifest 1.3.31');
+assert(manifest.version === '1.3.32', 'manifest 1.3.32');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'permissions unchanged');
 const isolatedJs =
   (manifest.content_scripts || []).find(
@@ -726,8 +739,9 @@ CSI.storeElementProduct(hostEl, {
 const dumped = JSON.parse(hostEl.dataset.csiProductData);
 assert(!dumped.tasteProfile, 'host DOM product data has no tasteProfile');
 assert(!dumped.tasteMap, 'host DOM product data has no tasteMap');
-assert(!JSON.stringify(dumped).includes('tripBudgetUsd'), 'profile fields absent from host DOM');
+assert(!JSON.stringify(dumped).includes('budget'), 'profile budget absent from host DOM');
 assert(!JSON.stringify(dumped).includes('brandAvoid'), 'brand prefs absent from host DOM');
+assert(!JSON.stringify(dumped).includes('watchedStores'), 'watched stores absent from host DOM');
 
 const gates = fs.readFileSync(path.join(root, 'web/lib/feature-gates.ts'), 'utf8');
 assert(gates.includes("'picksForYou'"), 'web feature-gates lists picksForYou');

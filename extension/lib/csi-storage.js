@@ -409,7 +409,20 @@
 
   async function loadTasteProfile() {
     const data = await storageGet([KEYS.PROFILE]);
-    const parsed = CSI.profile?.normalize?.(data[KEYS.PROFILE]);
+    const raw = data[KEYS.PROFILE];
+    if (raw == null) return { enabled: false };
+
+    // One-time idempotent v1 → v2 migration; write back only when shape changes.
+    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
+    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+      const normalizedMigrated = CSI.profile.normalize(migrated.value);
+      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
+        await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
+        return normalizedMigrated.value;
+      }
+    }
+
+    const parsed = CSI.profile?.normalize?.(raw);
     if (!parsed || !parsed.ok || !parsed.value) {
       return { enabled: false };
     }
@@ -464,6 +477,24 @@
   async function exportTasteProfile() {
     const profile = await loadTasteProfile();
     return CSI.profile?.exportJson?.(profile) || { ok: false, error: 'profile module missing' };
+  }
+
+  /**
+   * Preview a local JSON import (no write). Caller must confirm, then saveTasteProfile.
+   */
+  async function previewTasteProfileImport(text) {
+    const parsed = CSI.profile?.parseImportJson?.(text);
+    if (!parsed || !parsed.ok) {
+      return { ok: false, error: (parsed && parsed.error) || 'invalid import' };
+    }
+    const current = await loadTasteProfile();
+    const diff = CSI.profile.diffProfiles(current, parsed.value);
+    return {
+      ok: true,
+      value: parsed.value,
+      diff,
+      lines: CSI.profile.formatDiffLines(diff)
+    };
   }
 
   let boughtBeforeWrite = Promise.resolve();
@@ -695,6 +726,7 @@
     saveTasteProfile,
     deleteTasteProfile,
     exportTasteProfile,
+    previewTasteProfileImport,
     setBoughtBeforeFlag,
     loadSavedWatch,
     loadSavedItems,

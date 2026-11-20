@@ -1,24 +1,67 @@
 /**
- * Opt-in local taste profile (Free). Structured chem prefs only.
+ * Opt-in local taste profile (Free). Structured shopping prefs only.
  * Storage and network live in csi-storage.js — this file is schema + merge.
+ *
+ * Schema v2 (#73 PR A). v1 migrates once on load/import.
+ * avoidEffects is stored and shown only — never used in scoring.
  */
 (function (global) {
   'use strict';
   const CSI = global.CSI;
   if (!CSI) throw new Error('CSI core missing');
 
-  const SCHEMA_VERSION = 1;
+  const SCHEMA_VERSION = 2;
   const STORAGE_KEY = 'csi_taste_profile';
   const MAX_BOUGHT = 200;
-  const MAX_BRANDS = 30;
+  const MAX_TOKENS = 30;
+  const MAX_TOKEN_LEN = 48;
   const MAX_BUDGET = 2000;
+  const MAX_IMPORT_BYTES = 64 * 1024;
 
-  const FORMS = Object.freeze(['flower', 'vape', 'concentrate', 'edible', 'topical']);
+  const FORMAT_IDS = Object.freeze([
+    'flower',
+    'vape',
+    'vape-live-resin-rosin',
+    'troche',
+    'concentrate',
+    'tincture-rso',
+    'edible',
+    'topical'
+  ]);
+  const FORMAT_SLOTS = Object.freeze(['day', 'night']);
   const SIZES = Object.freeze(['1g', '3.5g', '7g', '14g', '28g']);
   const RATIOS = Object.freeze(['thc-forward', 'balanced', 'cbd-forward', 'cbg-forward']);
   const POTENCY_BANDS = Object.freeze(['under-15', '15-25', '25-plus']);
   const FLAGS = Object.freeze(['rebuy', 'fine', 'never']);
   const DEAL_TIERS = Object.freeze(['any', 'sale', 'below-median']);
+  const GOALS = Object.freeze([
+    'sleep-time',
+    'relaxation',
+    'daytime-focus',
+    'body-comfort',
+    'mood-creative'
+  ]);
+  const TIME_OF_USE = Object.freeze(['daytime', 'evening', 'bedtime']);
+  const THC_PREF = Object.freeze(['moderate', 'high', 'terps-first', 'low-thc-high-cbd']);
+  const MINORS = Object.freeze(['cbd', 'cbn', 'cbg']);
+  // Stored and shown only — never used in scoring (see applyToTasteMap / picks).
+  const AVOID_EFFECTS = Object.freeze([
+    'couch-lock',
+    'racy',
+    'brain-fog',
+    'dry-mouth-munchies',
+    'next-morning-grogginess'
+  ]);
+  const DAY_RATIO = Object.freeze([
+    'cbd-20-1',
+    'cbd-10-1',
+    'cbd-4-1',
+    'cbd-2-1',
+    'balanced-1-1',
+    'lowest-thc'
+  ]);
+  const FLOWER_METHOD = Object.freeze(['joint-preroll', 'pipe-bong', 'dry-herb-vape']);
+  const VAPE_HARDWARE = Object.freeze(['cart-510', 'aio', 'prefer-rosin']);
   const STORE_IDS = Object.freeze([
     'sunnyside',
     'zenleaf',
@@ -32,19 +75,40 @@
     'schemaVersion',
     'enabled',
     'updatedAt',
-    'forms',
+    'goals',
+    'timeOfUse',
+    'formats',
     'sizes',
     'cannabinoidRatio',
     'potencyBandThc',
+    'thcPref',
     'likedTerpenes',
     'avoidTerpenes',
+    'minors',
+    'budget',
+    'avoidEffects',
+    'dayRatio',
+    'flowerMethod',
+    'vapeHardware',
+    'strainLoves',
+    'strainAvoids',
+    'brandLoves',
+    'brandAvoids',
+    'familyLoves',
+    'familyAvoids',
+    'watchedStores',
+    'dealTier',
+    'dealsOnly',
+    'boughtBefore'
+  ]);
+  /** v1-only keys accepted solely for migration (never written back). */
+  const V1_MIGRATE_KEYS = Object.freeze([
+    'forms',
     'tripBudgetUsd',
     'homeStore',
     'secondaryStores',
     'brandLoyal',
-    'brandAvoid',
-    'dealTier',
-    'boughtBefore'
+    'brandAvoid'
   ]);
   const BRAND_RE = /^[A-Za-z0-9][A-Za-z0-9 .,'&-]{0,47}$/;
   // Dutchie + Trulieve + Beyond Hello + Curaleaf: apex only after one-prefix www strip
@@ -68,18 +132,41 @@
     hint: 'Optional and Free. Stored on this device only. Nothing is saved until you turn it on. Turning off stops using the profile; Delete wipes it. Structured chem fields — not a notes field.',
     enable: 'Save a local taste profile',
     forms: 'Forms',
+    formats: 'Formats',
     sizes: 'Package sizes',
     ratio: 'Cannabinoid ratio',
     potency: 'THC band',
+    thcPref: 'THC preference',
     liked: 'Liked terpenes',
     avoid: 'Avoid terpenes',
-    budget: 'Per-trip budget (USD)',
+    minors: 'Minor cannabinoids',
+    budget: 'Trip budget (USD)',
+    budgetMin: 'Budget min (USD)',
+    budgetMax: 'Budget max (USD)',
+    watched: 'Watched stores',
     home: 'Home store',
     secondary: 'Secondary stores',
     brandLoyal: 'Brands to keep',
     brandAvoid: 'Brands to skip',
+    brandLoves: 'Brands to keep',
+    brandAvoids: 'Brands to skip',
+    strainLoves: 'Strains to keep',
+    strainAvoids: 'Strains to skip',
+    familyLoves: 'Strain families to keep',
+    familyAvoids: 'Strain families to skip',
+    goals: 'Shopping goals',
+    timeOfUse: 'Time of use',
+    dayRatio: 'Daytime CBD:THC ratio',
+    flowerMethod: 'Flower method',
+    vapeHardware: 'Vape hardware',
+    // avoidEffects: stored and shown only — never used in scoring.
+    avoidEffects: 'Skip list (shown only)',
     dealTier: 'Deal listing',
+    dealsOnly: 'Deals only',
     export: 'Export JSON',
+    import: 'Import JSON',
+    importConfirm: 'Apply import',
+    importCancel: 'Cancel import',
     del: 'Delete profile',
     save: 'Save profile',
     brandsEmpty: 'Browse a supported menu first to pick brands from listed products.',
@@ -87,6 +174,59 @@
     flagRebuy: 'Re-buy',
     flagFine: 'Fine',
     flagNever: 'Never again',
+    goalLabels: {
+      'sleep-time': 'Sleep-time shopping',
+      relaxation: 'Relaxation shopping',
+      'daytime-focus': 'Daytime focus',
+      'body-comfort': 'Body comfort',
+      'mood-creative': 'Creative sessions'
+    },
+    timeOfUseLabels: {
+      daytime: 'Daytime',
+      evening: 'Evening',
+      bedtime: 'Bedtime'
+    },
+    thcPrefLabels: {
+      moderate: 'Moderate THC',
+      high: 'Higher THC',
+      'terps-first': 'Terpenes first',
+      'low-thc-high-cbd': 'Lower THC, higher CBD'
+    },
+    avoidEffectsLabels: {
+      'couch-lock': 'Couch-lock',
+      racy: 'Racy',
+      'brain-fog': 'Brain fog',
+      'dry-mouth-munchies': 'Dry mouth / munchies',
+      'next-morning-grogginess': 'Next-morning grogginess'
+    },
+    dayRatioLabels: {
+      'cbd-20-1': 'CBD 20:1',
+      'cbd-10-1': 'CBD 10:1',
+      'cbd-4-1': 'CBD 4:1',
+      'cbd-2-1': 'CBD 2:1',
+      'balanced-1-1': 'Balanced 1:1',
+      'lowest-thc': 'Lowest THC'
+    },
+    flowerMethodLabels: {
+      'joint-preroll': 'Joint / pre-roll',
+      'pipe-bong': 'Pipe / bong',
+      'dry-herb-vape': 'Dry-herb vape'
+    },
+    vapeHardwareLabels: {
+      'cart-510': '510 cart',
+      aio: 'All-in-one',
+      'prefer-rosin': 'Prefer rosin'
+    },
+    formatLabels: {
+      flower: 'Flower',
+      vape: 'Vape',
+      'vape-live-resin-rosin': 'Live resin / rosin vape',
+      troche: 'Troche',
+      concentrate: 'Concentrate',
+      'tincture-rso': 'Tincture / RSO',
+      edible: 'Edible',
+      topical: 'Topical'
+    },
     ratioLabels: {
       'thc-forward': 'THC-forward',
       balanced: 'Balanced',
@@ -105,6 +245,9 @@
     }
   });
 
+  // Legacy alias used by older popup/smoke labels.
+  const FORMS = FORMAT_IDS;
+
   function terpeneIds() {
     const list = Array.isArray(CSI.TERPENE_CANON) ? CSI.TERPENE_CANON : [];
     return list.map((e) => e && e.name).filter(Boolean);
@@ -119,18 +262,30 @@
       schemaVersion: SCHEMA_VERSION,
       enabled: true,
       updatedAt: 0,
-      forms: [],
+      goals: [],
+      timeOfUse: [],
+      formats: [],
       sizes: [],
       cannabinoidRatio: null,
       potencyBandThc: null,
+      thcPref: null,
       likedTerpenes: [],
       avoidTerpenes: [],
-      tripBudgetUsd: null,
-      homeStore: null,
-      secondaryStores: [],
-      brandLoyal: [],
-      brandAvoid: [],
+      minors: [],
+      budget: null,
+      avoidEffects: [],
+      dayRatio: null,
+      flowerMethod: null,
+      vapeHardware: null,
+      strainLoves: [],
+      strainAvoids: [],
+      brandLoves: [],
+      brandAvoids: [],
+      familyLoves: [],
+      familyAvoids: [],
+      watchedStores: [],
       dealTier: 'any',
+      dealsOnly: false,
       boughtBefore: {}
     };
   }
@@ -207,23 +362,32 @@
   function normalizeBrandLabel(raw) {
     if (typeof raw !== 'string') return null;
     const s = raw.trim().replace(/\s+/g, ' ');
+    if (s.length > MAX_TOKEN_LEN) return null;
     if (!BRAND_RE.test(s)) return null;
     return s;
   }
 
-  function uniqueBrands(list) {
+  function uniqueTokens(list, label) {
+    if (list == null) return { ok: true, values: [] };
+    if (!Array.isArray(list)) return fail(`${label} must be an array`);
     const out = [];
     const seen = new Set();
-    (Array.isArray(list) ? list : []).forEach((raw) => {
-      const label = normalizeBrandLabel(raw);
-      if (!label) return;
-      const key = label.toLowerCase();
-      if (seen.has(key)) return;
+    for (const raw of list) {
+      if (typeof raw !== 'string') return fail(`${label} must be strings`);
+      if (!raw.trim()) continue;
+      const token = normalizeBrandLabel(raw);
+      if (!token) return fail(`${label} tokens must match brand pattern (≤${MAX_TOKEN_LEN} chars)`);
+      const key = token.toLowerCase();
+      if (seen.has(key)) continue;
       seen.add(key);
-      out.push(label);
-    });
-    if (out.length > MAX_BRANDS) return fail('too many brands');
+      out.push(token);
+    }
+    if (out.length > MAX_TOKENS) return fail(`too many ${label} (max ${MAX_TOKENS})`);
     return { ok: true, values: out };
+  }
+
+  function uniqueBrands(list) {
+    return uniqueTokens(list, 'brands');
   }
 
   function productKeyFromUrl(url) {
@@ -317,6 +481,207 @@
     return !!(value && typeof value === 'object' && value.schemaVersion === SCHEMA_VERSION);
   }
 
+  function looksLikeV1(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return false;
+    if (input.schemaVersion === 1) return true;
+    if (input.schemaVersion === SCHEMA_VERSION) return false;
+    if (input.schemaVersion != null) return false;
+    return V1_MIGRATE_KEYS.some((k) => Object.prototype.hasOwnProperty.call(input, k));
+  }
+
+  function migrateFormatsFromForms(forms) {
+    const out = [];
+    const seen = new Set();
+    (Array.isArray(forms) ? forms : []).forEach((raw) => {
+      if (typeof raw !== 'string') return;
+      const id = raw.trim();
+      if (!FORMAT_IDS.includes(id) || seen.has(id)) return;
+      seen.add(id);
+      out.push({ id, slot: null });
+    });
+    return out;
+  }
+
+  /**
+   * One-time idempotent v1 → v2 migration.
+   * If v1 had no tripBudgetUsd, budget stays unset (never a default cap).
+   * watchedStores = homeStore first, then secondaryStores, deduped, STORE_IDS only.
+   */
+  function migrateV1toV2(v1) {
+    if (!v1 || typeof v1 !== 'object' || Array.isArray(v1)) {
+      return fail('profile must be an object');
+    }
+    const base = emptyEnabled();
+    base.enabled = v1.enabled === true;
+    if (Number.isFinite(Number(v1.updatedAt))) base.updatedAt = Math.floor(Number(v1.updatedAt));
+
+    if (Array.isArray(v1.formats)) {
+      base.formats = v1.formats;
+    } else {
+      base.formats = migrateFormatsFromForms(v1.forms);
+    }
+    base.sizes = Array.isArray(v1.sizes) ? v1.sizes.slice() : [];
+    base.cannabinoidRatio = v1.cannabinoidRatio || null;
+    base.potencyBandThc = v1.potencyBandThc || null;
+    base.likedTerpenes = Array.isArray(v1.likedTerpenes) ? v1.likedTerpenes.slice() : [];
+    base.avoidTerpenes = Array.isArray(v1.avoidTerpenes) ? v1.avoidTerpenes.slice() : [];
+    base.dealTier = v1.dealTier || 'any';
+    base.boughtBefore =
+      v1.boughtBefore && typeof v1.boughtBefore === 'object' && !Array.isArray(v1.boughtBefore)
+        ? { ...v1.boughtBefore }
+        : {};
+
+    // Budget: only map when v1 had tripBudgetUsd. Never invent a default cap.
+    if (v1.tripBudgetUsd != null) {
+      base.budget = { min: null, max: Number(v1.tripBudgetUsd), currency: 'USD' };
+    } else if (v1.budget != null) {
+      base.budget = v1.budget;
+    } else {
+      base.budget = null;
+    }
+
+    // watchedStores: home first, then secondary, STORE_IDS only, deduped.
+    if (Array.isArray(v1.watchedStores)) {
+      base.watchedStores = v1.watchedStores.slice();
+    } else {
+      const watched = [];
+      const seen = new Set();
+      const pushStore = (id) => {
+        if (typeof id !== 'string' || !STORE_IDS.includes(id) || seen.has(id)) return;
+        seen.add(id);
+        watched.push(id);
+      };
+      pushStore(v1.homeStore || null);
+      (Array.isArray(v1.secondaryStores) ? v1.secondaryStores : []).forEach(pushStore);
+      base.watchedStores = watched;
+    }
+
+    base.brandLoves = Array.isArray(v1.brandLoves)
+      ? v1.brandLoves.slice()
+      : Array.isArray(v1.brandLoyal)
+        ? v1.brandLoyal.slice()
+        : [];
+    base.brandAvoids = Array.isArray(v1.brandAvoids)
+      ? v1.brandAvoids.slice()
+      : Array.isArray(v1.brandAvoid)
+        ? v1.brandAvoid.slice()
+        : [];
+
+    // Pass through any v2 fields already present on a mixed payload.
+    [
+      'goals',
+      'timeOfUse',
+      'thcPref',
+      'minors',
+      'avoidEffects',
+      'dayRatio',
+      'flowerMethod',
+      'vapeHardware',
+      'strainLoves',
+      'strainAvoids',
+      'familyLoves',
+      'familyAvoids',
+      'dealsOnly'
+    ].forEach((k) => {
+      if (Object.prototype.hasOwnProperty.call(v1, k)) base[k] = v1[k];
+    });
+
+    base.schemaVersion = SCHEMA_VERSION;
+    return { ok: true, value: base, didMigrate: true };
+  }
+
+  function migrateIfNeeded(input) {
+    if (input == null || input === false) return { ok: true, value: { enabled: false }, didMigrate: false };
+    if (typeof input !== 'object' || Array.isArray(input)) return fail('profile must be an object');
+    if (input.schemaVersion != null && input.schemaVersion > SCHEMA_VERSION) {
+      return fail('unsupported schemaVersion');
+    }
+    if (looksLikeV1(input) || input.schemaVersion === 1) {
+      return migrateV1toV2(input);
+    }
+    return { ok: true, value: input, didMigrate: false };
+  }
+
+  function strictEnumList(list, allowedList, label) {
+    if (list == null) return { values: [] };
+    if (!Array.isArray(list)) return { error: `${label} must be an array` };
+    const allowed = new Set(allowedList);
+    for (const raw of list) {
+      if (typeof raw !== 'string' || !allowed.has(raw)) return { error: `unknown ${label}` };
+    }
+    return { values: uniqueEnum(list, allowedList) };
+  }
+
+  function normalizeFormats(list) {
+    if (list == null) return { values: [] };
+    if (!Array.isArray(list)) return { error: 'formats must be an array' };
+    const out = [];
+    const seen = new Set();
+    for (const raw of list) {
+      let id = null;
+      let slot = null;
+      if (typeof raw === 'string') {
+        id = raw.trim();
+      } else if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+        if (typeof raw.id !== 'string') return { error: 'unknown format' };
+        id = raw.id.trim();
+        if (raw.slot != null) {
+          if (typeof raw.slot !== 'string' || !FORMAT_SLOTS.includes(raw.slot)) {
+            return { error: 'unknown format slot' };
+          }
+          slot = raw.slot;
+        }
+      } else {
+        return { error: 'unknown format' };
+      }
+      if (!FORMAT_IDS.includes(id)) return { error: 'unknown format' };
+      if (seen.has(id)) continue;
+      seen.add(id);
+      out.push({ id, slot });
+    }
+    return { values: out };
+  }
+
+  function normalizeBudget(raw) {
+    if (raw == null) return { ok: true, value: null };
+    if (typeof raw !== 'object' || Array.isArray(raw)) return fail('budget must be an object');
+    const keys = Object.keys(raw);
+    for (const k of keys) {
+      if (k !== 'min' && k !== 'max' && k !== 'currency') return fail('unknown budget field');
+    }
+    let min = raw.min == null ? null : Number(raw.min);
+    let max = raw.max == null ? null : Number(raw.max);
+    const currency = raw.currency == null ? 'USD' : raw.currency;
+    if (currency !== 'USD') return fail('budget currency must be USD');
+    if (min != null && (!Number.isInteger(min) || min < 1 || min > MAX_BUDGET)) {
+      return fail(`budget.min must be an integer 1–${MAX_BUDGET}`);
+    }
+    if (max != null && (!Number.isInteger(max) || max < 1 || max > MAX_BUDGET)) {
+      return fail(`budget.max must be an integer 1–${MAX_BUDGET}`);
+    }
+    if (min != null && max != null && min > max) return fail('budget.min must be ≤ budget.max');
+    if (min == null && max == null) return { ok: true, value: null };
+    return { ok: true, value: { min, max, currency: 'USD' } };
+  }
+
+  function formatIds(profile) {
+    if (!profile) return [];
+    if (Array.isArray(profile.formats)) {
+      return profile.formats
+        .map((f) => (typeof f === 'string' ? f : f && f.id))
+        .filter((id) => typeof id === 'string');
+    }
+    if (Array.isArray(profile.forms)) return profile.forms.slice();
+    return [];
+  }
+
+  function budgetMax(profile) {
+    if (!profile) return null;
+    if (profile.budget && profile.budget.max != null) return profile.budget.max;
+    if (profile.tripBudgetUsd != null) return profile.tripBudgetUsd;
+    return null;
+  }
+
   /**
    * Validate and normalize a profile payload.
    * Unknown fields, free-text notes, and unknown terpene/store ids fail closed.
@@ -329,111 +694,245 @@
     if (typeof input !== 'object' || Array.isArray(input)) {
       return fail('profile must be an object');
     }
-    const keys = Object.keys(input);
+
+    if (input.schemaVersion != null && input.schemaVersion > SCHEMA_VERSION) {
+      return fail('unsupported schemaVersion');
+    }
+
+    let working = input;
+    let didMigrate = false;
+    if (looksLikeV1(input) || input.schemaVersion === 1) {
+      const migrated = migrateV1toV2(input);
+      if (!migrated.ok) return migrated;
+      working = migrated.value;
+      didMigrate = true;
+    }
+
+    const keys = Object.keys(working);
     for (const k of keys) {
       if (!ALLOWED_KEYS.includes(k)) return fail(`unknown field: ${k}`);
     }
-    if (hasForbiddenText(input)) return fail('free-text and health/mood fields are not allowed');
+    if (hasForbiddenText(working)) return fail('free-text and health/mood fields are not allowed');
 
-    if (input.enabled !== true && input.enabled !== false && input.enabled != null) {
+    if (working.enabled !== true && working.enabled !== false && working.enabled != null) {
       return fail('enabled must be boolean');
     }
 
     // Bare disable / empty load — no field payload.
-    if (input.enabled !== true && !hasProfileFields(input)) {
+    if (working.enabled !== true && !hasProfileFields(working)) {
       return { ok: true, value: { enabled: false } };
     }
 
     // Fields without an explicit boolean mean "not opted in" — reject rather than store.
-    if (input.enabled == null) {
+    if (working.enabled == null) {
       return fail('profile is not enabled');
     }
 
-    if (input.schemaVersion != null && input.schemaVersion !== SCHEMA_VERSION) {
+    if (working.schemaVersion != null && working.schemaVersion !== SCHEMA_VERSION) {
       return fail('unsupported schemaVersion');
     }
 
-    function strictEnumList(list, allowedList, label) {
-      if (list == null) return { values: [] };
-      if (!Array.isArray(list)) return { error: `${label} must be an array` };
-      const allowed = new Set(allowedList);
-      for (const raw of list) {
-        if (typeof raw !== 'string' || !allowed.has(raw)) return { error: `unknown ${label}` };
-      }
-      return { values: uniqueEnum(list, allowedList) };
-    }
-
-    const forms = strictEnumList(input.forms, FORMS, 'form');
-    if (forms.error) return fail(forms.error);
-    const sizes = strictEnumList(input.sizes, SIZES, 'size');
+    const formats = normalizeFormats(working.formats);
+    if (formats.error) return fail(formats.error);
+    const sizes = strictEnumList(working.sizes, SIZES, 'size');
     if (sizes.error) return fail(sizes.error);
-    const secondary = strictEnumList(input.secondaryStores, STORE_IDS, 'secondary store');
-    if (secondary.error) return fail(secondary.error);
+    const goals = strictEnumList(working.goals, GOALS, 'goal');
+    if (goals.error) return fail(goals.error);
+    const timeOfUse = strictEnumList(working.timeOfUse, TIME_OF_USE, 'timeOfUse');
+    if (timeOfUse.error) return fail(timeOfUse.error);
+    const minors = strictEnumList(working.minors, MINORS, 'minor');
+    if (minors.error) return fail(minors.error);
+    // avoidEffects: stored and shown only — never used in scoring.
+    const avoidEffects = strictEnumList(working.avoidEffects, AVOID_EFFECTS, 'avoidEffect');
+    if (avoidEffects.error) return fail(avoidEffects.error);
+    const watched = strictEnumList(working.watchedStores, STORE_IDS, 'watched store');
+    if (watched.error) return fail(watched.error);
 
     const knownTerps = terpeneSet();
-    const liked = canonTerpeneList(input.likedTerpenes, knownTerps);
+    const liked = canonTerpeneList(working.likedTerpenes, knownTerps);
     if (liked.error) return fail(liked.error);
-    const avoid = canonTerpeneList(input.avoidTerpenes, knownTerps);
+    const avoid = canonTerpeneList(working.avoidTerpenes, knownTerps);
     if (avoid.error) return fail(avoid.error);
     const avoidSet = new Set(avoid.values);
     const likedTerpenes = liked.values.filter((t) => !avoidSet.has(t));
 
-    if (input.cannabinoidRatio != null && !RATIOS.includes(input.cannabinoidRatio)) {
+    if (working.cannabinoidRatio != null && !RATIOS.includes(working.cannabinoidRatio)) {
       return fail('unknown cannabinoidRatio');
     }
-    if (input.potencyBandThc != null && !POTENCY_BANDS.includes(input.potencyBandThc)) {
+    if (working.potencyBandThc != null && !POTENCY_BANDS.includes(working.potencyBandThc)) {
       return fail('unknown potencyBandThc');
     }
-    if (input.dealTier != null && !DEAL_TIERS.includes(input.dealTier)) {
+    if (working.thcPref != null && !THC_PREF.includes(working.thcPref)) {
+      return fail('unknown thcPref');
+    }
+    if (working.dayRatio != null && !DAY_RATIO.includes(working.dayRatio)) {
+      return fail('unknown dayRatio');
+    }
+    if (working.flowerMethod != null && !FLOWER_METHOD.includes(working.flowerMethod)) {
+      return fail('unknown flowerMethod');
+    }
+    if (working.vapeHardware != null && !VAPE_HARDWARE.includes(working.vapeHardware)) {
+      return fail('unknown vapeHardware');
+    }
+    if (working.dealTier != null && !DEAL_TIERS.includes(working.dealTier)) {
       return fail('unknown dealTier');
     }
-    if (input.homeStore != null && !STORE_IDS.includes(input.homeStore)) {
-      return fail('unknown homeStore');
-    }
-    if (input.tripBudgetUsd != null) {
-      const n = Number(input.tripBudgetUsd);
-      if (!Number.isInteger(n) || n < 1 || n > MAX_BUDGET) return fail('tripBudgetUsd must be an integer 1–2000');
+    if (working.dealsOnly != null && working.dealsOnly !== true && working.dealsOnly !== false) {
+      return fail('dealsOnly must be boolean');
     }
 
-    const loyal = uniqueBrands(input.brandLoyal);
-    if (!loyal.ok) return loyal;
-    const skip = uniqueBrands(input.brandAvoid);
-    if (!skip.ok) return skip;
-    if (Array.isArray(input.brandLoyal) && input.brandLoyal.some((b) => typeof b === 'string' && b.trim() && !normalizeBrandLabel(b))) {
-      return fail('brand labels must match listed-product brand pattern');
+    const budget = normalizeBudget(working.budget);
+    if (!budget.ok) return budget;
+
+    const strainLoves = uniqueTokens(working.strainLoves, 'strainLoves');
+    if (!strainLoves.ok) return strainLoves;
+    const strainAvoids = uniqueTokens(working.strainAvoids, 'strainAvoids');
+    if (!strainAvoids.ok) return strainAvoids;
+    const brandLoves = uniqueTokens(working.brandLoves, 'brandLoves');
+    if (!brandLoves.ok) return brandLoves;
+    const brandAvoids = uniqueTokens(working.brandAvoids, 'brandAvoids');
+    if (!brandAvoids.ok) return brandAvoids;
+    const familyLoves = uniqueTokens(working.familyLoves, 'familyLoves');
+    if (!familyLoves.ok) return familyLoves;
+    const familyAvoids = uniqueTokens(working.familyAvoids, 'familyAvoids');
+    if (!familyAvoids.ok) return familyAvoids;
+
+    // Reject raw entries that fail the pattern (uniqueTokens skips empty; reject bad non-empty).
+    function rejectBadTokens(list, label) {
+      if (!Array.isArray(list)) return null;
+      for (const b of list) {
+        if (typeof b === 'string' && b.trim() && !normalizeBrandLabel(b)) {
+          return fail(`${label} tokens must match brand pattern (≤${MAX_TOKEN_LEN} chars)`);
+        }
+      }
+      return null;
     }
-    if (Array.isArray(input.brandAvoid) && input.brandAvoid.some((b) => typeof b === 'string' && b.trim() && !normalizeBrandLabel(b))) {
-      return fail('brand labels must match listed-product brand pattern');
+    for (const [list, label] of [
+      [working.strainLoves, 'strainLoves'],
+      [working.strainAvoids, 'strainAvoids'],
+      [working.brandLoves, 'brandLoves'],
+      [working.brandAvoids, 'brandAvoids'],
+      [working.familyLoves, 'familyLoves'],
+      [working.familyAvoids, 'familyAvoids']
+    ]) {
+      const bad = rejectBadTokens(list, label);
+      if (bad) return bad;
     }
 
-    const bought = normalizeBought(input.boughtBefore);
+    const bought = normalizeBought(working.boughtBefore);
     if (!bought.ok) return bought;
 
     let updatedAt = emptyEnabled().updatedAt;
     if (opts && Number.isFinite(opts.now)) updatedAt = Math.floor(opts.now);
-    else if (Number.isFinite(Number(input.updatedAt))) updatedAt = Math.floor(Number(input.updatedAt));
-
-    const secondaryStores = secondary.values.filter((id) => id !== (input.homeStore || null));
+    else if (Number.isFinite(Number(working.updatedAt))) updatedAt = Math.floor(Number(working.updatedAt));
 
     const value = {
       schemaVersion: SCHEMA_VERSION,
-      enabled: input.enabled === true,
+      enabled: working.enabled === true,
       updatedAt,
-      forms: forms.values,
+      goals: goals.values,
+      timeOfUse: timeOfUse.values,
+      formats: formats.values,
       sizes: sizes.values,
-      cannabinoidRatio: input.cannabinoidRatio || null,
-      potencyBandThc: input.potencyBandThc || null,
+      cannabinoidRatio: working.cannabinoidRatio || null,
+      potencyBandThc: working.potencyBandThc || null,
+      thcPref: working.thcPref || null,
       likedTerpenes,
       avoidTerpenes: avoid.values,
-      tripBudgetUsd: input.tripBudgetUsd == null ? null : Number(input.tripBudgetUsd),
-      homeStore: input.homeStore || null,
-      secondaryStores,
-      brandLoyal: loyal.values,
-      brandAvoid: skip.values,
-      dealTier: input.dealTier || 'any',
+      minors: minors.values,
+      budget: budget.value,
+      // avoidEffects: stored and shown only — never used in scoring.
+      avoidEffects: avoidEffects.values,
+      dayRatio: working.dayRatio || null,
+      flowerMethod: working.flowerMethod || null,
+      vapeHardware: working.vapeHardware || null,
+      strainLoves: strainLoves.values,
+      strainAvoids: strainAvoids.values,
+      brandLoves: brandLoves.values,
+      brandAvoids: brandAvoids.values,
+      familyLoves: familyLoves.values,
+      familyAvoids: familyAvoids.values,
+      watchedStores: watched.values,
+      dealTier: working.dealTier || 'any',
+      dealsOnly: working.dealsOnly === true,
       boughtBefore: bought.value
     };
-    return { ok: true, value };
+    return { ok: true, value, didMigrate };
+  }
+
+  function stableStringify(value) {
+    return JSON.stringify(value);
+  }
+
+  function diffProfiles(current, next) {
+    const changes = [];
+    const cur = isStoredProfile(current) ? current : null;
+    const nxt = next;
+    if (!nxt || typeof nxt !== 'object') return { ok: false, error: 'nothing to diff', changes: [] };
+
+    const keys = new Set([
+      ...ALLOWED_KEYS.filter((k) => k !== 'updatedAt'),
+      ...(cur ? Object.keys(cur) : [])
+    ]);
+    keys.forEach((k) => {
+      if (k === 'updatedAt' || k === 'schemaVersion') return;
+      const a = cur ? cur[k] : undefined;
+      const b = nxt[k];
+      if (stableStringify(a) === stableStringify(b)) return;
+      changes.push({
+        key: k,
+        from: a === undefined ? null : a,
+        to: b === undefined ? null : b
+      });
+    });
+    if (!cur) {
+      changes.unshift({ key: '_', from: null, to: 'new profile' });
+    }
+    return { ok: true, changes };
+  }
+
+  function formatDiffLines(diff) {
+    if (!diff || !diff.ok) return [];
+    return (diff.changes || []).map((c) => {
+      if (c.key === '_') return 'Create a new local profile from this file.';
+      return `${c.key}: ${stableStringify(c.from)} → ${stableStringify(c.to)}`;
+    });
+  }
+
+  /**
+   * Parse a local JSON export into a null-prototype object, enforce allowlist,
+   * size cap, vocab, and schemaVersion ≤ 2 (migrate v1). Does not write storage.
+   */
+  function parseImportJson(text) {
+    if (typeof text !== 'string') return fail('import must be a string');
+    if (text.length > MAX_IMPORT_BYTES) return fail('import exceeds size cap');
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch {
+      return fail('invalid JSON');
+    }
+    if (parsed == null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+      return fail('profile must be an object');
+    }
+
+    const clean = Object.create(null);
+    for (const k of Object.keys(parsed)) {
+      if (k === '__proto__' || k === 'constructor' || k === 'prototype') {
+        return fail('forbidden key');
+      }
+      const isAllowed = ALLOWED_KEYS.includes(k) || V1_MIGRATE_KEYS.includes(k);
+      if (!isAllowed) return fail(`unknown field: ${k}`);
+      clean[k] = parsed[k];
+    }
+
+    if (clean.schemaVersion != null && clean.schemaVersion > SCHEMA_VERSION) {
+      return fail('unsupported schemaVersion');
+    }
+
+    const normalized = normalize(clean);
+    if (!normalized.ok) return normalized;
+    return { ok: true, value: normalized.value };
   }
 
   function exportJson(profile) {
@@ -456,6 +955,7 @@
       )
     );
     (profile.avoidTerpenes || []).forEach((name) => avoid.add(name));
+    // avoidEffects is intentionally ignored here — stored/shown only, never scoring.
     return {
       ...tasteMap,
       preferredTerpenes,
@@ -488,20 +988,43 @@
   CSI.profile = {
     SCHEMA_VERSION,
     STORAGE_KEY,
+    MAX_BUDGET,
+    MAX_TOKENS,
+    MAX_TOKEN_LEN,
+    MAX_IMPORT_BYTES,
     FORMS,
+    FORMAT_IDS,
+    FORMAT_SLOTS,
     SIZES,
     RATIOS,
     POTENCY_BANDS,
     FLAGS,
     DEAL_TIERS,
+    GOALS,
+    TIME_OF_USE,
+    THC_PREF,
+    MINORS,
+    AVOID_EFFECTS,
+    DAY_RATIO,
+    FLOWER_METHOD,
+    VAPE_HARDWARE,
     STORE_IDS,
+    ALLOWED_KEYS,
     COPY,
     terpeneIds,
     emptyEnabled,
     hasProfileFields,
     isStoredProfile,
+    looksLikeV1,
+    migrateIfNeeded,
+    migrateV1toV2,
     normalize,
+    formatIds,
+    budgetMax,
     exportJson,
+    parseImportJson,
+    diffProfiles,
+    formatDiffLines,
     applyToTasteMap,
     productKeyFromUrl,
     brandsFromCacheEntries,

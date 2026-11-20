@@ -86,19 +86,31 @@ assert(CSI.profile, 'profile module');
 assert(CSI.storage.KEYS.PROFILE === 'csi_taste_profile', 'storage key');
 assert(CSI.features === undefined, 'profile tests do not require feature gates');
 
-const copyBlob = JSON.stringify(CSI.profile.COPY);
+assert(CSI.profile.SCHEMA_VERSION === 2, 'schema version 2');
+assert(CSI.profile.STORAGE_KEY === 'csi_taste_profile', 'storage key constant');
+
+function copyFacingText(node, out = []) {
+  if (typeof node === 'string') out.push(node);
+  else if (node && typeof node === 'object') Object.values(node).forEach((v) => copyFacingText(v, out));
+  return out;
+}
+const copyBlob = copyFacingText(CSI.profile.COPY).join(' ');
 assert(
   !/\b(mood|health|symptom|dosing|dose|medical|effects?|relief|anxiety|pain|treatment|euphoria)\b/i.test(
     copyBlob
   ),
   'no medical or effects language in profile copy'
 );
+assert(/shopping/i.test(CSI.profile.COPY.goalLabels['sleep-time']), 'goals framed as shopping prefs');
 
 const loadedEmpty = await CSI.storage.loadTasteProfile();
 assert(loadedEmpty.enabled === false, 'opt-in default is off');
 assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'nothing stored until opt-in');
 
-const skipped = await CSI.storage.saveTasteProfile({ enabled: false, forms: ['flower'] });
+const skipped = await CSI.storage.saveTasteProfile({
+  enabled: false,
+  formats: [{ id: 'flower', slot: null }]
+});
 assert(skipped.ok, 'disabled payload before opt-in is accepted as a no-store');
 assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'unchecked profile is not written before first opt-in');
 
@@ -135,13 +147,13 @@ assert(aliasTerp.value.likedTerpenes.includes('Limonene'), 'canonical Limonene i
 
 const rejectedForm = CSI.profile.normalize({
   enabled: true,
-  forms: ['gummies']
+  formats: ['gummies']
 });
-assert(!rejectedForm.ok, 'unknown form rejected');
+assert(!rejectedForm.ok, 'unknown format rejected');
 
 const rejectedBrand = CSI.profile.normalize({
   enabled: true,
-  brandLoyal: ['<script>alert(1)</script>']
+  brandLoves: ['<script>alert(1)</script>']
 });
 assert(!rejectedBrand.ok, 'free-text / unsafe brand rejected');
 
@@ -154,38 +166,46 @@ assert(!rejectedUrl.ok, 'unsupported product URL rejected');
 const sampleUrl = 'https://www.sunnyside.shop/product/abc-1';
 const saved = await CSI.storage.saveTasteProfile({
   enabled: true,
-  forms: ['flower', 'vape'],
+  formats: [
+    { id: 'flower', slot: 'day' },
+    { id: 'vape', slot: null }
+  ],
   sizes: ['3.5g'],
   cannabinoidRatio: 'thc-forward',
   potencyBandThc: '15-25',
   likedTerpenes: ['Limonene', 'Beta-Myrcene'],
   avoidTerpenes: ['Linalool'],
-  tripBudgetUsd: 80,
-  homeStore: 'sunnyside',
-  secondaryStores: ['zenleaf', 'sunnyside'],
-  brandLoyal: ['Savvy'],
-  brandAvoid: ['House Brand'],
+  budget: { min: 20, max: 80, currency: 'USD' },
+  watchedStores: ['sunnyside', 'zenleaf', 'sunnyside'],
+  brandLoves: ['Savvy'],
+  brandAvoids: ['House Brand'],
   dealTier: 'sale',
+  dealsOnly: false,
   boughtBefore: { [sampleUrl]: 'rebuy' }
 });
 assert(saved.ok && saved.value.enabled === true, 'opt-in save');
 assert(store.csi_taste_profile, 'profile written to chrome.storage.local');
-assert(saved.value.secondaryStores.includes('sunnyside') === false, 'home store dropped from secondary');
+assert(saved.value.schemaVersion === 2, 'stored schema v2');
+assert(
+  JSON.stringify(saved.value.watchedStores) === JSON.stringify(['sunnyside', 'zenleaf']),
+  'watchedStores deduped with home first'
+);
+assert(saved.value.budget.max === 80 && saved.value.budget.min === 20, 'budget range kept');
 assert(saved.value.likedTerpenes.includes('Limonene'), 'liked terpenes kept');
 assert(saved.value.boughtBefore[CSI.profile.productKeyFromUrl(sampleUrl)] === 'rebuy', 'flag stored');
 
 const edited = await CSI.storage.saveTasteProfile({
   ...saved.value,
   potencyBandThc: '25-plus',
-  tripBudgetUsd: 120
+  budget: { min: null, max: 120, currency: 'USD' }
 });
 assert(edited.ok && edited.value.potencyBandThc === '25-plus', 'edit persists');
-assert(edited.value.tripBudgetUsd === 120, 'budget edit');
+assert(edited.value.budget.max === 120, 'budget edit');
 
 const dumped = await CSI.storage.exportTasteProfile();
-assert(dumped.ok && dumped.json.includes('"schemaVersion": 1'), 'export json');
+assert(dumped.ok && dumped.json.includes('"schemaVersion": 2'), 'export json');
 const roundTrip = CSI.profile.normalize(JSON.parse(dumped.json));
-assert(roundTrip.ok && roundTrip.value.tripBudgetUsd === 120, 'export round-trip');
+assert(roundTrip.ok && roundTrip.value.budget.max === 120, 'export round-trip');
 
 const flagged = await CSI.storage.setBoughtBeforeFlag(sampleUrl, 'never');
 assert(flagged.ok && flagged.value.boughtBefore[CSI.profile.productKeyFromUrl(sampleUrl)] === 'never', 'flag update');
@@ -246,8 +266,11 @@ const disabled = await CSI.storage.saveTasteProfile({ enabled: false });
 assert(disabled.ok && disabled.value.enabled === false, 'disable save ok');
 assert(Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'disable keeps the storage key');
 assert(store.csi_taste_profile.enabled === false, 'stored enabled is false');
-assert(store.csi_taste_profile.forms.includes('flower'), 'forms retained while disabled');
-assert(store.csi_taste_profile.tripBudgetUsd === 120, 'budget retained while disabled');
+assert(
+  CSI.profile.formatIds(store.csi_taste_profile).includes('flower'),
+  'formats retained while disabled'
+);
+assert(store.csi_taste_profile.budget.max === 120, 'budget retained while disabled');
 assert(store.csi_taste_profile.dealTier === 'sale', 'deal tier retained while disabled');
 assert(store.csi_taste_profile.boughtBefore[boughtKey] === 'rebuy', 'boughtBefore retained while disabled');
 
@@ -265,7 +288,7 @@ assert(!noFlagWhileOff.ok, 'bought-before writes require enabled profile');
 
 const reenabled = await CSI.storage.saveTasteProfile({ ...loadedDisabled, enabled: true });
 assert(reenabled.ok && reenabled.value.enabled === true, 're-enable without blank rewrite');
-assert(reenabled.value.forms.includes('flower'), 're-enable keeps forms');
+assert(CSI.profile.formatIds(reenabled.value).includes('flower'), 're-enable keeps formats');
 assert(reenabled.value.boughtBefore[boughtKey] === 'rebuy', 're-enable keeps boughtBefore');
 
 await CSI.storage.saveTasteProfile({ enabled: false });
@@ -277,6 +300,200 @@ assert(!CSI.profile.isStoredProfile(afterDelete), 'delete leaves no stored field
 const noExport = await CSI.storage.exportTasteProfile();
 assert(!noExport.ok, 'export fails when nothing is stored');
 
+// --- v1 → v2 migration ---
+const v1WithBudget = {
+  schemaVersion: 1,
+  enabled: true,
+  updatedAt: 1000,
+  forms: ['flower', 'vape', 'gummies'],
+  sizes: ['3.5g'],
+  cannabinoidRatio: 'thc-forward',
+  potencyBandThc: '15-25',
+  likedTerpenes: ['Limonene'],
+  avoidTerpenes: [],
+  tripBudgetUsd: 75,
+  homeStore: 'zenleaf',
+  secondaryStores: ['sunnyside', 'zenleaf', 'dutchie'],
+  brandLoyal: ['Savvy'],
+  brandAvoid: ['Skip Co'],
+  dealTier: 'any',
+  boughtBefore: { [sampleUrl]: 'fine' }
+};
+store.csi_taste_profile = v1WithBudget;
+const migrated = await CSI.storage.loadTasteProfile();
+assert(migrated.schemaVersion === 2, 'load migrates v1 to v2');
+assert(store.csi_taste_profile.schemaVersion === 2, 'migration written back once');
+assert(migrated.budget && migrated.budget.max === 75 && migrated.budget.currency === 'USD', 'v1 budget maps to budget.max');
+assert(migrated.budget.min == null, 'v1 budget.min stays unset');
+assert(
+  JSON.stringify(migrated.watchedStores) === JSON.stringify(['zenleaf', 'sunnyside', 'dutchie']),
+  'homeStore first then secondary, deduped'
+);
+assert(
+  CSI.profile.formatIds(migrated).includes('flower') && CSI.profile.formatIds(migrated).includes('vape'),
+  'v1 forms migrate to formats'
+);
+assert(!CSI.profile.formatIds(migrated).includes('gummies'), 'unknown v1 form dropped');
+assert(migrated.brandLoves.includes('Savvy') && migrated.brandAvoids.includes('Skip Co'), 'brands migrate');
+assert(!Object.prototype.hasOwnProperty.call(migrated, 'homeStore'), 'v1 homeStore not retained');
+assert(!Object.prototype.hasOwnProperty.call(migrated, 'tripBudgetUsd'), 'v1 tripBudgetUsd not retained');
+
+// Idempotent: loading again does not change shape
+const migratedAgain = await CSI.storage.loadTasteProfile();
+assert(migratedAgain.schemaVersion === 2, 'second load stays v2');
+assert(
+  JSON.stringify(migratedAgain.watchedStores) === JSON.stringify(migrated.watchedStores),
+  'migration is idempotent'
+);
+
+await CSI.storage.deleteTasteProfile();
+const v1NoBudget = {
+  schemaVersion: 1,
+  enabled: true,
+  forms: ['edible'],
+  sizes: [],
+  likedTerpenes: [],
+  avoidTerpenes: [],
+  tripBudgetUsd: null,
+  homeStore: 'sunnyside',
+  secondaryStores: [],
+  brandLoyal: [],
+  brandAvoid: [],
+  dealTier: 'any',
+  boughtBefore: {}
+};
+store.csi_taste_profile = v1NoBudget;
+const migratedNoBudget = await CSI.storage.loadTasteProfile();
+assert(migratedNoBudget.budget == null, 'v1 without tripBudgetUsd leaves budget unset');
+assert(migratedNoBudget.watchedStores[0] === 'sunnyside', 'homeStore preserved as watchedStores[0]');
+
+// --- export / import round-trip + hostile imports ---
+const exportRound = await CSI.storage.exportTasteProfile();
+assert(exportRound.ok, 'export after migration');
+const previewOk = await CSI.storage.previewTasteProfileImport(exportRound.json);
+assert(previewOk.ok && previewOk.value.schemaVersion === 2, 'import preview accepts export');
+assert(Array.isArray(previewOk.lines) && previewOk.lines.length >= 0, 'import preview lists diff lines');
+
+const applied = await CSI.storage.saveTasteProfile(previewOk.value);
+assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
+
+const hostileProto = CSI.profile.parseImportJson(
+  '{"enabled":true,"schemaVersion":2,"__proto__":{"polluted":true}}'
+);
+assert(!hostileProto.ok, '__proto__ key rejected');
+
+const hostileCtor = CSI.profile.parseImportJson(
+  '{"enabled":true,"schemaVersion":2,"constructor":{"prototype":{"x":1}}}'
+);
+assert(!hostileCtor.ok, 'constructor key rejected');
+
+const hostileUnknown = CSI.profile.parseImportJson(
+  JSON.stringify({ enabled: true, schemaVersion: 2, evilKey: 1 })
+);
+assert(!hostileUnknown.ok && /unknown field/.test(hostileUnknown.error), 'unknown import key rejected');
+
+const oversized = 'x'.repeat(CSI.profile.MAX_IMPORT_BYTES + 1);
+assert(!CSI.profile.parseImportJson(oversized).ok, 'oversized import rejected');
+
+const futureSchema = CSI.profile.parseImportJson(
+  JSON.stringify({ enabled: true, schemaVersion: 99, watchedStores: ['sunnyside'] })
+);
+assert(!futureSchema.ok && /schemaVersion/i.test(futureSchema.error), 'future schemaVersion rejected');
+
+const badVocab = CSI.profile.parseImportJson(
+  JSON.stringify({
+    enabled: true,
+    schemaVersion: 2,
+    goals: ['not-a-goal'],
+    watchedStores: []
+  })
+);
+assert(!badVocab.ok, 'bad goals vocab rejected');
+
+const badAvoid = CSI.profile.parseImportJson(
+  JSON.stringify({
+    enabled: true,
+    schemaVersion: 2,
+    avoidEffects: ['euphoria'],
+    watchedStores: []
+  })
+);
+assert(!badAvoid.ok, 'bad avoidEffects vocab rejected');
+
+const longToken = 'A'.repeat(49);
+const overLong = CSI.profile.parseImportJson(
+  JSON.stringify({
+    enabled: true,
+    schemaVersion: 2,
+    brandLoves: [longToken],
+    watchedStores: []
+  })
+);
+assert(!overLong.ok, 'over-long token rejected');
+
+const tooMany = Array.from({ length: 31 }, (_, i) => `Brand${i}`);
+const overCount = CSI.profile.parseImportJson(
+  JSON.stringify({
+    enabled: true,
+    schemaVersion: 2,
+    strainLoves: tooMany,
+    watchedStores: []
+  })
+);
+assert(!overCount.ok, 'over-count tokens rejected');
+
+const scripty = CSI.profile.parseImportJson(
+  JSON.stringify({
+    enabled: true,
+    schemaVersion: 2,
+    familyLoves: ['<script>alert(1)</script>'],
+    watchedStores: []
+  })
+);
+assert(!scripty.ok, 'script-y tokens rejected');
+
+const v1Import = CSI.profile.parseImportJson(
+  JSON.stringify({
+    schemaVersion: 1,
+    enabled: true,
+    forms: ['flower'],
+    tripBudgetUsd: 50,
+    homeStore: 'dutchie',
+    secondaryStores: ['shopd'],
+    brandLoyal: ['Ok Brand'],
+    brandAvoid: [],
+    likedTerpenes: [],
+    avoidTerpenes: [],
+    sizes: [],
+    dealTier: 'any',
+    boughtBefore: {}
+  })
+);
+assert(v1Import.ok && v1Import.value.schemaVersion === 2, 'import migrates v1');
+assert(v1Import.value.budget.max === 50, 'imported v1 budget maps');
+assert(
+  JSON.stringify(v1Import.value.watchedStores) === JSON.stringify(['dutchie', 'shopd']),
+  'imported v1 store order'
+);
+
+// avoidEffects stored but never fed into taste-map scoring
+const withAvoidEffects = CSI.profile.normalize({
+  enabled: true,
+  avoidEffects: ['couch-lock', 'racy'],
+  likedTerpenes: ['Limonene'],
+  watchedStores: ['sunnyside']
+});
+assert(withAvoidEffects.ok, 'avoidEffects accepted');
+const mapped = CSI.profile.applyToTasteMap(
+  { preferredTerpenes: {}, avoidTerpenes: [] },
+  withAvoidEffects.value
+);
+assert(!JSON.stringify(mapped).includes('couch-lock'), 'avoidEffects never used in scoring');
+assert(
+  /never used in scoring/i.test(fs.readFileSync(path.join(ext, 'lib/csi-profile.js'), 'utf8')),
+  'avoidEffects scoring lock documented in code'
+);
+
 const features = fs.readFileSync(path.join(ext, 'lib/csi-features.js'), 'utf8');
 assert(/tasteProfile:\s*true/.test(features), 'tasteProfile is a Free gate');
 assert(!/const PRO_FEATURES = \{[^}]*tasteProfile/.test(features), 'tasteProfile is not Pro');
@@ -285,6 +502,8 @@ assert(/tasteMap:\s*true/.test(features), 'taste-map stays Pro');
 const popupHtml = fs.readFileSync(path.join(ext, 'popup/popup.html'), 'utf8');
 assert(popupHtml.includes('id="profile-enable"'), 'popup opt-in');
 assert(popupHtml.includes('profile-export'), 'popup export');
+assert(popupHtml.includes('profile-import'), 'popup import');
+assert(popupHtml.includes('profile-import-confirm'), 'popup import confirm');
 assert(popupHtml.includes('profile-delete'), 'popup delete');
 assert(/Turning off stops using the profile/i.test(popupHtml), 'popup copy: off stops using');
 assert(/Delete wipes it/i.test(popupHtml), 'popup copy: Delete wipes');
@@ -292,15 +511,18 @@ const fieldsetMatch = popupHtml.match(/<fieldset[^>]*id="profile-fields"[^>]*>([
 assert(fieldsetMatch, 'profile-fields fieldset present');
 assert(!/id="profile-save"/.test(fieldsetMatch[1]), 'Save is outside profile-fields');
 assert(!/id="profile-export"/.test(fieldsetMatch[1]), 'Export is outside profile-fields');
+assert(!/id="profile-import"/.test(fieldsetMatch[1]), 'Import is outside profile-fields');
 assert(!/id="profile-delete"/.test(fieldsetMatch[1]), 'Delete is outside profile-fields');
 assert(!/eval\(|new Function\(/.test(fs.readFileSync(path.join(ext, 'lib/csi-profile.js'), 'utf8')), 'no eval');
+assert(!/storage\.sync/.test(fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8')), 'no storage.sync');
+assert(!/geolocation|getCurrentPosition/.test(fs.readFileSync(path.join(ext, 'lib/csi-profile.js'), 'utf8')), 'no geolocation');
 
 // Locks: deal-tier / trip budget stay inert for Free similar-by-chem ranking.
 const rankingSrc = fs.readFileSync(path.join(ext, 'lib/csi-core.js'), 'utf8');
 const pdpSrc = fs.readFileSync(path.join(ext, 'content-pdp.js'), 'utf8');
 const listingSrc = fs.readFileSync(path.join(ext, 'content-listing.js'), 'utf8');
 assert(!/dealTier/.test(rankingSrc), 'dealTier not used in core ranking');
-assert(!/tripBudget/.test(rankingSrc), 'tripBudget not used in core ranking');
+assert(!/tripBudget|budget\.max|watchedStores/.test(rankingSrc), 'budget/stores not used in core ranking');
 assert(!/dealTier|tripBudget/.test(pdpSrc), 'dealTier/tripBudget inert on PDP');
 assert(!/dealTier|tripBudget/.test(listingSrc), 'dealTier/tripBudget inert on listing');
 assert(!/p\.tasteProfile\s*=/.test(listingSrc), 'listing storage listener does not attach profile to cards');
@@ -506,7 +728,7 @@ assert(
 );
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.31', 'manifest 1.3.31');
+assert(manifest.version === '1.3.32', 'manifest 1.3.32');
 assert(manifest.permissions.join(',') === 'storage', 'no new permissions');
 assert(
   (manifest.content_scripts || []).some(

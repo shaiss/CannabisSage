@@ -436,6 +436,7 @@
   });
   document.getElementById('profile-import-confirm').addEventListener('click', async () => {
     const snapshot = pendingImport;
+    const applySeq = importPreviewSeq;
     if (!snapshot || !snapshot.value) {
       showStatus('Nothing to import');
       return;
@@ -447,8 +448,8 @@
       (CSI.storage.peekTasteProfile
         ? await CSI.storage.peekTasteProfile()
         : await CSI.storage.loadTasteProfile()) || { enabled: false };
-    // Cancel / new file / Delete may have cleared pending during the await.
-    if (pendingImport !== snapshot) {
+    // Cancel / new file / Delete may have cleared or replaced pending during the await.
+    if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
       showStatus('Import cancelled');
       return;
     }
@@ -468,10 +469,18 @@
     });
     if (!saved.ok) {
       if (saved.stale) {
+        if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+          showStatus('Import cancelled');
+          return;
+        }
         const latest =
           (CSI.storage.peekTasteProfile
             ? await CSI.storage.peekTasteProfile()
             : await CSI.storage.loadTasteProfile()) || { enabled: false };
+        if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+          showStatus('Import cancelled');
+          return;
+        }
         const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
         const diff = CSI.profile.diffProfiles(latest, importValue);
         showImportPreview({
@@ -485,7 +494,7 @@
       showStatus(saved.error || 'Import failed');
       return;
     }
-    if (pendingImport !== snapshot) {
+    if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
       showStatus('Import cancelled');
       return;
     }

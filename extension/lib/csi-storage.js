@@ -52,6 +52,26 @@
     });
   }
 
+  /** Rejects on chrome.runtime.lastError so callers can tell read failure from a missing key. */
+  function storageGetStrict(keys) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.storage.local.get(keys, (result) => {
+          const err = chrome.runtime && chrome.runtime.lastError;
+          if (err) {
+            CSI.warn('storageGetStrict failed', err);
+            reject(new Error(err.message || 'storage read failed'));
+            return;
+          }
+          resolve(result || {});
+        });
+      } catch (e) {
+        CSI.warn('storageGetStrict failed', e);
+        reject(e);
+      }
+    });
+  }
+
   function storageSet(obj) {
     return new Promise((resolve, reject) => {
       try {
@@ -461,17 +481,23 @@
       const normalizedMigrated = CSI.profile.normalize(migrated.value);
       if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
         // Re-read before write so a concurrent Delete / other migration wins.
+        // Read failure must not look like deletion — keep the in-memory v2 profile.
         try {
-          const again = await storageGet([KEYS.PROFILE]);
+          const again = await storageGetStrict([KEYS.PROFILE]);
           const current = again[KEYS.PROFILE];
           if (current == null) return { enabled: false };
           const remig = CSI.profile.migrateIfNeeded(current);
           if (remig && remig.ok && !remig.didMigrate) {
             return normalizeStoredOrOff(current);
           }
-          await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
-        } catch (e) {
-          CSI.warn('profile migration write failed', e);
+          try {
+            await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
+          } catch (writeErr) {
+            CSI.warn('profile migration write failed', writeErr);
+          }
+        } catch (readErr) {
+          CSI.warn('profile migration recheck read failed', readErr);
+          return normalizedMigrated.value;
         }
         return normalizedMigrated.value;
       }

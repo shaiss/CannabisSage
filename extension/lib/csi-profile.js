@@ -534,7 +534,11 @@
     }
     const base = emptyEnabled();
     base.enabled = v1.enabled;
-    if (Number.isFinite(Number(v1.updatedAt))) base.updatedAt = Math.floor(Number(v1.updatedAt));
+    if (v1.updatedAt != null) {
+      const ts = coerceUpdatedAt(v1.updatedAt);
+      if (!ts.ok) return ts;
+      base.updatedAt = ts.value;
+    }
 
     if (Array.isArray(v1.formats)) {
       base.formats = v1.formats;
@@ -677,6 +681,19 @@
     const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
     if (!Number.isFinite(n)) return fail(`${label} must be a number`);
     return { ok: true, value: n };
+  }
+
+  function coerceUpdatedAt(raw) {
+    if (raw == null) return { ok: true, value: null };
+    if (typeof raw === 'boolean' || (typeof raw === 'object' && raw !== null)) {
+      return fail('updatedAt must be a number');
+    }
+    if (typeof raw !== 'number' && typeof raw !== 'string') {
+      return fail('updatedAt must be a number');
+    }
+    const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
+    if (!Number.isFinite(n)) return fail('updatedAt must be a number');
+    return { ok: true, value: Math.floor(n) };
   }
 
   function normalizeBudget(raw) {
@@ -872,8 +889,13 @@
     if (!bought.ok) return bought;
 
     let updatedAt = emptyEnabled().updatedAt;
-    if (opts && Number.isFinite(opts.now)) updatedAt = Math.floor(opts.now);
-    else if (Number.isFinite(Number(working.updatedAt))) updatedAt = Math.floor(Number(working.updatedAt));
+    if (opts && Number.isFinite(opts.now)) {
+      updatedAt = Math.floor(opts.now);
+    } else if (working.updatedAt != null) {
+      const ts = coerceUpdatedAt(working.updatedAt);
+      if (!ts.ok) return ts;
+      updatedAt = ts.value;
+    }
 
     const value = {
       schemaVersion: SCHEMA_VERSION,

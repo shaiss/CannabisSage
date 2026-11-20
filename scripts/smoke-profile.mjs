@@ -26,6 +26,14 @@ function makeChrome(store, opts = {}) {
     storage: {
       local: {
         get: (keys, cb) => {
+          opts._getCalls = (opts._getCalls || 0) + 1;
+          if (opts.failGetOnCall && opts._getCalls === opts.failGetOnCall) {
+            runtime.lastError = { message: 'storage read failed' };
+            opts.failGetOnCall = 0;
+            cb && cb({});
+            runtime.lastError = null;
+            return;
+          }
           if (keys == null) {
             cb({ ...store });
             return;
@@ -64,7 +72,7 @@ function makeChrome(store, opts = {}) {
 }
 
 const store = {};
-const chromeOpts = { failNextSet: false };
+const chromeOpts = { failNextSet: false, failGetOnCall: 0, _getCalls: 0 };
 const sandbox = {
   console,
   URL,
@@ -384,6 +392,16 @@ assert(migratedDespiteWriteFail.schemaVersion === 2, 'migration returns v2 even 
 assert(migratedDespiteWriteFail.budget && migratedDespiteWriteFail.budget.max === 75, 'in-memory migrated budget intact');
 assert(store.csi_taste_profile.schemaVersion === 1, 'failed migration write left v1 on disk');
 
+// Recheck read failure must keep in-memory v2 (not treat as delete).
+await CSI.storage.deleteTasteProfile();
+store.csi_taste_profile = { ...v1WithBudget };
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 2; // soft first get succeeds; strict recheck fails
+const migratedDespiteReadFail = await CSI.storage.loadTasteProfile();
+assert(migratedDespiteReadFail.schemaVersion === 2, 'migration returns v2 when recheck read fails');
+assert(migratedDespiteReadFail.enabled === true, 'read-fail path keeps enabled profile');
+assert(store.csi_taste_profile.schemaVersion === 1, 'failed recheck read left v1 on disk');
+
 await CSI.storage.deleteTasteProfile();
 const v1NoBudget = {
   schemaVersion: 1,
@@ -598,13 +616,40 @@ const v1NoEnabled = CSI.profile.normalize({
 assert(!v1NoEnabled.ok && /enabled must be boolean/i.test(v1NoEnabled.error || ''), 'v1 missing enabled rejected');
 
 // Import size cap is UTF-8 bytes, not string length.
-const multibyteOver =
-  '{"enabled":true,"schemaVersion":2,"formats":[],"x":"' + 'é'.repeat(CSI.profile.MAX_IMPORT_BYTES) + '"}';
+// Fixture: JS string length under the cap, UTF-8 bytes over it (é is 2 bytes).
+const maxImport = CSI.profile.MAX_IMPORT_BYTES;
+const multibyteFiller = 'é'.repeat(Math.floor(maxImport / 2) + 256);
+const multibyteOver = JSON.stringify({
+  schemaVersion: 2,
+  enabled: true,
+  formats: [],
+  sizes: [],
+  likedTerpenes: [],
+  avoidTerpenes: [],
+  watchedStores: [],
+  dealTier: 'any',
+  boughtBefore: {},
+  updatedAt: 1,
+  strainLoves: [multibyteFiller]
+});
+assert(multibyteOver.length < maxImport, 'multibyte fixture string length under cap');
 assert(
-  CSI.profile.utf8ByteLength(multibyteOver) > CSI.profile.MAX_IMPORT_BYTES,
-  'multibyte fixture exceeds byte cap'
+  CSI.profile.utf8ByteLength(multibyteOver) > maxImport,
+  'multibyte fixture UTF-8 bytes over cap'
 );
-assert(!CSI.profile.parseImportJson(multibyteOver).ok, 'multibyte oversized import rejected by byte cap');
+const multibyteResult = CSI.profile.parseImportJson(multibyteOver);
+assert(!multibyteResult.ok, 'multibyte oversized import rejected');
+assert(
+  multibyteResult.error === 'import exceeds size cap',
+  'multibyte oversize reports exact size-cap error'
+);
+
+// Hostile non-numeric updatedAt must fail closed (not throw).
+const badUpdatedAt = CSI.profile.normalize({
+  enabled: true,
+  updatedAt: { toString: null }
+});
+assert(!badUpdatedAt.ok && /updatedAt must be a number/i.test(badUpdatedAt.error || ''), 'object updatedAt rejected');
 assert(
   partialResave.value.formats.some((f) => f.id === 'vape-live-resin-rosin' && f.slot === 'night'),
   'detailed format + slot preserved'

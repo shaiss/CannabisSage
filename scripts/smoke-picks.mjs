@@ -411,6 +411,60 @@ assert(
   'sale filter still excludes skip brands'
 );
 
+// dealsOnly: listed sale/promo only (schema v2)
+const dealsOnlyRanked = CSI.picks.rankPicks({
+  profile: {
+    ...baseProfile,
+    dealTier: 'any',
+    dealsOnly: true,
+    budget: { min: null, max: 100, currency: 'USD' },
+    boughtBefore: {}
+  },
+  cacheEntries,
+  isPro: true,
+  now
+});
+assert(dealsOnlyRanked.status === 'ok', 'dealsOnly ranking ok');
+assert(
+  dealsOnlyRanked.picks.length && dealsOnlyRanked.picks.every((p) => p.onSale),
+  'dealsOnly keeps onSale listings only'
+);
+assert(
+  dealsOnlyRanked.picks.some((p) => p.url === saleUrl),
+  'dealsOnly still surfaces a sale-listed pick'
+);
+
+// Detailed format IDs map onto productFormKey buckets
+const detailedVapeProfile = CSI.profile.normalize({
+  ...baseProfile,
+  formats: [{ id: 'vape-live-resin-rosin', slot: null }],
+  sizes: [],
+  cannabinoidRatio: null,
+  potencyBandThc: null,
+  brandAvoids: [],
+  budget: { min: null, max: 100, currency: 'USD' },
+  boughtBefore: {}
+}).value;
+assert(
+  CSI.profile.formatMatchesProduct(detailedVapeProfile, 'vape'),
+  'vape-live-resin-rosin maps to vape'
+);
+const detailedVapeRanked = CSI.picks.rankPicks({
+  profile: detailedVapeProfile,
+  cacheEntries,
+  isPro: true,
+  now
+});
+assert(detailedVapeRanked.status === 'ok', 'detailed vape format ranking ok');
+assert(
+  detailedVapeRanked.picks.some((p) => p.url === wrongFormUrl),
+  'vape-live-resin-rosin matches productFormKey vape listings'
+);
+assert(
+  !detailedVapeRanked.picks.some((p) => p.url === flowerA || p.url === saleUrl),
+  'detailed vape format excludes flower listings'
+);
+
 // Deal preference: below median (host medians provided)
 const mediansByHost = {
   'sunnyside.shop': {

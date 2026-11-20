@@ -333,6 +333,12 @@
       }
     }
 
+    // dealsOnly: keep only listings with a real listed deal (onSale / promo).
+    // Price-history drops are PR E; schema field is applied here for ranking.
+    if (profile.dealsOnly === true && !product.onSale) {
+      return { ok: false, reason: 'deals_only' };
+    }
+
     const cap = profileBudgetMax(profile);
     if (cap != null) {
       if (price == null || price > cap) return { ok: false, reason: 'budget' };
@@ -417,6 +423,9 @@
         );
       }
       if (gate.flag === 'rebuy') filterReasons.push(COPY.rebuy);
+      if (profile.dealsOnly === true && product.onSale) {
+        filterReasons.push(COPY.priceSale);
+      }
 
       const reasons = [
         ...filterReasons,

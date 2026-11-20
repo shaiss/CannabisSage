@@ -524,8 +524,16 @@
     if (!v1 || typeof v1 !== 'object' || Array.isArray(v1)) {
       return fail('profile must be an object');
     }
+    // Validate original v1 keys/opt-in before dropping or defaulting fields.
+    const migrateAllowed = new Set([...ALLOWED_KEYS, ...V1_MIGRATE_KEYS]);
+    for (const k of Object.keys(v1)) {
+      if (!migrateAllowed.has(k)) return fail(`unknown field: ${k}`);
+    }
+    if (v1.enabled !== true && v1.enabled !== false) {
+      return fail('enabled must be boolean');
+    }
     const base = emptyEnabled();
-    base.enabled = v1.enabled === true;
+    base.enabled = v1.enabled;
     if (Number.isFinite(Number(v1.updatedAt))) base.updatedAt = Math.floor(Number(v1.updatedAt));
 
     if (Array.isArray(v1.formats)) {
@@ -546,7 +554,9 @@
 
     // Budget: only map when v1 had tripBudgetUsd. Never invent a default cap.
     if (v1.tripBudgetUsd != null) {
-      base.budget = { min: null, max: Number(v1.tripBudgetUsd), currency: 'USD' };
+      const trip = coerceBudgetBound(v1.tripBudgetUsd, 'tripBudgetUsd');
+      if (!trip.ok) return trip;
+      base.budget = { min: null, max: trip.value, currency: 'USD' };
     } else if (v1.budget != null) {
       base.budget = v1.budget;
     } else {
@@ -655,6 +665,20 @@
     return { values: out };
   }
 
+  function coerceBudgetBound(raw, label) {
+    if (raw == null) return { ok: true, value: null };
+    // Reject booleans/objects (Number(true)===1; some objects throw on ToNumber).
+    if (typeof raw === 'boolean' || (typeof raw === 'object' && raw !== null)) {
+      return fail(`${label} must be a number`);
+    }
+    if (typeof raw !== 'number' && typeof raw !== 'string') {
+      return fail(`${label} must be a number`);
+    }
+    const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
+    if (!Number.isFinite(n)) return fail(`${label} must be a number`);
+    return { ok: true, value: n };
+  }
+
   function normalizeBudget(raw) {
     if (raw == null) return { ok: true, value: null };
     if (typeof raw !== 'object' || Array.isArray(raw)) return fail('budget must be an object');
@@ -662,8 +686,12 @@
     for (const k of keys) {
       if (k !== 'min' && k !== 'max' && k !== 'currency') return fail('unknown budget field');
     }
-    let min = raw.min == null ? null : Number(raw.min);
-    let max = raw.max == null ? null : Number(raw.max);
+    const minRes = coerceBudgetBound(raw.min, 'budget.min');
+    if (!minRes.ok) return minRes;
+    const maxRes = coerceBudgetBound(raw.max, 'budget.max');
+    if (!maxRes.ok) return maxRes;
+    let min = minRes.value;
+    let max = maxRes.value;
     const currency = raw.currency == null ? 'USD' : raw.currency;
     if (currency !== 'USD') return fail('budget currency must be USD');
     if (min != null && (!Number.isInteger(min) || min < 1 || min > MAX_BUDGET)) {
@@ -924,9 +952,26 @@
    * Parse a local JSON export into a null-prototype object, enforce allowlist,
    * size cap, vocab, and schemaVersion ≤ 2 (migrate v1). Does not write storage.
    */
+  function utf8ByteLength(text) {
+    if (typeof TextEncoder !== 'undefined') {
+      return new TextEncoder().encode(text).length;
+    }
+    let bytes = 0;
+    for (let i = 0; i < text.length; i++) {
+      const c = text.charCodeAt(i);
+      if (c <= 0x7f) bytes += 1;
+      else if (c <= 0x7ff) bytes += 2;
+      else if (c >= 0xd800 && c <= 0xdbff) {
+        bytes += 4;
+        i += 1;
+      } else bytes += 3;
+    }
+    return bytes;
+  }
+
   function parseImportJson(text) {
     if (typeof text !== 'string') return fail('import must be a string');
-    if (text.length > MAX_IMPORT_BYTES) return fail('import exceeds size cap');
+    if (utf8ByteLength(text) > MAX_IMPORT_BYTES) return fail('import exceeds size cap');
     let parsed;
     try {
       parsed = JSON.parse(text);
@@ -1013,6 +1058,7 @@
     MAX_TOKENS,
     MAX_TOKEN_LEN,
     MAX_IMPORT_BYTES,
+    utf8ByteLength,
     FORMS,
     FORMAT_IDS,
     FORMAT_TO_PRODUCT_FORM,

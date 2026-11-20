@@ -424,6 +424,32 @@
     await storageSetBestEffort({ [KEYS.SOFT_UNLOCK_DISMISS]: true });
   }
 
+  function normalizeStoredOrOff(raw) {
+    const parsed = CSI.profile?.normalize?.(raw);
+    if (!parsed || !parsed.ok || !parsed.value) return { enabled: false };
+    if (CSI.profile.isStoredProfile(parsed.value)) return parsed.value;
+    return { enabled: false };
+  }
+
+  /**
+   * Read profile without write-back. Used for import preview so Cancel cannot
+   * leave a migrated v2 key behind.
+   */
+  async function peekTasteProfile() {
+    const data = await storageGet([KEYS.PROFILE]);
+    const raw = data[KEYS.PROFILE];
+    if (raw == null) return { enabled: false };
+
+    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
+    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+      const normalizedMigrated = CSI.profile.normalize(migrated.value);
+      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
+        return normalizedMigrated.value;
+      }
+    }
+    return normalizeStoredOrOff(raw);
+  }
+
   async function loadTasteProfile() {
     const data = await storageGet([KEYS.PROFILE]);
     const raw = data[KEYS.PROFILE];
@@ -434,8 +460,15 @@
     if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
       const normalizedMigrated = CSI.profile.normalize(migrated.value);
       if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
-        // Return the in-memory profile even if persist fails (quota/context).
+        // Re-read before write so a concurrent Delete / other migration wins.
         try {
+          const again = await storageGet([KEYS.PROFILE]);
+          const current = again[KEYS.PROFILE];
+          if (current == null) return { enabled: false };
+          const remig = CSI.profile.migrateIfNeeded(current);
+          if (remig && remig.ok && !remig.didMigrate) {
+            return normalizeStoredOrOff(current);
+          }
           await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
         } catch (e) {
           CSI.warn('profile migration write failed', e);
@@ -444,13 +477,7 @@
       }
     }
 
-    const parsed = CSI.profile?.normalize?.(raw);
-    if (!parsed || !parsed.ok || !parsed.value) {
-      return { enabled: false };
-    }
-    // Return full stored profiles even when disabled so the popup can reload fields.
-    if (CSI.profile.isStoredProfile(parsed.value)) return parsed.value;
-    return { enabled: false };
+    return normalizeStoredOrOff(raw);
   }
 
   async function saveTasteProfile(raw) {
@@ -513,11 +540,13 @@
     if (!parsed || !parsed.ok) {
       return { ok: false, error: (parsed && parsed.error) || 'invalid import' };
     }
-    const current = await loadTasteProfile();
+    // Read-only: do not migrate-write during preview.
+    const current = await peekTasteProfile();
     const diff = CSI.profile.diffProfiles(current, parsed.value);
     return {
       ok: true,
       value: parsed.value,
+      currentUpdatedAt: CSI.profile.isStoredProfile(current) ? current.updatedAt : null,
       diff,
       lines: CSI.profile.formatDiffLines(diff)
     };
@@ -770,6 +799,7 @@
     loadSoftUnlockDismissed,
     saveSoftUnlockDismissed,
     loadTasteProfile,
+    peekTasteProfile,
     saveTasteProfile,
     deleteTasteProfile,
     exportTasteProfile,

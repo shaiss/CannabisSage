@@ -1020,7 +1020,12 @@
     state.selection = await CSI.storage.loadCompare();
     await refreshSavedUrls();
     await refreshDigestBadge();
-    state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    try {
+      state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    } catch (e) {
+      CSI.warn?.('loadTasteProfile failed during listing init', e);
+      state.profile = { enabled: false };
+    }
     await refreshTasteMap();
     state.filters = await CSI.storage.loadFilters();
     await CSI.glossary.ensureGlossary();

@@ -280,16 +280,20 @@
     });
     const formats = [...fromUi, ...preservedDetailed];
 
+    const prevMin =
+      base.budget && base.budget.min != null && Number.isInteger(Number(base.budget.min))
+        ? Number(base.budget.min)
+        : null;
     let budget = null;
     if (budgetRaw !== '') {
       const max = Number(budgetRaw);
-      let prevMin =
-        base.budget && base.budget.min != null && Number.isInteger(Number(base.budget.min))
-          ? Number(base.budget.min)
-          : null;
+      let min = prevMin;
       // UI only edits max; drop a hidden min that would make normalize reject the save.
-      if (prevMin != null && Number.isInteger(max) && prevMin > max) prevMin = null;
-      budget = { min: prevMin, max, currency: 'USD' };
+      if (min != null && Number.isInteger(max) && min > max) min = null;
+      budget = { min, max, currency: 'USD' };
+    } else if (prevMin != null) {
+      // Clearing max must not wipe an unedited minimum-only budget.
+      budget = { min: prevMin, max: null, currency: 'USD' };
     }
 
     return {
@@ -361,15 +365,32 @@
   });
 
   let pendingImport = null;
+  let importPreviewSeq = 0;
 
   function hideImportPreview() {
+    importPreviewSeq += 1;
     pendingImport = null;
     const preview = document.getElementById('profile-import-preview');
     const diff = document.getElementById('profile-import-diff');
     const fileInput = document.getElementById('profile-import-file');
+    const applyBtn = document.getElementById('profile-import-confirm');
     preview.hidden = true;
     diff.textContent = '';
+    if (applyBtn) applyBtn.disabled = true;
     if (fileInput) fileInput.value = '';
+  }
+
+  function showImportPreview(preview) {
+    pendingImport = {
+      value: preview.value,
+      basisUpdatedAt: preview.currentUpdatedAt == null ? null : preview.currentUpdatedAt
+    };
+    const box = document.getElementById('profile-import-preview');
+    const diff = document.getElementById('profile-import-diff');
+    const applyBtn = document.getElementById('profile-import-confirm');
+    diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
+    box.hidden = false;
+    if (applyBtn) applyBtn.disabled = false;
   }
 
   document.getElementById('profile-import').addEventListener('click', () => {
@@ -378,33 +399,63 @@
   document.getElementById('profile-import-file').addEventListener('change', async (e) => {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
+    const seq = ++importPreviewSeq;
+    pendingImport = null;
+    const applyBtn = document.getElementById('profile-import-confirm');
+    if (applyBtn) applyBtn.disabled = true;
+    document.getElementById('profile-import-preview').hidden = true;
+    document.getElementById('profile-import-diff').textContent = '';
+
+    const maxBytes = CSI.profile?.MAX_IMPORT_BYTES || 64 * 1024;
+    if (typeof file.size === 'number' && file.size > maxBytes) {
+      if (seq !== importPreviewSeq) return;
+      hideImportPreview();
+      showStatus('Import exceeds size cap');
+      return;
+    }
+
     let text;
     try {
       text = await file.text();
     } catch {
+      if (seq !== importPreviewSeq) return;
       hideImportPreview();
       showStatus('Could not read file');
       return;
     }
+    if (seq !== importPreviewSeq) return;
     const preview = await CSI.storage.previewTasteProfileImport(text);
+    if (seq !== importPreviewSeq) return;
     if (!preview.ok) {
       hideImportPreview();
       showStatus(preview.error || 'Invalid import');
       return;
     }
-    pendingImport = preview.value;
-    const box = document.getElementById('profile-import-preview');
-    const diff = document.getElementById('profile-import-diff');
-    diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
-    box.hidden = false;
+    showImportPreview(preview);
     showStatus('Review import changes, then Apply');
   });
   document.getElementById('profile-import-confirm').addEventListener('click', async () => {
-    if (!pendingImport) {
+    if (!pendingImport || !pendingImport.value) {
       showStatus('Nothing to import');
       return;
     }
-    const saved = await CSI.storage.importTasteProfile(pendingImport);
+    // If the stored profile changed after preview, re-diff and require confirmation again.
+    const current =
+      (CSI.storage.peekTasteProfile
+        ? await CSI.storage.peekTasteProfile()
+        : await CSI.storage.loadTasteProfile()) || { enabled: false };
+    const currentUpdatedAt = CSI.profile.isStoredProfile(current) ? current.updatedAt : null;
+    if (currentUpdatedAt !== pendingImport.basisUpdatedAt) {
+      const diff = CSI.profile.diffProfiles(current, pendingImport.value);
+      showImportPreview({
+        value: pendingImport.value,
+        currentUpdatedAt,
+        lines: CSI.profile.formatDiffLines(diff)
+      });
+      showStatus('Stored profile changed — review again, then Apply');
+      return;
+    }
+    const saved = await CSI.storage.importTasteProfile(pendingImport.value);
     if (!saved.ok) {
       showStatus(saved.error || 'Import failed');
       return;
@@ -591,8 +642,18 @@
       renderDigestResult({ status: 'locked', message: CSI.digest.COPY.locked }, savedItems);
       return;
     }
-    const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
-    renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
+    try {
+      const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
+      renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
+    } catch (e) {
+      renderDigestResult(
+        {
+          status: 'error',
+          message: (e && e.message) || 'Saved-watch write failed'
+        },
+        savedItems
+      );
+    }
   }
 
   document.getElementById('digest-upgrade').addEventListener('click', () => {
@@ -601,8 +662,19 @@
   document.getElementById('digest-saved-list').addEventListener('click', async (event) => {
     const btn = event.target.closest('.digest-remove');
     if (!btn) return;
-    await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
-    await loadDigestUi();
+    try {
+      await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
+      await loadDigestUi();
+    } catch (e) {
+      const savedItems = await CSI.storage.loadSavedItems().catch(() => []);
+      renderDigestResult(
+        {
+          status: 'error',
+          message: (e && e.message) || 'Saved-watch write failed'
+        },
+        savedItems
+      );
+    }
   });
 
   document.getElementById('picks-upgrade').addEventListener('click', () => {

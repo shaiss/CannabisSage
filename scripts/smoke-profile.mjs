@@ -408,9 +408,31 @@ assert(migratedNoBudget.watchedStores[0] === 'sunnyside', 'homeStore preserved a
 // --- export / import round-trip + hostile imports ---
 const exportRound = await CSI.storage.exportTasteProfile();
 assert(exportRound.ok, 'export after migration');
+// Preview must not migrate-write a stored v1 profile.
+await CSI.storage.deleteTasteProfile();
+store.csi_taste_profile = {
+  schemaVersion: 1,
+  enabled: true,
+  forms: ['flower'],
+  sizes: [],
+  likedTerpenes: [],
+  avoidTerpenes: [],
+  tripBudgetUsd: 40,
+  homeStore: 'dutchie',
+  secondaryStores: [],
+  brandLoyal: [],
+  brandAvoid: [],
+  dealTier: 'any',
+  boughtBefore: {}
+};
+const previewAgainstV1 = await CSI.storage.previewTasteProfileImport(exportRound.json);
+assert(previewAgainstV1.ok, 'preview against stored v1 ok');
+assert(store.csi_taste_profile.schemaVersion === 1, 'import preview does not migrate-write');
+
 const previewOk = await CSI.storage.previewTasteProfileImport(exportRound.json);
 assert(previewOk.ok && previewOk.value.schemaVersion === 2, 'import preview accepts export');
 assert(Array.isArray(previewOk.lines) && previewOk.lines.length >= 0, 'import preview lists diff lines');
+assert(Object.prototype.hasOwnProperty.call(previewOk, 'currentUpdatedAt'), 'preview exposes basis updatedAt');
 
 const applied = await CSI.storage.importTasteProfile(previewOk.value);
 assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
@@ -509,6 +531,54 @@ const popupStyleLower = {
 };
 const loweredOk = CSI.profile.normalize(popupStyleLower);
 assert(loweredOk.ok && loweredOk.value.budget.min == null && loweredOk.value.budget.max === 20, 'popup clears min when max drops below it');
+
+// Clearing max in the popup must keep an unedited minimum-only budget.
+const minOnlyPopup = {
+  ...partialResave.value,
+  budget: (() => {
+    const prevMin = 25;
+    const budgetRaw = '';
+    if (budgetRaw !== '') return { min: prevMin, max: Number(budgetRaw), currency: 'USD' };
+    return { min: prevMin, max: null, currency: 'USD' };
+  })()
+};
+const minOnlyOk = CSI.profile.normalize(minOnlyPopup);
+assert(minOnlyOk.ok && minOnlyOk.value.budget.min === 25 && minOnlyOk.value.budget.max == null, 'empty max keeps min-only budget');
+
+// Budget bounds reject boolean/object coercion before Number().
+const boolBudget = CSI.profile.normalize({
+  enabled: true,
+  budget: { min: null, max: true, currency: 'USD' }
+});
+assert(!boolBudget.ok && /budget\.max must be a number/i.test(boolBudget.error || ''), 'boolean budget.max rejected');
+const objBudget = CSI.profile.normalize({
+  enabled: true,
+  budget: { min: Object.create(null), max: 40, currency: 'USD' }
+});
+assert(!objBudget.ok && /budget\.min must be a number/i.test(objBudget.error || ''), 'object budget.min rejected');
+
+// v1 notes / missing enabled fail before migration defaults.
+const v1Notes = CSI.profile.normalize({
+  schemaVersion: 1,
+  enabled: true,
+  forms: ['flower'],
+  notes: 'secret'
+});
+assert(!v1Notes.ok && /unknown field/i.test(v1Notes.error || ''), 'v1 notes rejected before migrate');
+const v1NoEnabled = CSI.profile.normalize({
+  schemaVersion: 1,
+  forms: ['flower']
+});
+assert(!v1NoEnabled.ok && /enabled must be boolean/i.test(v1NoEnabled.error || ''), 'v1 missing enabled rejected');
+
+// Import size cap is UTF-8 bytes, not string length.
+const multibyteOver =
+  '{"enabled":true,"schemaVersion":2,"formats":[],"x":"' + 'é'.repeat(CSI.profile.MAX_IMPORT_BYTES) + '"}';
+assert(
+  CSI.profile.utf8ByteLength(multibyteOver) > CSI.profile.MAX_IMPORT_BYTES,
+  'multibyte fixture exceeds byte cap'
+);
+assert(!CSI.profile.parseImportJson(multibyteOver).ok, 'multibyte oversized import rejected by byte cap');
 assert(
   partialResave.value.formats.some((f) => f.id === 'vape-live-resin-rosin' && f.slot === 'night'),
   'detailed format + slot preserved'

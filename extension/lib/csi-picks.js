@@ -333,11 +333,7 @@
       }
     }
 
-    // dealsOnly: keep only listings with a real listed deal (onSale / promo).
-    // Price-history drops are PR E; schema field is applied here for ranking.
-    if (profile.dealsOnly === true && !product.onSale) {
-      return { ok: false, reason: 'deals_only' };
-    }
+    // dealsOnly is schema-only in PR A; ranking/filtering is #73 PR E.
 
     const cap = profileBudgetMax(profile);
     if (cap != null) {
@@ -499,9 +495,17 @@
       !!(CSI.features?.can?.(FEATURE_ID));
     if (!isPro) return emptyResult('locked', { message: COPY.locked });
 
-    const profile =
-      options.profile ||
-      (CSI.storage?.loadTasteProfile ? await CSI.storage.loadTasteProfile() : { enabled: false });
+    let profile = options.profile;
+    if (!profile) {
+      try {
+        profile = CSI.storage?.loadTasteProfile
+          ? await CSI.storage.loadTasteProfile()
+          : { enabled: false };
+      } catch (e) {
+        CSI.warn?.('loadTasteProfile failed during picks', e);
+        profile = { enabled: false };
+      }
+    }
     const cacheEntries =
       options.cacheEntries ||
       (CSI.storage?.listPdpCache ? await CSI.storage.listPdpCache() : []);

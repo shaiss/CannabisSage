@@ -432,8 +432,8 @@ assert(
   'sale filter still excludes skip brands'
 );
 
-// dealsOnly: listed sale/promo only (schema v2)
-const dealsOnlyRanked = CSI.picks.rankPicks({
+// dealsOnly is schema-only in PR A (#73 PR E owns ranking/filtering).
+const dealsOnlyIgnored = CSI.picks.rankPicks({
   profile: {
     ...baseProfile,
     dealTier: 'any',
@@ -445,21 +445,10 @@ const dealsOnlyRanked = CSI.picks.rankPicks({
   isPro: true,
   now
 });
-assert(dealsOnlyRanked.status === 'ok', 'dealsOnly ranking ok');
+assert(dealsOnlyIgnored.status === 'ok', 'dealsOnly schema field does not break ranking');
 assert(
-  dealsOnlyRanked.picks.length && dealsOnlyRanked.picks.every((p) => p.onSale),
-  'dealsOnly keeps onSale listings only'
-);
-assert(
-  dealsOnlyRanked.picks.some((p) => p.url === saleUrl),
-  'dealsOnly still surfaces a sale-listed pick'
-);
-assert(
-  dealsOnlyRanked.picks.every((p) => {
-    const saleLines = (p.reasons || []).filter((r) => /sale listed/i.test(String(r)));
-    return saleLines.length <= 1;
-  }),
-  'dealsOnly does not duplicate the sale reason'
+  dealsOnlyIgnored.picks.some((p) => !p.onSale),
+  'dealsOnly does not filter non-sale picks in PR A'
 );
 
 // Detailed format IDs map onto productFormKey buckets

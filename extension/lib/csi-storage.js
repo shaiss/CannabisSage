@@ -71,6 +71,15 @@
     });
   }
 
+  /** Cache / prefs writes: log and continue so UI never stalls on quota/context errors. */
+  async function storageSetBestEffort(obj) {
+    try {
+      await storageSet(obj);
+    } catch (e) {
+      CSI.warn('storageSet best-effort failed', e);
+    }
+  }
+
   function storageRemove(keys) {
     return new Promise((resolve) => {
       try {
@@ -108,7 +117,7 @@
           .replace(/\/$/, '')
       }))
       .filter((p) => p.url);
-    await storageSet({ [KEYS.COMPARE]: cleaned });
+    await storageSetBestEffort({ [KEYS.COMPARE]: cleaned });
   }
 
   async function clearCompare() {
@@ -147,7 +156,7 @@
   }
 
   async function saveTasteMap(map) {
-    await storageSet({ [KEYS.TASTE]: map });
+    await storageSetBestEffort({ [KEYS.TASTE]: map });
   }
 
   async function loadFilters() {
@@ -156,7 +165,7 @@
   }
 
   async function saveFilters(filters) {
-    await storageSet({ [KEYS.FILTERS]: { ...DEFAULT_FILTERS, ...filters } });
+    await storageSetBestEffort({ [KEYS.FILTERS]: { ...DEFAULT_FILTERS, ...filters } });
   }
 
   function cacheKey(url) {
@@ -203,7 +212,7 @@
         };
       }
     }
-    await storageSet({
+    await storageSetBestEffort({
       [key]: { data, fetchedAt }
     });
   }
@@ -343,7 +352,7 @@
     // Host key is www-insensitive; keep snap.host normalized for callers.
     if (normalizeHostName(snap.host) !== key) return null;
     if (!fromHostKey) {
-      await storageSet({ [hostKey]: { ...snap, host: key } });
+      await storageSetBestEffort({ [hostKey]: { ...snap, host: key } });
     }
     return { ...snap, host: key };
   }
@@ -395,7 +404,7 @@
     });
     const products = Array.from(byUrl.values()).slice(-400);
 
-    await storageSet({
+    await storageSetBestEffort({
       [hostKey]: {
         host,
         adapterId: snapshot.adapterId || '',
@@ -412,7 +421,7 @@
   }
 
   async function saveSoftUnlockDismissed() {
-    await storageSet({ [KEYS.SOFT_UNLOCK_DISMISS]: true });
+    await storageSetBestEffort({ [KEYS.SOFT_UNLOCK_DISMISS]: true });
   }
 
   async function loadTasteProfile() {
@@ -425,7 +434,12 @@
     if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
       const normalizedMigrated = CSI.profile.normalize(migrated.value);
       if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
-        await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
+        // Return the in-memory profile even if persist fails (quota/context).
+        try {
+          await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
+        } catch (e) {
+          CSI.warn('profile migration write failed', e);
+        }
         return normalizedMigrated.value;
       }
     }

@@ -374,6 +374,16 @@ assert(
   'migration is idempotent'
 );
 
+// Migration write failure must still return the in-memory v2 profile (not abort load).
+await CSI.storage.deleteTasteProfile();
+store.csi_taste_profile = { ...v1WithBudget };
+chromeOpts.failNextSet = true;
+const migratedDespiteWriteFail = await CSI.storage.loadTasteProfile();
+assert(chromeOpts.failNextSet === false, 'migration attempted a write');
+assert(migratedDespiteWriteFail.schemaVersion === 2, 'migration returns v2 even when write rejects');
+assert(migratedDespiteWriteFail.budget && migratedDespiteWriteFail.budget.max === 75, 'in-memory migrated budget intact');
+assert(store.csi_taste_profile.schemaVersion === 1, 'failed migration write left v1 on disk');
+
 await CSI.storage.deleteTasteProfile();
 const v1NoBudget = {
   schemaVersion: 1,

@@ -435,27 +435,39 @@
     showStatus('Review import changes, then Apply');
   });
   document.getElementById('profile-import-confirm').addEventListener('click', async () => {
-    if (!pendingImport || !pendingImport.value) {
+    const snapshot = pendingImport;
+    if (!snapshot || !snapshot.value) {
       showStatus('Nothing to import');
       return;
     }
+    const importValue = snapshot.value;
+    const basisUpdatedAt = snapshot.basisUpdatedAt;
     // If the stored profile changed after preview, re-diff and require confirmation again.
     const current =
       (CSI.storage.peekTasteProfile
         ? await CSI.storage.peekTasteProfile()
         : await CSI.storage.loadTasteProfile()) || { enabled: false };
+    // Cancel / new file / Delete may have cleared pending during the await.
+    if (pendingImport !== snapshot) {
+      showStatus('Import cancelled');
+      return;
+    }
     const currentUpdatedAt = CSI.profile.isStoredProfile(current) ? current.updatedAt : null;
-    if (currentUpdatedAt !== pendingImport.basisUpdatedAt) {
-      const diff = CSI.profile.diffProfiles(current, pendingImport.value);
+    if (currentUpdatedAt !== basisUpdatedAt) {
+      const diff = CSI.profile.diffProfiles(current, importValue);
       showImportPreview({
-        value: pendingImport.value,
+        value: importValue,
         currentUpdatedAt,
         lines: CSI.profile.formatDiffLines(diff)
       });
       showStatus('Stored profile changed — review again, then Apply');
       return;
     }
-    const saved = await CSI.storage.importTasteProfile(pendingImport.value);
+    const saved = await CSI.storage.importTasteProfile(importValue);
+    if (pendingImport !== snapshot) {
+      showStatus('Import cancelled');
+      return;
+    }
     if (!saved.ok) {
       showStatus(saved.error || 'Import failed');
       return;

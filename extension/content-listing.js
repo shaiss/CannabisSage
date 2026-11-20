@@ -1059,26 +1059,27 @@
         if (changes.csi_taste_map || changes.csi_taste_profile) {
           CSI.storage
             .loadTasteProfile()
+            .then(
+              (profile) => profile || { enabled: false },
+              (e) => {
+                CSI.warn?.('loadTasteProfile failed in storage listener', e);
+                return { enabled: false };
+              }
+            )
             .then(async (profile) => {
-              state.profile = profile || { enabled: false };
-              await refreshTasteMap();
-              querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
-                const p = CSI.getElementProduct(card);
-                if (!p) return;
-                if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
-                CSI.storeElementProduct(card, p);
-                renderBadges(card, p, p.status || 'ok');
-              });
-              applyFiltersAndSort();
-            })
-            .catch(async (e) => {
-              CSI.warn?.('loadTasteProfile failed in storage listener', e);
-              state.profile = { enabled: false };
+              state.profile = profile;
               try {
                 await refreshTasteMap();
+                querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
+                  const p = CSI.getElementProduct(card);
+                  if (!p) return;
+                  if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
+                  CSI.storeElementProduct(card, p);
+                  renderBadges(card, p, p.status || 'ok');
+                });
                 applyFiltersAndSort();
               } catch (refreshErr) {
-                CSI.warn?.('taste refresh failed after profile load error', refreshErr);
+                CSI.warn?.('taste refresh failed after profile change', refreshErr);
               }
             });
         }

@@ -13,7 +13,8 @@
     FILTERS: 'csi_listing_filters',
     CACHE_PREFIX: 'csi_pdp:',
     CATEGORY_MEDIANS: 'csi_category_medians',
-    SOFT_UNLOCK_DISMISS: 'csi_soft_unlock_dismissed'
+    SOFT_UNLOCK_DISMISS: 'csi_soft_unlock_dismissed',
+    SAVED_WATCH: 'csi_saved_watch'
   };
 
   const DEFAULT_TASTE = {
@@ -488,6 +489,188 @@
     return saveTasteProfile({ ...profile, boughtBefore });
   }
 
+  let savedWatchWrite = Promise.resolve();
+
+  /**
+   * Content scripts and the popup each have their own JS heap. Saved-watch
+   * writes go through the service worker so two tabs cannot clobber one blob.
+   * Tests and the worker itself run the queue locally (no runtime.id, or this
+   * is the worker).
+   */
+  function savedWatchUsesLocalQueue() {
+    if (typeof ServiceWorkerGlobalScope !== 'undefined') return true;
+    try {
+      return !chrome.runtime?.id;
+    } catch {
+      return true;
+    }
+  }
+
+  function proxySavedWatch(op, payload) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage({ type: 'CSI_SAVED_WATCH', op, payload: payload || {} }, (response) => {
+          const err = chrome.runtime.lastError;
+          if (err || !response) {
+            resolve({ ok: false, error: (err && err.message) || 'watch update failed' });
+            return;
+          }
+          resolve(response);
+        });
+      } catch (e) {
+        resolve({ ok: false, error: (e && e.message) || 'watch update failed' });
+      }
+    });
+  }
+
+  function enqueueSavedWatch(mutator) {
+    const run = savedWatchWrite.then(mutator, mutator);
+    savedWatchWrite = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
+  async function loadSavedWatch() {
+    const data = await storageGet([KEYS.SAVED_WATCH]);
+    return CSI.digest?.normalizeWatch?.(data[KEYS.SAVED_WATCH]) || { items: [], byUrl: {}, lastIssuedAt: null, issued: null };
+  }
+
+  async function writeSavedWatch(watch) {
+    const normalized = CSI.digest?.normalizeWatch?.(watch) || watch;
+    await storageSet({ [KEYS.SAVED_WATCH]: normalized });
+    return normalized;
+  }
+
+  async function loadSavedItems() {
+    const watch = await loadSavedWatch();
+    return watch.items || [];
+  }
+
+  function savedAdapterId(url, explicit) {
+    if (typeof explicit === 'string' && explicit.trim()) return explicit.trim().slice(0, 32);
+    return CSI.adapterIdFromUrl?.(url) || '';
+  }
+
+  async function toggleSavedItem(raw) {
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('toggle', raw);
+    return enqueueSavedWatch(async () => {
+      const url = CSI.digest?.allowlistedUrl?.(raw && raw.url) || '';
+      if (!url) return { ok: false, error: 'unsupported product URL', saved: false, items: [] };
+      const watch = await loadSavedWatch();
+      const existing = (watch.items || []).findIndex((item) => item.url === url);
+      if (existing > -1) {
+        const items = watch.items.slice();
+        items.splice(existing, 1);
+        const byUrl = { ...(watch.byUrl || {}) };
+        delete byUrl[url];
+        const next = await writeSavedWatch({ ...watch, items, byUrl });
+        return { ok: true, saved: false, items: next.items };
+      }
+      if ((watch.items || []).length >= (CSI.digest?.MAX_SAVED || 40)) {
+        return { ok: false, error: 'list full', saved: false, items: watch.items };
+      }
+      const items = (watch.items || []).concat([
+        {
+          url,
+          name: CSI.digest?.cleanName?.(raw && raw.name) || CSI.digest?.COPY?.productFallback || 'Saved product',
+          adapterId: savedAdapterId(url, raw && raw.adapterId),
+          savedAt: Date.now()
+        }
+      ]);
+      const byUrl = { ...(watch.byUrl || {}) };
+      if (raw && raw.observation) {
+        byUrl[url] = CSI.digest.applyObservation(null, raw.observation);
+      }
+      const next = await writeSavedWatch({ ...watch, items, byUrl });
+      return { ok: true, saved: true, items: next.items };
+    });
+  }
+
+  async function removeSavedItem(url) {
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('remove', { url });
+    return enqueueSavedWatch(async () => {
+      const canonical = CSI.digest?.allowlistedUrl?.(url) || '';
+      const watch = await loadSavedWatch();
+      if (!canonical) return { ok: false, error: 'unsupported product URL', saved: false, items: watch.items || [] };
+      if (!(watch.items || []).some((item) => item.url === canonical)) {
+        return { ok: true, saved: false, items: watch.items || [] };
+      }
+      const items = watch.items.filter((item) => item.url !== canonical);
+      const byUrl = { ...(watch.byUrl || {}) };
+      delete byUrl[canonical];
+      const next = await writeSavedWatch({ ...watch, items, byUrl });
+      return { ok: true, saved: false, items: next.items };
+    });
+  }
+
+  async function recordSavedObservation(url, observation) {
+    if (!savedWatchUsesLocalQueue()) return proxySavedWatch('record', { url, observation });
+    return enqueueSavedWatch(async () => {
+      const canonical = CSI.digest?.allowlistedUrl?.(url) || '';
+      if (!canonical || !CSI.digest?.applyObservation) return { ok: false, recorded: false };
+      const watch = await loadSavedWatch();
+      const saved = (watch.items || []).find((item) => item.url === canonical);
+      if (!saved) return { ok: false, recorded: false };
+      const prev = watch.byUrl && watch.byUrl[canonical];
+      if (prev && CSI.digest.sameCommercialObservation(prev, observation)) {
+        return { ok: true, recorded: false, items: watch.items };
+      }
+      const byUrl = { ...(watch.byUrl || {}) };
+      byUrl[canonical] = CSI.digest.applyObservation(prev, observation);
+      const items = (watch.items || []).map((item) => {
+        if (item.url !== canonical) return item;
+        const name = CSI.digest.cleanName(observation && observation.name);
+        return name ? { ...item, name } : item;
+      });
+      await writeSavedWatch({ ...watch, items, byUrl });
+      return { ok: true, recorded: true, items };
+    });
+  }
+
+  async function commitSavedDigest(now, opts) {
+    const isProFlag =
+      opts && typeof opts.isPro === 'boolean'
+        ? opts.isPro
+        : !!(CSI.features && CSI.features.can && CSI.features.can(CSI.digest.FEATURE_ID));
+    if (!savedWatchUsesLocalQueue()) {
+      return proxySavedWatch('commit', { now: now || Date.now(), isPro: isProFlag });
+    }
+    return enqueueSavedWatch(async () => {
+      const watch = await loadSavedWatch();
+      if (!CSI.digest?.evaluate) return { view: { status: 'empty', items: [] }, watch };
+      const isPro = isProFlag;
+      const result = CSI.digest.evaluate({
+        savedItems: watch.items,
+        digest: watch,
+        now: now || Date.now(),
+        isPro,
+        commit: true
+      });
+      if (!result.persist) return { view: result.view, watch };
+      const next = await writeSavedWatch({
+        ...watch,
+        ...result.digest,
+        items: watch.items
+      });
+      return { view: result.view, watch: next };
+    });
+  }
+
+  async function previewSavedDigest(now) {
+    const watch = await loadSavedWatch();
+    if (!CSI.digest?.evaluate) return { status: 'empty', items: [] };
+    const isPro = !!(CSI.features && CSI.features.can && CSI.features.can(CSI.digest.FEATURE_ID));
+    return CSI.digest.evaluate({
+      savedItems: watch.items,
+      digest: watch,
+      now: now || Date.now(),
+      isPro,
+      commit: false
+    }).view;
+  }
+
   CSI.storage = {
     KEYS,
     DEFAULT_TASTE,
@@ -512,6 +695,13 @@
     saveTasteProfile,
     deleteTasteProfile,
     exportTasteProfile,
-    setBoughtBeforeFlag
+    setBoughtBeforeFlag,
+    loadSavedWatch,
+    loadSavedItems,
+    toggleSavedItem,
+    removeSavedItem,
+    recordSavedObservation,
+    commitSavedDigest,
+    previewSavedDigest
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

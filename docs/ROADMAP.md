@@ -78,8 +78,8 @@ Voice in and out, then an optional avatar, plus later B2B and partner work for g
 
 Kept short on cannabissage.app:
 
-- **Now:** Listed cannabinoids and primary terpenes on supported menus, side-by-side chem comparison, similar picks on the same menu, close matches at your other supported stores, and value math.
-- **Next:** A saved taste profile, picks that match it across nearby supported menus, and restock and deal alerts.
+- **Now:** Listed cannabinoids and primary terpenes on supported menus, side-by-side chem comparison, similar picks on the same menu, close matches at your other supported stores, value math, an optional on-device taste profile, Pro picks across nearby supported menus, and a once-a-day restock and deal digest for products you save.
+- **Next:** A note when listed batch chemistry shifts, and how old a cached menu is.
 - **Later:** Verified lab results from partners, and Ask Sage, a chat guide that explains listed chemistry in plain words.
 
 Footer: “Plans can change. We ship each piece when it’s solid.” The landing page does not link to this file.

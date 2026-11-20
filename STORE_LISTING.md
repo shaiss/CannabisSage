@@ -7,10 +7,14 @@ Use this copy when submitting **v1.3+** to the Chrome Web Store. Keep claims fac
 | Field | Value |
 | --- | --- |
 | **Name** | CannabisSage |
-| **Version** | 1.3.30 |
+| **Version** | 1.3.31 |
 | **Category** | Shopping (or Productivity) |
 | **Language** | English |
 | **Single purpose** | Surface cannabinoid/terpene details on supported dispensary listings and product pages; compare and optionally unlock Pro tools (filters, taste-map, multi-store) after website Stripe Checkout. |
+
+## Release notes (v1.3.31)
+
+Pro restock and deal digest for products you save on a menu. One digest a day in the toolbar popup, from listed price and stock seen while you browse. No new permissions and no background refresh.
 
 ## Release notes (v1.3.30)
 
@@ -62,6 +66,7 @@ Pro features (unlock after purchase on the CannabisSage website):
 • CSV/JSON export and deal badges
 • Chem insights across more stores you shop
 • Picks for you across nearby supported menus (from your local profile + cached listings)
+• One daily restock and deal digest for products you save on this device
 
 Payments:
 • Subscription checkout uses Stripe Checkout on our website — never inside the extension
@@ -124,7 +129,7 @@ Call entitlement activate/validate APIs and open Upgrade / Manage links on the p
 
 ### Permission: `storage`
 
-Persist compare tray, taste-map prefs, filters, TTL cache, denylist/partners caches, and Pro license entitlement on device.
+Persist compare tray, saved products and the on-device restock/deal digest, taste-map prefs, filters, TTL cache, denylist/partners caches, and Pro license entitlement on device.
 
 ## Single purpose statement
 
@@ -143,7 +148,7 @@ Enhance supported cannabis retailer listing and detail pages by displaying retai
 1. Chrome Web Store developer account.
 2. Deploy `web/` (Vercel), configure Stripe test→live, webhooks, Customer Portal.
 3. Confirm `extension/data/config.json` + manifest hosts for `https://cannabissage.app` and `https://cannabissage.vercel.app` (localhost kept for unpacked local/dev).
-4. Upload `dist/cannabis-sage-1.3.30.zip` (includes Curaleaf KOP Sweed + iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
+4. Upload `dist/cannabis-sage-1.3.31.zip` (includes Curaleaf KOP Sweed + iHeartJane RISE + Beyond Hello West Chester + Dutchie Liberty + Trulieve shopd Limerick).
 5. Paste copy + permission justifications; host `PRIVACY.md` on HTTPS.
 6. Screenshots; privacy questionnaire; submit (age-restricted vertical; no medical claims).
 

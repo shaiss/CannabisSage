@@ -7,6 +7,8 @@ Automated checks:
 ```bash
 node scripts/smoke-adapters.mjs
 node scripts/smoke-profile.mjs
+node scripts/smoke-picks.mjs
+node scripts/smoke-digest.mjs
 node web/scripts/smoke-monetization.mjs
 ```
 
@@ -289,7 +291,7 @@ Copy says taste-map match and $/mg stay optional, and that chemistry and compare
 | Step | Pass? |
 | --- | --- |
 | No console spam without debug flag | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.30.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.31.zip` | |
 | Zip contains `adapters/*`, `lib/csi-entitlement.js`, manifest, popup/*, data/*, icons | |
 | No secrets in package | |
 | `node scripts/smoke-adapters.mjs` exits 0 | |
@@ -385,7 +387,7 @@ Opt-in, Free, `chrome.storage.local` only (`csi_taste_profile`). Nothing is writ
 | Pro: Map match still uses taste-map weights; liked/avoid from the profile also apply | |
 | Copy has no medical / effects / dosing language | |
 | `node scripts/smoke-profile.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.30.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.31.zip` | |
 
 
 ## Picks for you (v1.3.20+)
@@ -403,7 +405,27 @@ Pro-gated popup view. Reads the local taste profile (`csi_taste_profile`) and al
 | Links only open adapter-supported hosts | |
 | Host-page product data attributes never include the taste profile | |
 | `node scripts/smoke-picks.mjs` exits 0 | |
-| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.30.zip` | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.31.zip` | |
+
+## Restock and deal digest (v1.3.31+)
+
+Pro, popup only. Save is on every supported listing and product page (same control, no per-store gate). The digest lists saved products that came back in stock, dropped in listed price, or picked up a sale or a below-median deal since the last digest. At most one new digest every 24 hours. Built from pages you open — no background refresh. Free sees Upgrade (same site pricing link). No card form. Copy does not name a retailer or make medical or effects claims.
+
+| Step | Pass? |
+| --- | --- |
+| Listing and product page show **Save** on Free and Pro, on more than one supported store | |
+| Save, reload: button reads **Saved**. Popup lists the product with **Open product** | |
+| Remove in the popup clears it on the menu after reload | |
+| Free: digest section shows Upgrade; no restock, price, or deal lines | |
+| Pro, save a product, no later change: quiet note, no invented price | |
+| Pro, see the product out of stock, then listed again: digest includes **Back in stock** and **Open product** | |
+| Pro, listed price lower than the last digest: **Listed price dropped** with the two listed prices | |
+| Pro, sale or below-median appears after the last digest: one deal line, no guessed percent | |
+| Open the popup again the same day after another change: the same digest, not a second one | |
+| The next day (24 hours): a new digest can include changes since the previous one | |
+| Toolbar badge is a count, not a notification. No new permission prompt | |
+| `node scripts/smoke-digest.mjs` exits 0 | |
+| `./scripts/pack-extension.sh` builds `dist/cannabis-sage-1.3.31.zip` | |
 
 ## What CannabisSage adds (v1.3.7+)
 

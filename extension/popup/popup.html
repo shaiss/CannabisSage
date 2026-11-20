@@ -113,6 +113,28 @@
       </div>
     </section>
 
+    <section id="digest-section">
+      <h2>Restock and deal digest</h2>
+      <p class="hint" id="digest-hint">
+        Pro. One digest a day for products you save on this device. It uses listed price, sale, and stock
+        from menus you open. Nothing is checked in the background.
+      </p>
+      <div id="digest-locked" class="digest-locked" hidden>
+        <p class="hint">
+          Restock and deal alerts are a Pro tool. Saved items stay on this device. You get one digest a
+          day, not separate pings.
+        </p>
+        <button type="button" id="digest-upgrade" class="primary">Upgrade</button>
+      </div>
+      <p id="digest-status" class="hint" hidden></p>
+      <ul id="digest-list" class="digest-list" hidden></ul>
+      <p id="digest-disclaimer" class="hint" hidden>Listed, not guaranteed.</p>
+      <div id="digest-saved" hidden>
+        <p class="hint">Saved on this device</p>
+        <ul id="digest-saved-list" class="digest-saved-list"></ul>
+      </div>
+    </section>
+
     <section id="taste-section">
       <h2>Preferred terpenes</h2>
       <p class="hint">Weights 0–1. Higher = more important for “Map match”. <span id="taste-pro-note"></span></p>
@@ -149,6 +171,7 @@
     <script src="../adapters/sunnyside.js"></script>
     <script src="../adapters/zenleaf.js"></script>
     <script src="../adapters/terravida.js"></script>
+    <script src="../adapters/curaleaf.js"></script>
     <script src="../adapters/iheartjane.js"></script>
     <script src="../adapters/dutchie.js"></script>
     <script src="../adapters/shopd.js"></script>
@@ -158,6 +181,7 @@
     <script src="../lib/csi-storage.js"></script>
     <script src="../lib/csi-profile.js"></script>
     <script src="../lib/csi-picks.js"></script>
+    <script src="../lib/csi-digest.js"></script>
     <script src="popup.js"></script>
   </body>
 </html>

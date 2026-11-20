@@ -16,7 +16,8 @@ export const FEATURE_GATES = {
     'exportCompare',
     'multiStore',
     'dealBadges',
-    'picksForYou'
+    'picksForYou',
+    'savedItemDigest'
   ]
 } as const;
 

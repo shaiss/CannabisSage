@@ -33,6 +33,7 @@ assert(pricingSrc.includes('STRIPE_PRICE_ID'), 'price id alias');
 const gatesSrc = fs.readFileSync(path.join(webRoot, 'lib/feature-gates.ts'), 'utf8');
 assert(gatesSrc.includes('tasteMap'), 'pro tasteMap');
 assert(gatesSrc.includes('picksForYou'), 'pro picksForYou');
+assert(gatesSrc.includes('savedItemDigest'), 'pro savedItemDigest');
 assert(gatesSrc.includes('multiStore'), 'pro multiStore');
 assert(gatesSrc.includes('hoverTooltip'), 'free hover');
 
@@ -100,6 +101,7 @@ assert(feat.includes('multiStore: true'), 'ext multiStore pro');
 assert(feat.includes('compareTray: true'), 'ext compare free');
 assert(feat.includes('tasteProfile: true'), 'ext tasteProfile free');
 assert(feat.includes('picksForYou: true'), 'ext picksForYou pro');
+assert(feat.includes('savedItemDigest: true'), 'ext savedItemDigest pro');
 
 const entitlements = fs.readFileSync(path.join(extRoot, 'lib/csi-entitlement.js'), 'utf8');
 assert(entitlements.includes('/api/license/activate'), 'activate endpoint');
@@ -107,7 +109,7 @@ assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.30', 'extension 1.3.30');
+assert(manifest.version === '1.3.31', 'extension 1.3.31');
 assert(manifest.host_permissions.includes('https://cannabissage.app/*'), 'prod API host (custom domain)');
 assert(manifest.host_permissions.includes('https://cannabissage.vercel.app/*'), 'prod API host (vercel fallback)');
 assert(manifest.host_permissions.includes('http://localhost:3000/*'), 'localhost API host (unpacked local/dev)');

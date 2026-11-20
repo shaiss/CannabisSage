@@ -287,10 +287,9 @@
     let budget = null;
     if (budgetRaw !== '') {
       const max = Number(budgetRaw);
-      let min = prevMin;
-      // UI only edits max; drop a hidden min that would make normalize reject the save.
-      if (min != null && Number.isInteger(max) && min > max) min = null;
-      budget = { min, max, currency: 'USD' };
+      // Keep a hidden/imported min even when max is below it — normalize rejects
+      // with a clear conflict message instead of silently deleting the min.
+      budget = { min: prevMin, max, currency: 'USD' };
     } else if (prevMin != null) {
       // Clearing max must not wipe an unedited minimum-only budget.
       budget = { min: prevMin, max: null, currency: 'USD' };
@@ -366,6 +365,23 @@
 
   let pendingImport = null;
   let importPreviewSeq = 0;
+  let importApplyBusy = false;
+
+  function setImportApplyBusy(busy) {
+    importApplyBusy = !!busy;
+    const cancelBtn = document.getElementById('profile-import-cancel');
+    const applyBtn = document.getElementById('profile-import-confirm');
+    const deleteBtn = document.getElementById('profile-delete');
+    const fileInput = document.getElementById('profile-import-file');
+    const importBtn = document.getElementById('profile-import');
+    const preview = document.getElementById('profile-import-preview');
+    const previewOpen = !!(preview && !preview.hidden && pendingImport);
+    if (cancelBtn) cancelBtn.disabled = importApplyBusy;
+    if (deleteBtn) deleteBtn.disabled = importApplyBusy;
+    if (fileInput) fileInput.disabled = importApplyBusy;
+    if (importBtn) importBtn.disabled = importApplyBusy;
+    if (applyBtn) applyBtn.disabled = importApplyBusy || !previewOpen;
+  }
 
   function hideImportPreview() {
     importPreviewSeq += 1;
@@ -373,11 +389,10 @@
     const preview = document.getElementById('profile-import-preview');
     const diff = document.getElementById('profile-import-diff');
     const fileInput = document.getElementById('profile-import-file');
-    const applyBtn = document.getElementById('profile-import-confirm');
     preview.hidden = true;
     diff.textContent = '';
-    if (applyBtn) applyBtn.disabled = true;
     if (fileInput) fileInput.value = '';
+    setImportApplyBusy(importApplyBusy);
   }
 
   function showImportPreview(preview) {
@@ -387,10 +402,9 @@
     };
     const box = document.getElementById('profile-import-preview');
     const diff = document.getElementById('profile-import-diff');
-    const applyBtn = document.getElementById('profile-import-confirm');
     diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
     box.hidden = false;
-    if (applyBtn) applyBtn.disabled = false;
+    setImportApplyBusy(importApplyBusy);
   }
 
   document.getElementById('profile-import').addEventListener('click', () => {
@@ -441,77 +455,83 @@
       showStatus('Nothing to import');
       return;
     }
+    if (importApplyBusy) return;
     const importValue = snapshot.value;
     const basisUpdatedAt = snapshot.basisUpdatedAt;
-    // If the stored profile changed after preview, re-diff and require confirmation again.
-    const current =
-      (CSI.storage.peekTasteProfile
-        ? await CSI.storage.peekTasteProfile()
-        : await CSI.storage.loadTasteProfile()) || { enabled: false };
-    // Cancel / new file / Delete may have cleared or replaced pending during the await.
-    if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
-      showStatus('Import cancelled');
-      return;
-    }
-    const currentUpdatedAt = CSI.profile.isStoredProfile(current) ? current.updatedAt : null;
-    if (currentUpdatedAt !== basisUpdatedAt) {
-      const diff = CSI.profile.diffProfiles(current, importValue);
-      showImportPreview({
-        value: importValue,
-        currentUpdatedAt,
-        lines: CSI.profile.formatDiffLines(diff)
-      });
-      showStatus('Stored profile changed — review again, then Apply');
-      return;
-    }
-    const saved = await CSI.storage.importTasteProfile(importValue, {
-      expectedUpdatedAt: basisUpdatedAt
-    });
-    if (!saved.ok) {
-      if (saved.stale) {
-        if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
-          showStatus('Import cancelled');
-          return;
-        }
-        const latest =
-          (CSI.storage.peekTasteProfile
-            ? await CSI.storage.peekTasteProfile()
-            : await CSI.storage.loadTasteProfile()) || { enabled: false };
-        if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
-          showStatus('Import cancelled');
-          return;
-        }
-        const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
-        const diff = CSI.profile.diffProfiles(latest, importValue);
-        showImportPreview({
-          value: importValue,
-          currentUpdatedAt: latestUpdatedAt,
-          lines: CSI.profile.formatDiffLines(diff)
-        });
-        showStatus(saved.error || 'profile changed, re-run import');
+    // Lock Cancel / Apply / Delete / file pick until importTasteProfile settles so a
+    // mid-flight Cancel cannot persist the write while the UI reports cancelled.
+    setImportApplyBusy(true);
+    try {
+      // If the stored profile changed after preview, re-diff and require confirmation again.
+      const current =
+        (CSI.storage.peekTasteProfile
+          ? await CSI.storage.peekTasteProfile()
+          : await CSI.storage.loadTasteProfile()) || { enabled: false };
+      if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+        showStatus('Import cancelled');
         return;
       }
-      showStatus(saved.error || 'Import failed');
-      return;
+      const currentUpdatedAt = CSI.profile.isStoredProfile(current) ? current.updatedAt : null;
+      if (currentUpdatedAt !== basisUpdatedAt) {
+        const diff = CSI.profile.diffProfiles(current, importValue);
+        showImportPreview({
+          value: importValue,
+          currentUpdatedAt,
+          lines: CSI.profile.formatDiffLines(diff)
+        });
+        showStatus('Stored profile changed — review again, then Apply');
+        return;
+      }
+      const saved = await CSI.storage.importTasteProfile(importValue, {
+        expectedUpdatedAt: basisUpdatedAt
+      });
+      if (!saved.ok) {
+        if (saved.stale) {
+          if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+            showStatus('Import cancelled');
+            return;
+          }
+          const latest =
+            (CSI.storage.peekTasteProfile
+              ? await CSI.storage.peekTasteProfile()
+              : await CSI.storage.loadTasteProfile()) || { enabled: false };
+          if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+            showStatus('Import cancelled');
+            return;
+          }
+          const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
+          const diff = CSI.profile.diffProfiles(latest, importValue);
+          showImportPreview({
+            value: importValue,
+            currentUpdatedAt: latestUpdatedAt,
+            lines: CSI.profile.formatDiffLines(diff)
+          });
+          showStatus(saved.error || 'profile changed, re-run import');
+          return;
+        }
+        showStatus(saved.error || 'Import failed');
+        return;
+      }
+      // Write succeeded — always refresh UI and report success (Cancel was disabled).
+      hideImportPreview();
+      document.getElementById('profile-export-out').hidden = true;
+      await loadProfileUi();
+      await loadPicksUi();
+      showStatus(
+        saved.value.enabled ? 'Profile imported' : 'Profile imported (off — data kept until Delete)'
+      );
+    } finally {
+      setImportApplyBusy(false);
     }
-    if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
-      showStatus('Import cancelled');
-      return;
-    }
-    hideImportPreview();
-    document.getElementById('profile-export-out').hidden = true;
-    await loadProfileUi();
-    await loadPicksUi();
-    showStatus(
-      saved.value.enabled ? 'Profile imported' : 'Profile imported (off — data kept until Delete)'
-    );
   });
   document.getElementById('profile-import-cancel').addEventListener('click', () => {
+    if (importApplyBusy) return;
     hideImportPreview();
     showStatus('Import cancelled');
   });
 
   document.getElementById('profile-delete').addEventListener('click', async () => {
+    if (importApplyBusy) return;
     await CSI.storage.deleteTasteProfile();
     document.getElementById('profile-export-out').hidden = true;
     hideImportPreview();
@@ -701,7 +721,10 @@
     const btn = event.target.closest('.digest-remove');
     if (!btn) return;
     try {
-      await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
+      const removed = await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
+      if (!removed || !removed.ok) {
+        throw new Error((removed && removed.error) || 'Saved-watch write failed');
+      }
       await loadDigestUi();
     } catch (e) {
       const savedItems = await CSI.storage.loadSavedItems().catch(() => []);

@@ -506,7 +506,26 @@
     return normalizeStoredOrOff(raw);
   }
 
+  /**
+   * Serialize taste-profile read/compare/write so import stale checks cannot
+   * race other profile writers (save / delete / bought-before) in this JS heap.
+   */
+  let tasteProfileWrite = Promise.resolve();
+
+  function enqueueTasteProfile(mutator) {
+    const run = tasteProfileWrite.then(() => mutator());
+    tasteProfileWrite = run.then(
+      () => undefined,
+      () => undefined
+    );
+    return run;
+  }
+
   async function saveTasteProfile(raw) {
+    return enqueueTasteProfile(() => saveTasteProfileUnlocked(raw));
+  }
+
+  async function saveTasteProfileUnlocked(raw) {
     const now = Date.now();
     const parsed = CSI.profile?.normalize?.(raw, { now });
     if (!parsed || !parsed.ok) {
@@ -549,8 +568,10 @@
   }
 
   async function deleteTasteProfile() {
-    await storageRemove([KEYS.PROFILE]);
-    return { ok: true, value: { enabled: false } };
+    return enqueueTasteProfile(async () => {
+      await storageRemove([KEYS.PROFILE]);
+      return { ok: true, value: { enabled: false } };
+    });
   }
 
   async function exportTasteProfile() {
@@ -583,6 +604,8 @@
    * and even when no key exists yet (restore after Delete / off export).
    * When opts.expectedUpdatedAt is set, re-reads storage immediately before
    * writing and aborts if the stored updatedAt no longer matches the preview basis.
+   * Stale recheck + write run on the shared profile queue so concurrent saves
+   * cannot slip between the compare and the write in this JS heap.
    */
   async function importTasteProfile(raw, opts) {
     const now = Date.now();
@@ -597,30 +620,52 @@
       opts && Object.prototype.hasOwnProperty.call(opts, 'expectedUpdatedAt')
         ? opts.expectedUpdatedAt
         : undefined;
-    try {
-      if (expectUpdatedAt !== undefined) {
-        const latest = await peekTasteProfile();
-        const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
-        if (latestUpdatedAt !== expectUpdatedAt) {
-          return { ok: false, error: 'profile changed, re-run import', stale: true };
+    return enqueueTasteProfile(async () => {
+      try {
+        if (expectUpdatedAt !== undefined) {
+          // Strict read: a failed get must not look like empty storage (which
+          // would pass when expectedUpdatedAt is null and then overwrite).
+          let again;
+          try {
+            again = await storageGetStrict([KEYS.PROFILE]);
+          } catch (readErr) {
+            return {
+              ok: false,
+              error: (readErr && readErr.message) || 'storage read failed'
+            };
+          }
+          const rawLatest = again[KEYS.PROFILE];
+          let latestUpdatedAt = null;
+          if (rawLatest != null) {
+            const migrated = CSI.profile?.migrateIfNeeded?.(rawLatest);
+            let latest;
+            if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+              const normalizedMigrated = CSI.profile.normalize(migrated.value);
+              latest =
+                normalizedMigrated &&
+                normalizedMigrated.ok &&
+                CSI.profile.isStoredProfile(normalizedMigrated.value)
+                  ? normalizedMigrated.value
+                  : normalizeStoredOrOff(rawLatest);
+            } else {
+              latest = normalizeStoredOrOff(rawLatest);
+            }
+            latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
+          }
+          if (latestUpdatedAt !== expectUpdatedAt) {
+            return { ok: false, error: 'profile changed, re-run import', stale: true };
+          }
         }
+        await storageSet({ [KEYS.PROFILE]: parsed.value });
+      } catch (e) {
+        return { ok: false, error: (e && e.message) || 'storage write failed' };
       }
-      await storageSet({ [KEYS.PROFILE]: parsed.value });
-    } catch (e) {
-      return { ok: false, error: (e && e.message) || 'storage write failed' };
-    }
-    return { ok: true, value: parsed.value };
+      return { ok: true, value: parsed.value };
+    });
   }
 
-  let boughtBeforeWrite = Promise.resolve();
-
   async function setBoughtBeforeFlag(url, flag) {
-    const run = boughtBeforeWrite.then(() => setBoughtBeforeFlagUnlocked(url, flag));
-    boughtBeforeWrite = run.then(
-      () => undefined,
-      () => undefined
-    );
-    return run;
+    return enqueueTasteProfile(() => setBoughtBeforeFlagUnlocked(url, flag));
   }
 
   async function setBoughtBeforeFlagUnlocked(url, flag) {
@@ -632,7 +677,7 @@
     const boughtBefore = { ...(profile.boughtBefore || {}) };
     if (!nextFlag) delete boughtBefore[key];
     else boughtBefore[key] = nextFlag;
-    return saveTasteProfile({ ...profile, boughtBefore });
+    return saveTasteProfileUnlocked({ ...profile, boughtBefore });
   }
 
   let savedWatchWrite = Promise.resolve();

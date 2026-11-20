@@ -481,6 +481,31 @@ const freshImport = await CSI.storage.importTasteProfile(competingExport.value, 
 });
 assert(freshImport.ok && freshImport.value.watchedStores[0] === 'zenleaf', 'matching basis imports');
 
+// Strict stale recheck: a failed storage read must not look like empty storage
+// (which would pass when expectedUpdatedAt is null) and must not write.
+await CSI.storage.deleteTasteProfile();
+const emptyBasisImport = CSI.profile.exportJson({
+  ...CSI.profile.emptyEnabled(),
+  enabled: true,
+  watchedStores: ['sunnyside'],
+  updatedAt: 1
+});
+assert(emptyBasisImport.ok, 'empty-basis import payload ok');
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+const readFailImport = await CSI.storage.importTasteProfile(emptyBasisImport.value, {
+  expectedUpdatedAt: null
+});
+assert(!readFailImport.ok, 'import aborts when stale recheck read fails');
+assert(/storage read failed/i.test(readFailImport.error || ''), 'import reports strict read failure');
+assert(!readFailImport.stale, 'read failure is not reported as stale');
+assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'failed recheck did not write');
+// Successful empty read (no key) with expectedUpdatedAt null must still allow the write.
+const emptyOkImport = await CSI.storage.importTasteProfile(emptyBasisImport.value, {
+  expectedUpdatedAt: null
+});
+assert(emptyOkImport.ok && emptyOkImport.value.watchedStores[0] === 'sunnyside', 'empty-basis import writes');
+
 // Disabled import into empty storage must still write the key (restore after Delete).
 await CSI.storage.deleteTasteProfile();
 const disabledExport = CSI.profile.exportJson({
@@ -558,23 +583,28 @@ assert(
 );
 assert(partialResave.value.budget.min === 25 && partialResave.value.budget.max === 110, 'budget.min preserved');
 
-// Lowering max below a preserved min must not block save (clear the hidden min).
+// Lowering max below a preserved/imported min must surface a validation conflict
+// (popup keeps the hidden min; normalize rejects) rather than silently clearing it.
 const loweredMax = CSI.profile.normalize({
   ...partialResave.value,
   budget: { min: 25, max: 20, currency: 'USD' }
 });
 assert(!loweredMax.ok, 'normalize still rejects min > max when both are explicit');
+assert(/budget\.min must be/i.test(loweredMax.error || ''), 'min>max conflict message');
 const popupStyleLower = {
   ...partialResave.value,
   budget: (() => {
     const max = 20;
-    let prevMin = 25;
-    if (prevMin > max) prevMin = null;
+    const prevMin = 25;
+    // Mirror popup readProfileForm: keep prevMin even when max is below it.
     return { min: prevMin, max, currency: 'USD' };
   })()
 };
-const loweredOk = CSI.profile.normalize(popupStyleLower);
-assert(loweredOk.ok && loweredOk.value.budget.min == null && loweredOk.value.budget.max === 20, 'popup clears min when max drops below it');
+const loweredConflict = CSI.profile.normalize(popupStyleLower);
+assert(
+  !loweredConflict.ok && /budget\.min must be/i.test(loweredConflict.error || ''),
+  'popup keeps min and normalize reports conflict when max drops below it'
+);
 
 // Clearing max in the popup must keep an unedited minimum-only budget.
 const minOnlyPopup = {

@@ -403,11 +403,14 @@
       const size = productSizeKey(product);
       const ratio = productRatioKey(product);
       const band = productPotencyBand(product);
+      // Only claim a form match when the profile actually selected formats.
+      const selectedFormats = profileFormatIds(profile);
       if (
         form &&
+        selectedFormats.length &&
         (CSI.profile?.formatMatchesProduct
           ? CSI.profile.formatMatchesProduct(profile, form)
-          : profileFormatIds(profile).includes(form))
+          : selectedFormats.includes(form))
       ) {
         filterReasons.push(`${COPY.matchedForm}: ${form}`);
       }

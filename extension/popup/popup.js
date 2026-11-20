@@ -282,11 +282,14 @@
 
     let budget = null;
     if (budgetRaw !== '') {
-      const prevMin =
+      const max = Number(budgetRaw);
+      let prevMin =
         base.budget && base.budget.min != null && Number.isInteger(Number(base.budget.min))
           ? Number(base.budget.min)
           : null;
-      budget = { min: prevMin, max: Number(budgetRaw), currency: 'USD' };
+      // UI only edits max; drop a hidden min that would make normalize reject the save.
+      if (prevMin != null && Number.isInteger(max) && prevMin > max) prevMin = null;
+      budget = { min: prevMin, max, currency: 'USD' };
     }
 
     return {

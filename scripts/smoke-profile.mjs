@@ -481,6 +481,24 @@ assert(
   'goals preserved across partial save'
 );
 assert(partialResave.value.budget.min === 25 && partialResave.value.budget.max === 110, 'budget.min preserved');
+
+// Lowering max below a preserved min must not block save (clear the hidden min).
+const loweredMax = CSI.profile.normalize({
+  ...partialResave.value,
+  budget: { min: 25, max: 20, currency: 'USD' }
+});
+assert(!loweredMax.ok, 'normalize still rejects min > max when both are explicit');
+const popupStyleLower = {
+  ...partialResave.value,
+  budget: (() => {
+    const max = 20;
+    let prevMin = 25;
+    if (prevMin > max) prevMin = null;
+    return { min: prevMin, max, currency: 'USD' };
+  })()
+};
+const loweredOk = CSI.profile.normalize(popupStyleLower);
+assert(loweredOk.ok && loweredOk.value.budget.min == null && loweredOk.value.budget.max === 20, 'popup clears min when max drops below it');
 assert(
   partialResave.value.formats.some((f) => f.id === 'vape-live-resin-rosin' && f.slot === 'night'),
   'detailed format + slot preserved'

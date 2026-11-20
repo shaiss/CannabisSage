@@ -307,6 +307,27 @@ const ranked = CSI.picks.rankPicks({
   now
 });
 assert(ranked.status === 'ok', 'pro ranked ok');
+
+// Empty formats must not claim a matched-form reason.
+const noFormatProfile = CSI.profile.normalize({
+  ...baseProfile,
+  formats: [],
+  sizes: ['3.5g'],
+  boughtBefore: {}
+}).value;
+const noFormatRanked = CSI.picks.rankPicks({
+  profile: noFormatProfile,
+  cacheEntries,
+  isPro: true,
+  now
+});
+assert(noFormatRanked.status === 'ok', 'empty-formats ranking ok');
+assert(
+  noFormatRanked.picks.every(
+    (p) => !(p.reasons || []).some((r) => /matched form/i.test(String(r)))
+  ),
+  'empty formats do not claim matched-form reasons'
+);
 assert(ranked.picks.length >= 2, 'at least two picks');
 const urls = ranked.picks.map((p) => p.url);
 assert(!urls.includes(skipBrandUrl), 'skip brand excluded');

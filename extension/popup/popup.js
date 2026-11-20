@@ -463,13 +463,30 @@
       showStatus('Stored profile changed — review again, then Apply');
       return;
     }
-    const saved = await CSI.storage.importTasteProfile(importValue);
-    if (pendingImport !== snapshot) {
-      showStatus('Import cancelled');
+    const saved = await CSI.storage.importTasteProfile(importValue, {
+      expectedUpdatedAt: basisUpdatedAt
+    });
+    if (!saved.ok) {
+      if (saved.stale) {
+        const latest =
+          (CSI.storage.peekTasteProfile
+            ? await CSI.storage.peekTasteProfile()
+            : await CSI.storage.loadTasteProfile()) || { enabled: false };
+        const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
+        const diff = CSI.profile.diffProfiles(latest, importValue);
+        showImportPreview({
+          value: importValue,
+          currentUpdatedAt: latestUpdatedAt,
+          lines: CSI.profile.formatDiffLines(diff)
+        });
+        showStatus(saved.error || 'profile changed, re-run import');
+        return;
+      }
+      showStatus(saved.error || 'Import failed');
       return;
     }
-    if (!saved.ok) {
-      showStatus(saved.error || 'Import failed');
+    if (pendingImport !== snapshot) {
+      showStatus('Import cancelled');
       return;
     }
     hideImportPreview();

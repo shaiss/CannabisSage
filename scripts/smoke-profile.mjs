@@ -437,6 +437,32 @@ assert(Object.prototype.hasOwnProperty.call(previewOk, 'currentUpdatedAt'), 'pre
 const applied = await CSI.storage.importTasteProfile(previewOk.value);
 assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
 
+// Stale expectedUpdatedAt aborts immediately before write (import race guard).
+const beforeStale = store.csi_taste_profile;
+const staleBasis = beforeStale.updatedAt;
+store.csi_taste_profile = { ...beforeStale, updatedAt: Number(staleBasis) + 99 };
+const competingExport = CSI.profile.exportJson({
+  ...CSI.profile.emptyEnabled(),
+  enabled: true,
+  watchedStores: ['zenleaf'],
+  budget: { min: null, max: 33, currency: 'USD' },
+  updatedAt: 1
+});
+assert(competingExport.ok, 'competing import payload ok');
+const staleImport = await CSI.storage.importTasteProfile(competingExport.value, {
+  expectedUpdatedAt: staleBasis
+});
+assert(!staleImport.ok && staleImport.stale === true, 'stale expectedUpdatedAt aborts import');
+assert(/profile changed, re-run import/i.test(staleImport.error || ''), 'stale import error text');
+assert(store.csi_taste_profile.updatedAt === Number(staleBasis) + 99, 'stale import did not overwrite');
+assert(store.csi_taste_profile.watchedStores[0] !== 'zenleaf', 'stale import left prior stores');
+
+// Matching expectedUpdatedAt still writes.
+const freshImport = await CSI.storage.importTasteProfile(competingExport.value, {
+  expectedUpdatedAt: store.csi_taste_profile.updatedAt
+});
+assert(freshImport.ok && freshImport.value.watchedStores[0] === 'zenleaf', 'matching basis imports');
+
 // Disabled import into empty storage must still write the key (restore after Delete).
 await CSI.storage.deleteTasteProfile();
 const disabledExport = CSI.profile.exportJson({

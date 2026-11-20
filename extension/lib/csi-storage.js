@@ -555,8 +555,10 @@
   /**
    * Confirmed local import: write a full stored profile even when enabled:false
    * and even when no key exists yet (restore after Delete / off export).
+   * When opts.expectedUpdatedAt is set, re-reads storage immediately before
+   * writing and aborts if the stored updatedAt no longer matches the preview basis.
    */
-  async function importTasteProfile(raw) {
+  async function importTasteProfile(raw, opts) {
     const now = Date.now();
     const parsed = CSI.profile?.normalize?.(raw, { now });
     if (!parsed || !parsed.ok) {
@@ -565,7 +567,18 @@
     if (!CSI.profile.isStoredProfile(parsed.value)) {
       return { ok: false, error: 'import must be a full profile' };
     }
+    const expectUpdatedAt =
+      opts && Object.prototype.hasOwnProperty.call(opts, 'expectedUpdatedAt')
+        ? opts.expectedUpdatedAt
+        : undefined;
     try {
+      if (expectUpdatedAt !== undefined) {
+        const latest = await peekTasteProfile();
+        const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
+        if (latestUpdatedAt !== expectUpdatedAt) {
+          return { ok: false, error: 'profile changed, re-run import', stale: true };
+        }
+      }
       await storageSet({ [KEYS.PROFILE]: parsed.value });
     } catch (e) {
       return { ok: false, error: (e && e.message) || 'storage write failed' };

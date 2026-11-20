@@ -19,6 +19,8 @@ importScripts(
   'adapters/shopd.js',
   'adapters/registry.js',
   'lib/csi-profile.js',
+  'lib/csi-entitlement.js',
+  'lib/csi-features.js',
   'lib/csi-digest.js',
   'lib/csi-storage.js'
 );
@@ -28,9 +30,25 @@ importScripts(
  * Modules are imported at worker startup. MV3 rejects importScripts() later.
  */
 function ensureSavedWatchModules() {
-  if (!self.CSI?.storage?.toggleSavedItem || !self.CSI?.digest) {
+  if (
+    !self.CSI?.storage?.toggleSavedItem ||
+    !self.CSI?.digest?.FEATURE_ID ||
+    typeof self.CSI?.features?.can !== 'function' ||
+    typeof self.CSI?.entitlement?.refreshIsPro !== 'function'
+  ) {
     throw new Error('saved watch modules missing');
   }
+}
+
+/**
+ * Pro for a saved digest is the stored license, same gate as the popup
+ * (CSI.features.can(savedItemDigest) after CSI.entitlement.refreshIsPro).
+ * Message payload isPro is not an input.
+ * @returns {Promise<boolean>}
+ */
+async function savedDigestIsProFromLicense() {
+  await self.CSI.entitlement.refreshIsPro();
+  return self.CSI.features.can(self.CSI.digest.FEATURE_ID) === true;
 }
 
 /** Exact packaged paths content scripts may request (no page-origin WAR). */
@@ -430,7 +448,15 @@ chrome.runtime.onStartup?.addListener?.(() => {
   getPartnersRecord(true).catch(() => {});
 });
 
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+chrome.runtime.onMessage.addListener(
+  /**
+   * Route same-extension messages, including saved-watch writes.
+   * @param {object} message
+   * @param {chrome.runtime.MessageSender} sender
+   * @param {function} sendResponse
+   * @returns {boolean|undefined} True when the reply is sent asynchronously.
+   */
+  (message, sender, sendResponse) => {
   if (!message || !message.type) return false;
 
   if (message.type === 'CSI_DENYLIST_CHECK') {
@@ -538,7 +564,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
       return false;
     }
-    (async () => {
+    (/**
+     * Run a CSI_SAVED_WATCH op. Commit derives Pro from the stored license
+     * via CSI.entitlement.refreshIsPro and CSI.features.can, and ignores any payload isPro.
+     * @returns {Promise<void>}
+     */
+    async () => {
       try {
         ensureSavedWatchModules();
         const payload = message.payload || {};
@@ -548,7 +579,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         else if (message.op === 'record') {
           result = await self.CSI.storage.recordSavedObservation(payload.url, payload.observation);
         } else if (message.op === 'commit') {
-          result = await self.CSI.storage.commitSavedDigest(payload.now, { isPro: payload.isPro === true });
+          const isPro = await savedDigestIsProFromLicense();
+          result = await self.CSI.storage.commitSavedDigest(payload.now, { isPro });
         } else result = { ok: false, error: 'unknown watch op' };
         sendResponse(result);
       } catch (err) {

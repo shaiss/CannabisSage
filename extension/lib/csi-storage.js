@@ -480,7 +480,7 @@
   }
 
   /**
-   * Preview a local JSON import (no write). Caller must confirm, then saveTasteProfile.
+   * Preview a local JSON import (no write). Caller must confirm, then importTasteProfile.
    */
   async function previewTasteProfileImport(text) {
     const parsed = CSI.profile?.parseImportJson?.(text);
@@ -495,6 +495,23 @@
       diff,
       lines: CSI.profile.formatDiffLines(diff)
     };
+  }
+
+  /**
+   * Confirmed local import: write a full stored profile even when enabled:false
+   * and even when no key exists yet (restore after Delete / off export).
+   */
+  async function importTasteProfile(raw) {
+    const now = Date.now();
+    const parsed = CSI.profile?.normalize?.(raw, { now });
+    if (!parsed || !parsed.ok) {
+      return { ok: false, error: (parsed && parsed.error) || 'invalid import' };
+    }
+    if (!CSI.profile.isStoredProfile(parsed.value)) {
+      return { ok: false, error: 'import must be a full profile' };
+    }
+    await storageSet({ [KEYS.PROFILE]: parsed.value });
+    return { ok: true, value: parsed.value };
   }
 
   let boughtBeforeWrite = Promise.resolve();
@@ -727,6 +744,7 @@
     deleteTasteProfile,
     exportTasteProfile,
     previewTasteProfileImport,
+    importTasteProfile,
     setBoughtBeforeFlag,
     loadSavedWatch,
     loadSavedItems,

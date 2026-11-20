@@ -393,8 +393,33 @@ const previewOk = await CSI.storage.previewTasteProfileImport(exportRound.json);
 assert(previewOk.ok && previewOk.value.schemaVersion === 2, 'import preview accepts export');
 assert(Array.isArray(previewOk.lines) && previewOk.lines.length >= 0, 'import preview lists diff lines');
 
-const applied = await CSI.storage.saveTasteProfile(previewOk.value);
+const applied = await CSI.storage.importTasteProfile(previewOk.value);
 assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
+
+// Disabled import into empty storage must still write the key (restore after Delete).
+await CSI.storage.deleteTasteProfile();
+const disabledExport = CSI.profile.exportJson({
+  ...CSI.profile.emptyEnabled(),
+  enabled: false,
+  goals: ['relaxation'],
+  watchedStores: ['sunnyside'],
+  updatedAt: 42
+});
+assert(disabledExport.ok, 'can export a disabled full profile');
+const disabledPreview = await CSI.storage.previewTasteProfileImport(disabledExport.json);
+assert(disabledPreview.ok, 'disabled import preview ok');
+const disabledImport = await CSI.storage.importTasteProfile(disabledPreview.value);
+assert(disabledImport.ok && disabledImport.value.enabled === false, 'disabled import writes');
+assert(Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'disabled import creates key');
+assert(
+  store.csi_taste_profile.goals.includes('relaxation'),
+  'disabled import retains fields'
+);
+const loadedDisabledImport = await CSI.storage.loadTasteProfile();
+assert(
+  CSI.profile.isStoredProfile(loadedDisabledImport) && loadedDisabledImport.enabled === false,
+  'load returns full disabled imported profile'
+);
 
 // Preserve schema-v2-only fields across a partial (popup-style) save.
 const rich = await CSI.storage.saveTasteProfile({

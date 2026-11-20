@@ -401,7 +401,7 @@
       showStatus('Nothing to import');
       return;
     }
-    const saved = await CSI.storage.saveTasteProfile(pendingImport);
+    const saved = await CSI.storage.importTasteProfile(pendingImport);
     if (!saved.ok) {
       showStatus(saved.error || 'Import failed');
       return;
@@ -410,7 +410,9 @@
     document.getElementById('profile-export-out').hidden = true;
     await loadProfileUi();
     await loadPicksUi();
-    showStatus('Profile imported');
+    showStatus(
+      saved.value.enabled ? 'Profile imported' : 'Profile imported (off — data kept until Delete)'
+    );
   });
   document.getElementById('profile-import-cancel').addEventListener('click', () => {
     hideImportPreview();

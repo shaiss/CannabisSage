@@ -301,7 +301,10 @@
     const formatIds = profileFormatIds(profile);
     if (formatIds.length) {
       const form = CSI.productFormKey?.(product, url);
-      if (!form || !formatIds.includes(form)) return { ok: false, reason: 'form' };
+      const matches = CSI.profile?.formatMatchesProduct
+        ? CSI.profile.formatMatchesProduct(profile, form)
+        : form && formatIds.includes(form);
+      if (!matches) return { ok: false, reason: 'form' };
     }
 
     if ((profile.sizes || []).length) {
@@ -394,7 +397,12 @@
       const size = productSizeKey(product);
       const ratio = productRatioKey(product);
       const band = productPotencyBand(product);
-      if (form && profileFormatIds(profile).includes(form)) {
+      if (
+        form &&
+        (CSI.profile?.formatMatchesProduct
+          ? CSI.profile.formatMatchesProduct(profile, form)
+          : profileFormatIds(profile).includes(form))
+      ) {
         filterReasons.push(`${COPY.matchedForm}: ${form}`);
       }
       if (size && (profile.sizes || []).includes(size)) {

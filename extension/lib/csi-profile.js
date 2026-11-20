@@ -28,6 +28,22 @@
     'edible',
     'topical'
   ]);
+  /** Popup / productFormKey-compatible chips (subset of FORMAT_IDS). */
+  const FORMS = Object.freeze(['flower', 'vape', 'concentrate', 'edible', 'topical']);
+  /**
+   * Map profile format IDs onto productFormKey buckets so picks keep working
+   * until PR C does listing-aware format/slot ranking.
+   */
+  const FORMAT_TO_PRODUCT_FORM = Object.freeze({
+    flower: 'flower',
+    vape: 'vape',
+    'vape-live-resin-rosin': 'vape',
+    troche: 'edible',
+    concentrate: 'concentrate',
+    'tincture-rso': 'edible',
+    edible: 'edible',
+    topical: 'topical'
+  });
   const FORMAT_SLOTS = Object.freeze(['day', 'night']);
   const SIZES = Object.freeze(['1g', '3.5g', '7g', '14g', '28g']);
   const RATIOS = Object.freeze(['thc-forward', 'balanced', 'cbd-forward', 'cbg-forward']);
@@ -244,9 +260,6 @@
       'below-median': 'Below menu median'
     }
   });
-
-  // Legacy alias used by older popup/smoke labels.
-  const FORMS = FORMAT_IDS;
 
   function terpeneIds() {
     const list = Array.isArray(CSI.TERPENE_CANON) ? CSI.TERPENE_CANON : [];
@@ -675,6 +688,14 @@
     return [];
   }
 
+  /** True when a listed productFormKey satisfies any selected profile format. */
+  function formatMatchesProduct(profile, productForm) {
+    if (!productForm) return false;
+    const ids = formatIds(profile);
+    if (!ids.length) return true;
+    return ids.some((id) => (FORMAT_TO_PRODUCT_FORM[id] || id) === productForm);
+  }
+
   function budgetMax(profile) {
     if (!profile) return null;
     if (profile.budget && profile.budget.max != null) return profile.budget.max;
@@ -994,6 +1015,7 @@
     MAX_IMPORT_BYTES,
     FORMS,
     FORMAT_IDS,
+    FORMAT_TO_PRODUCT_FORM,
     FORMAT_SLOTS,
     SIZES,
     RATIOS,
@@ -1020,6 +1042,7 @@
     migrateV1toV2,
     normalize,
     formatIds,
+    formatMatchesProduct,
     budgetMax,
     exportJson,
     parseImportJson,

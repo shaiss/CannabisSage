@@ -198,7 +198,8 @@
     setProfileEnabled(enabled);
     // Reload stored fields even when disabled so re-enable is not a blank rewrite.
     const p = stored ? profile : CSI.profile.emptyEnabled();
-    const formatIds = CSI.profile.formatIds(p);
+    // Popup chips stay on productFormKey-compatible FORMS; detailed FORMAT_IDS stay via import.
+    const formatIds = CSI.profile.formatIds(p).filter((id) => CSI.profile.FORMS.includes(id));
     fillChecks(
       document.getElementById('profile-forms'),
       CSI.profile.FORMS.map((id) => ({ id, label: id })),
@@ -250,7 +251,11 @@
     );
   }
 
-  function readProfileForm() {
+  /**
+   * Build a save payload from the popup controls, preserving every schema-v2
+   * field the current UI does not edit (goals, slots, budget.min, etc.).
+   */
+  function readProfileForm(existing) {
     const enabled = document.getElementById('profile-enable').checked;
     const budgetRaw = document.getElementById('profile-budget').value;
     const home = document.getElementById('profile-home').value || null;
@@ -262,19 +267,38 @@
       seen.add(id);
       watchedStores.push(id);
     });
-    const formatIds = readChecks(document.getElementById('profile-forms'));
+
+    const base = CSI.profile.isStoredProfile(existing) ? existing : CSI.profile.emptyEnabled();
+    const uiFormatIds = readChecks(document.getElementById('profile-forms'));
+    const existingFormats = Array.isArray(base.formats) ? base.formats : [];
+    const preservedDetailed = existingFormats.filter(
+      (f) => f && typeof f.id === 'string' && !CSI.profile.FORMS.includes(f.id)
+    );
+    const fromUi = uiFormatIds.map((id) => {
+      const prev = existingFormats.find((f) => f && f.id === id);
+      return { id, slot: prev && prev.slot != null ? prev.slot : null };
+    });
+    const formats = [...fromUi, ...preservedDetailed];
+
+    let budget = null;
+    if (budgetRaw !== '') {
+      const prevMin =
+        base.budget && base.budget.min != null && Number.isInteger(Number(base.budget.min))
+          ? Number(base.budget.min)
+          : null;
+      budget = { min: prevMin, max: Number(budgetRaw), currency: 'USD' };
+    }
+
     return {
+      ...base,
       enabled,
-      formats: formatIds.map((id) => ({ id, slot: null })),
+      formats,
       sizes: readChecks(document.getElementById('profile-sizes')),
       cannabinoidRatio: document.getElementById('profile-ratio').value || null,
       potencyBandThc: document.getElementById('profile-potency').value || null,
       likedTerpenes: readChecks(document.getElementById('profile-liked')),
       avoidTerpenes: readChecks(document.getElementById('profile-avoid')),
-      budget:
-        budgetRaw === ''
-          ? null
-          : { min: null, max: Number(budgetRaw), currency: 'USD' },
+      budget,
       watchedStores,
       brandLoves: readChecks(document.getElementById('profile-brand-loyal')),
       brandAvoids: readChecks(document.getElementById('profile-brand-avoid')),
@@ -295,11 +319,8 @@
     document.getElementById('profile-fields').disabled = !e.target.checked;
   });
   document.getElementById('profile-save').addEventListener('click', async () => {
-    const raw = readProfileForm();
     const existing = await CSI.storage.loadTasteProfile();
-    if (CSI.profile.isStoredProfile(existing) && existing.boughtBefore) {
-      raw.boughtBefore = existing.boughtBefore;
-    }
+    const raw = readProfileForm(existing);
     // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
     if (!raw.enabled && CSI.profile.isStoredProfile(existing)) {
       const saved = await CSI.storage.saveTasteProfile({ ...existing, enabled: false });

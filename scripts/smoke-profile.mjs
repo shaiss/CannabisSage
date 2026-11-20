@@ -88,6 +88,25 @@ assert(CSI.features === undefined, 'profile tests do not require feature gates')
 
 assert(CSI.profile.SCHEMA_VERSION === 2, 'schema version 2');
 assert(CSI.profile.STORAGE_KEY === 'csi_taste_profile', 'storage key constant');
+assert(
+  CSI.profile.FORMS.every((id) => CSI.profile.FORMAT_IDS.includes(id)),
+  'popup FORMS are a subset of FORMAT_IDS'
+);
+assert(
+  CSI.profile.formatMatchesProduct(
+    { formats: [{ id: 'vape-live-resin-rosin', slot: null }] },
+    'vape'
+  ),
+  'detailed vape format matches productFormKey vape'
+);
+assert(
+  CSI.profile.formatMatchesProduct({ formats: [{ id: 'troche', slot: null }] }, 'edible'),
+  'troche format matches edible productFormKey'
+);
+assert(
+  CSI.profile.formatMatchesProduct({ formats: [{ id: 'tincture-rso', slot: null }] }, 'edible'),
+  'tincture-rso format matches edible productFormKey'
+);
 
 function copyFacingText(node, out = []) {
   if (typeof node === 'string') out.push(node);
@@ -376,6 +395,52 @@ assert(Array.isArray(previewOk.lines) && previewOk.lines.length >= 0, 'import pr
 
 const applied = await CSI.storage.saveTasteProfile(previewOk.value);
 assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
+
+// Preserve schema-v2-only fields across a partial (popup-style) save.
+const rich = await CSI.storage.saveTasteProfile({
+  enabled: true,
+  goals: ['relaxation', 'daytime-focus'],
+  timeOfUse: ['evening'],
+  formats: [
+    { id: 'flower', slot: 'day' },
+    { id: 'vape-live-resin-rosin', slot: 'night' }
+  ],
+  minors: ['cbd', 'cbg'],
+  budget: { min: 25, max: 90, currency: 'USD' },
+  avoidEffects: ['couch-lock'],
+  dayRatio: 'cbd-4-1',
+  flowerMethod: 'joint-preroll',
+  vapeHardware: 'cart-510',
+  strainLoves: ['Blue Dream'],
+  familyAvoids: ['Cookie'],
+  dealsOnly: true,
+  watchedStores: ['sunnyside'],
+  likedTerpenes: ['Limonene'],
+  avoidTerpenes: [],
+  sizes: ['3.5g'],
+  dealTier: 'any',
+  boughtBefore: {}
+});
+assert(rich.ok, 'rich v2 profile saves');
+const partialResave = await CSI.storage.saveTasteProfile({
+  ...rich.value,
+  // Simulate popup editing only budget.max / watchedStores while keeping the rest.
+  budget: { min: rich.value.budget.min, max: 110, currency: 'USD' },
+  watchedStores: ['sunnyside', 'zenleaf']
+});
+assert(partialResave.ok, 'partial resave ok');
+assert(
+  JSON.stringify(partialResave.value.goals) === JSON.stringify(['relaxation', 'daytime-focus']),
+  'goals preserved across partial save'
+);
+assert(partialResave.value.budget.min === 25 && partialResave.value.budget.max === 110, 'budget.min preserved');
+assert(
+  partialResave.value.formats.some((f) => f.id === 'vape-live-resin-rosin' && f.slot === 'night'),
+  'detailed format + slot preserved'
+);
+assert(partialResave.value.dealsOnly === true, 'dealsOnly preserved');
+assert(partialResave.value.avoidEffects.includes('couch-lock'), 'avoidEffects preserved');
+assert(partialResave.value.strainLoves.includes('Blue Dream'), 'strainLoves preserved');
 
 const hostileProto = CSI.profile.parseImportJson(
   '{"enabled":true,"schemaVersion":2,"__proto__":{"polluted":true}}'

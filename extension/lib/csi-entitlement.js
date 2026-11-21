@@ -165,9 +165,10 @@ function (global) {
   async function openManage() {
     const config = await loadConfig();
     const rec = await readStored();
-    // Prefer site account page (portal needs server session with license)
+    // Hand the key in the URL fragment so it never hits server/CDN/Referer/logs.
+    // The account page reads location.hash client-side, then clears it.
     const url = rec?.licenseKey
-      ? `${config.accountUrl}?key=${encodeURIComponent(rec.licenseKey)}`
+      ? `${config.accountUrl}#key=${encodeURIComponent(rec.licenseKey)}`
       : config.accountUrl;
     chrome.tabs?.create?.({ url }) || window.open(url, '_blank');
   }

@@ -107,6 +107,13 @@ const entitlements = fs.readFileSync(path.join(extRoot, 'lib/csi-entitlement.js'
 assert(entitlements.includes('/api/license/activate'), 'activate endpoint');
 assert(entitlements.includes('openUpgrade'), 'upgrade deep link');
 assert(!/stripe\.elements|PaymentElement|cardNumber/i.test(entitlements), 'no card elements in extension');
+assert(!/\?key=/.test(entitlements), 'openManage must not put license in ?key= query');
+assert(!/&key=/.test(entitlements), 'openManage must not put license in &key= query');
+assert(/#key=/.test(entitlements), 'openManage hands license in #key= fragment');
+
+const accountSrc = fs.readFileSync(path.join(webRoot, 'app/account/page.tsx'), 'utf8');
+assert(accountSrc.includes('location.hash'), 'account reads fragment');
+assert(accountSrc.includes('replaceState'), 'account clears fragment/query key from URL');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.31', 'extension 1.3.31');

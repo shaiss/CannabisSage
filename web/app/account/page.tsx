@@ -1,12 +1,45 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+
+/**
+ * Pull a license key from the URL fragment (#key=…) or, briefly, ?key= for
+ * older bookmarks. Never leave the key in the address bar.
+ */
+function takeLicenseKeyFromUrl(): string {
+  if (typeof window === 'undefined') return '';
+
+  let key = '';
+  const hash = window.location.hash.replace(/^#/, '');
+  if (hash) {
+    key = (new URLSearchParams(hash).get('key') || '').trim();
+  }
+  if (!key) {
+    key = (new URLSearchParams(window.location.search).get('key') || '').trim();
+  }
+
+  const url = new URL(window.location.href);
+  const hadQueryKey = url.searchParams.has('key');
+  const hadHashKey = Boolean(hash && new URLSearchParams(hash).has('key'));
+  if (hadQueryKey || hadHashKey || window.location.hash) {
+    url.searchParams.delete('key');
+    url.hash = '';
+    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
+  }
+
+  return key;
+}
 
 export default function AccountPage() {
   const [licenseKey, setLicenseKey] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fromUrl = takeLicenseKeyFromUrl();
+    if (fromUrl) setLicenseKey(fromUrl.toUpperCase());
+  }, []);
 
   async function validate() {
     setError(null);
@@ -56,6 +89,7 @@ export default function AccountPage() {
           onChange={(e) => setLicenseKey(e.target.value)}
           placeholder="CSG-XXXX-XXXX-XXXX"
           style={{ display: 'block', width: '100%', marginTop: 6, padding: '0.6rem' }}
+          autoComplete="off"
         />
       </label>
       <div className="cta-row" style={{ marginTop: '1rem' }}>

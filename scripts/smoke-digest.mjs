@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Headless checks for the Pro saved-item digest (v1.3.31).
+ * Headless checks for the Pro saved-item digest (v1.3.32).
  * Local observations only. Same gate on every supported store.
  * Run: node scripts/smoke-digest.mjs
  */
@@ -105,7 +105,7 @@ const assert = (cond, msg) => {
   if (!cond) throw new Error(msg);
 };
 
-assert(CSI.VERSION === '1.3.31', 'core version 1.3.31');
+assert(CSI.VERSION === '1.3.32', 'core version 1.3.32');
 assert(CSI.digest.FEATURE_ID === 'savedItemDigest', 'feature id');
 assert(CSI.features.PRO_FEATURES.savedItemDigest === true, 'digest is Pro');
 assert(CSI.features.FREE_FEATURES.savedItemDigest !== true, 'digest is not Free');
@@ -125,7 +125,7 @@ assert(!/\bfetch\s*\(|XMLHttpRequest|eval\(/.test(digestSrc), 'digest module doe
 assert(!/chrome\.alarms|notifications/.test(digestSrc), 'digest module does not schedule alarms or notifications');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(ext, 'manifest.json'), 'utf8'));
-assert(manifest.version === '1.3.31', 'manifest 1.3.31');
+assert(manifest.version === '1.3.32', 'manifest 1.3.32');
 assert(manifest.permissions.length === 1 && manifest.permissions[0] === 'storage', 'no new required permissions');
 assert(!(manifest.optional_permissions || []).includes('notifications'), 'notifications stay off');
 assert(!JSON.stringify(manifest.permissions).includes('alarms'), 'alarms not required');

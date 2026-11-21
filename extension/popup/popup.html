@@ -59,7 +59,7 @@
         <p class="hint">Avoid terpenes</p>
         <div id="profile-avoid" class="chip-grid chip-grid-terp"></div>
         <label>
-          Per-trip budget (USD)
+          Trip budget max (USD)
           <input type="number" id="profile-budget" min="1" max="2000" step="1" placeholder="Optional" />
         </label>
         <label>
@@ -83,9 +83,19 @@
       <div class="actions">
         <button type="button" id="profile-save" class="primary">Save profile</button>
         <button type="button" id="profile-export">Export JSON</button>
+        <button type="button" id="profile-import">Import JSON</button>
         <button type="button" id="profile-delete">Delete profile</button>
       </div>
+      <input type="file" id="profile-import-file" accept="application/json,.json" hidden />
       <textarea id="profile-export-out" hidden readonly rows="8"></textarea>
+      <div id="profile-import-preview" hidden>
+        <p class="hint">Import will change:</p>
+        <pre id="profile-import-diff" class="profile-import-diff"></pre>
+        <div class="actions">
+          <button type="button" id="profile-import-confirm" class="primary">Apply import</button>
+          <button type="button" id="profile-import-cancel">Cancel import</button>
+        </div>
+      </div>
     </section>
 
     <section id="picks-section">

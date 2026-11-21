@@ -61,6 +61,13 @@ function makeChrome(store, opts = {}) {
           cb && cb();
         },
         remove: (keys, cb) => {
+          if (opts.failNextRemove) {
+            runtime.lastError = { message: 'storage remove failed' };
+            opts.failNextRemove = false;
+            cb && cb();
+            runtime.lastError = null;
+            return;
+          }
           (Array.isArray(keys) ? keys : [keys]).forEach((k) => {
             delete store[k];
           });
@@ -72,7 +79,7 @@ function makeChrome(store, opts = {}) {
 }
 
 const store = {};
-const chromeOpts = { failNextSet: false, failGetOnCall: 0, _getCalls: 0 };
+const chromeOpts = { failNextSet: false, failNextRemove: false, failGetOnCall: 0, _getCalls: 0 };
 const sandbox = {
   console,
   URL,
@@ -505,6 +512,32 @@ const emptyOkImport = await CSI.storage.importTasteProfile(emptyBasisImport.valu
   expectedUpdatedAt: null
 });
 assert(emptyOkImport.ok && emptyOkImport.value.watchedStores[0] === 'sunnyside', 'empty-basis import writes');
+assert(
+  Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'),
+  'empty-basis import creates storage key'
+);
+assert(
+  store.csi_taste_profile && store.csi_taste_profile.watchedStores[0] === 'sunnyside',
+  'empty-basis import persists sunnyside in storage'
+);
+
+// Strict remove: chrome.storage.local.remove failure must not report success.
+const beforeFailDelete = store.csi_taste_profile;
+assert(beforeFailDelete && beforeFailDelete.watchedStores[0] === 'sunnyside', 'profile present before fail-delete');
+chromeOpts.failNextRemove = true;
+const failedDelete = await CSI.storage.deleteTasteProfile();
+assert(!failedDelete.ok, 'delete fails when storage remove fails');
+assert(/storage remove failed/i.test(failedDelete.error || ''), 'delete reports remove failure');
+assert(
+  Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile') &&
+    store.csi_taste_profile.watchedStores[0] === 'sunnyside',
+  'failed delete leaves profile in storage for retry'
+);
+assert(chromeOpts.failNextRemove === false, 'failNextRemove was consumed');
+// Successful delete still clears the key.
+const okDelete = await CSI.storage.deleteTasteProfile();
+assert(okDelete.ok, 'delete succeeds after remove recovers');
+assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'successful delete removes key');
 
 // Disabled import into empty storage must still write the key (restore after Delete).
 await CSI.storage.deleteTasteProfile();
@@ -840,6 +873,25 @@ assert(!/p\.tasteProfile\s*=/.test(listingSrc), 'listing storage listener does n
 assert(listingSrc.includes('tasteProfile: state.profile'), 'listing badges receive profile from content-script state');
 
 const popupJs = fs.readFileSync(path.join(ext, 'popup/popup.js'), 'utf8');
+// Save-during-Apply lock: disable profile-save and guard the Save handler.
+assert(
+  /getElementById\('profile-save'\)[\s\S]{0,120}disabled\s*=\s*importApplyBusy/.test(popupJs) ||
+    /saveBtn\.disabled\s*=\s*importApplyBusy/.test(popupJs),
+  'setImportApplyBusy disables profile-save'
+);
+assert(
+  /profile-save'\)\.addEventListener\('click'[\s\S]{0,200}if\s*\(\s*importApplyBusy\s*\)\s*return/.test(
+    popupJs
+  ),
+  'Save handler returns early while Apply is busy'
+);
+assert(
+  /deleteTasteProfile\(\)[\s\S]{0,200}!deleted\.ok/.test(popupJs) ||
+    /const deleted = await CSI\.storage\.deleteTasteProfile\(\);[\s\S]{0,120}!deleted\.ok/.test(
+      popupJs
+    ),
+  'Delete handler surfaces remove failure and keeps retry available'
+);
 assert(popupJs.includes("sunnyside: 'Sunnyside'"), 'adapter store labels OK in popup pickers');
 assert(popupJs.includes("dutchie: 'Liberty Norristown'"), 'dutchie store label in popup');
 assert(CSI.profile.STORE_IDS.includes('dutchie'), 'dutchie in profile store ids');

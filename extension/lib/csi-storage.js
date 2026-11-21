@@ -100,12 +100,33 @@
     }
   }
 
+  /** Cache cleanup: ignore remove failures so callers never stall. */
   function storageRemove(keys) {
     return new Promise((resolve) => {
       try {
         chrome.storage.local.remove(keys, () => resolve());
       } catch (e) {
         resolve();
+      }
+    });
+  }
+
+  /** Profile delete: surface chrome.runtime.lastError / throw so callers can retry. */
+  function storageRemoveStrict(keys) {
+    return new Promise((resolve, reject) => {
+      try {
+        chrome.storage.local.remove(keys, () => {
+          const err = chrome.runtime && chrome.runtime.lastError;
+          if (err) {
+            CSI.warn('storageRemoveStrict failed', err);
+            reject(new Error(err.message || 'storage remove failed'));
+            return;
+          }
+          resolve();
+        });
+      } catch (e) {
+        CSI.warn('storageRemoveStrict failed', e);
+        reject(e);
       }
     });
   }
@@ -569,8 +590,12 @@
 
   async function deleteTasteProfile() {
     return enqueueTasteProfile(async () => {
-      await storageRemove([KEYS.PROFILE]);
-      return { ok: true, value: { enabled: false } };
+      try {
+        await storageRemoveStrict([KEYS.PROFILE]);
+        return { ok: true, value: { enabled: false } };
+      } catch (e) {
+        return { ok: false, error: (e && e.message) || 'storage remove failed' };
+      }
     });
   }
 

@@ -324,7 +324,14 @@
   document.getElementById('profile-enable').addEventListener('change', (e) => {
     document.getElementById('profile-fields').disabled = !e.target.checked;
   });
+
+  let pendingImport = null;
+  let importPreviewSeq = 0;
+  let importApplyBusy = false;
+
   document.getElementById('profile-save').addEventListener('click', async () => {
+    // Guard against Save while Apply holds the import lock (stale form would overwrite).
+    if (importApplyBusy) return;
     const existing = await CSI.storage.loadTasteProfile();
     const raw = readProfileForm(existing);
     // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
@@ -363,21 +370,19 @@
     showStatus('Exported below');
   });
 
-  let pendingImport = null;
-  let importPreviewSeq = 0;
-  let importApplyBusy = false;
-
   function setImportApplyBusy(busy) {
     importApplyBusy = !!busy;
     const cancelBtn = document.getElementById('profile-import-cancel');
     const applyBtn = document.getElementById('profile-import-confirm');
     const deleteBtn = document.getElementById('profile-delete');
+    const saveBtn = document.getElementById('profile-save');
     const fileInput = document.getElementById('profile-import-file');
     const importBtn = document.getElementById('profile-import');
     const preview = document.getElementById('profile-import-preview');
     const previewOpen = !!(preview && !preview.hidden && pendingImport);
     if (cancelBtn) cancelBtn.disabled = importApplyBusy;
     if (deleteBtn) deleteBtn.disabled = importApplyBusy;
+    if (saveBtn) saveBtn.disabled = importApplyBusy;
     if (fileInput) fileInput.disabled = importApplyBusy;
     if (importBtn) importBtn.disabled = importApplyBusy;
     if (applyBtn) applyBtn.disabled = importApplyBusy || !previewOpen;
@@ -532,7 +537,11 @@
 
   document.getElementById('profile-delete').addEventListener('click', async () => {
     if (importApplyBusy) return;
-    await CSI.storage.deleteTasteProfile();
+    const deleted = await CSI.storage.deleteTasteProfile();
+    if (!deleted.ok) {
+      showStatus(deleted.error || 'Delete failed');
+      return;
+    }
     document.getElementById('profile-export-out').hidden = true;
     hideImportPreview();
     await loadProfileUi();

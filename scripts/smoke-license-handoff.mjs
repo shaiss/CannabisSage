@@ -1,13 +1,14 @@
-#!/usr/bin/env node
+#!/usr/bin/env -S node --experimental-strip-types
 /**
  * License handoff smoke: openManage must not put the key in a query string.
  * Fragment (#key=…) is OK; the account page clears it client-side.
- * Run: node scripts/smoke-license-handoff.mjs
+ * Run: node --experimental-strip-types scripts/smoke-license-handoff.mjs
+ *      (shebang includes the flag when executed directly)
  */
 import fs from 'fs';
 import path from 'path';
 import vm from 'vm';
-import { fileURLToPath } from 'url';
+import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, '..');
@@ -29,18 +30,108 @@ assert(
 assert(/openManage/.test(entitlementSrc), 'openManage present');
 
 const accountSrc = fs.readFileSync(path.join(web, 'app/account/page.tsx'), 'utf8');
-assert(/location\.hash/.test(accountSrc), 'account page reads location.hash');
-assert(/history\.replaceState/.test(accountSrc), 'account page clears key from the URL');
-assert(/searchParams\.delete\(\s*['"]key['"]\s*\)/.test(accountSrc), 'account page strips legacy ?key=');
+assert(
+  /from ['"]@\/lib\/license-handoff['"]/.test(accountSrc),
+  'account page imports takeLicenseKeyFromUrl from @/lib/license-handoff'
+);
+assert(/takeLicenseKeyFromUrl\s*\(/.test(accountSrc), 'account page calls takeLicenseKeyFromUrl');
 assert(
   /method:\s*['"]POST['"]/.test(accountSrc) && /\/api\/license\/validate/.test(accountSrc),
   'account page validates via POST body, not a query string'
 );
 
+const handoffSrc = fs.readFileSync(path.join(web, 'lib/license-handoff.ts'), 'utf8');
+assert(/location\.hash|loc\.hash/.test(handoffSrc), 'handoff helper reads hash');
+assert(/replaceState/.test(handoffSrc), 'handoff helper clears URL via replaceState');
+assert(/searchParams\.delete\(\s*['"]key['"]\s*\)/.test(handoffSrc), 'handoff strips legacy ?key=');
+
 const nextConfigSrc = fs.readFileSync(path.join(web, 'next.config.js'), 'utf8');
 assert(/Referrer-Policy/.test(nextConfigSrc), 'Referrer-Policy configured');
 assert(/no-referrer/.test(nextConfigSrc), 'account page uses Referrer-Policy: no-referrer');
 assert(/['"]\/account['"]/.test(nextConfigSrc), 'Referrer-Policy scoped to /account');
+
+const { takeLicenseKeyFromUrl } = await import(
+  pathToFileURL(path.join(web, 'lib/license-handoff.ts')).href
+);
+
+/** Mutable location + history stand-in for table-driven helper checks. */
+function makeBrowse(href) {
+  const u = new URL(href);
+  const loc = {
+    get href() {
+      return u.href;
+    },
+    get hash() {
+      return u.hash;
+    },
+    get search() {
+      return u.search;
+    },
+    get pathname() {
+      return u.pathname;
+    }
+  };
+  const hist = {
+    replaceState(_data, _title, next) {
+      const resolved = new URL(String(next), u.origin);
+      u.pathname = resolved.pathname;
+      u.search = resolved.search;
+      u.hash = resolved.hash;
+    }
+  };
+  return { loc, hist, url: u };
+}
+
+const FRAG = 'CSG-FRAG-AAAA-BBBB';
+const QUERY = 'CSG-QUERY-CCCC-DDDD';
+
+const cases = [
+  {
+    name: 'fragment precedence over query',
+    href: `https://cannabissage.app/account?key=${QUERY}&utm=1#key=${FRAG}`,
+    wantKey: FRAG,
+    wantHref: 'https://cannabissage.app/account?utm=1'
+  },
+  {
+    name: 'legacy query fallback',
+    href: `https://cannabissage.app/account?key=${QUERY}&ref=ext`,
+    wantKey: QUERY,
+    wantHref: 'https://cannabissage.app/account?ref=ext'
+  },
+  {
+    name: 'fragment only',
+    href: `https://cannabissage.app/account#key=${FRAG}`,
+    wantKey: FRAG,
+    wantHref: 'https://cannabissage.app/account'
+  },
+  {
+    name: 'no key leaves unrelated query intact',
+    href: 'https://cannabissage.app/account?utm=keep',
+    wantKey: '',
+    wantHref: 'https://cannabissage.app/account?utm=keep'
+  },
+  {
+    name: 'empty hash and search',
+    href: 'https://cannabissage.app/account',
+    wantKey: '',
+    wantHref: 'https://cannabissage.app/account'
+  }
+];
+
+for (const c of cases) {
+  const { loc, hist, url } = makeBrowse(c.href);
+  const got = takeLicenseKeyFromUrl(loc, hist);
+  assert(got === c.wantKey, `${c.name}: key want ${c.wantKey || '(empty)'} got ${got || '(empty)'}`);
+  assert(
+    url.href === c.wantHref,
+    `${c.name}: href want ${c.wantHref} got ${url.href}`
+  );
+  assert(!/[?#]key=/.test(url.href), `${c.name}: cleaned URL must not retain key=`);
+  // Second call after cleanup returns empty and stays clean.
+  const again = takeLicenseKeyFromUrl(loc, hist);
+  assert(again === '', `${c.name}: second call must return empty`);
+  assert(url.href === c.wantHref, `${c.name}: second call must not change URL`);
+}
 
 /** Promise-aware chrome.storage.local matching MV3 (no callback → Promise). */
 function makeChrome(store, opened) {

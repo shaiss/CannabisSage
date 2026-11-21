@@ -2,34 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-
-/**
- * Pull a license key from the URL fragment (#key=…) or, briefly, ?key= for
- * older bookmarks. Never leave the key in the address bar.
- */
-function takeLicenseKeyFromUrl(): string {
-  if (typeof window === 'undefined') return '';
-
-  let key = '';
-  const hash = window.location.hash.replace(/^#/, '');
-  if (hash) {
-    key = (new URLSearchParams(hash).get('key') || '').trim();
-  }
-  if (!key) {
-    key = (new URLSearchParams(window.location.search).get('key') || '').trim();
-  }
-
-  const url = new URL(window.location.href);
-  const hadQueryKey = url.searchParams.has('key');
-  const hadHashKey = Boolean(hash && new URLSearchParams(hash).has('key'));
-  if (hadQueryKey || hadHashKey || window.location.hash) {
-    url.searchParams.delete('key');
-    url.hash = '';
-    window.history.replaceState(null, '', `${url.pathname}${url.search}`);
-  }
-
-  return key;
-}
+import { takeLicenseKeyFromUrl } from '@/lib/license-handoff';
 
 export default function AccountPage() {
   const [licenseKey, setLicenseKey] = useState('');

@@ -45,9 +45,8 @@ assert(licensesSrc.includes('upsertLicense'), 'sole CRUD upsert');
 assert(licensesSrc.includes('getLicense'), 'sole CRUD get');
 assert(licensesSrc.includes('isEntitlementActive'), 'entitlement active helper');
 assert(
-  /typeof endRaw !== 'string'/.test(licensesSrc) &&
-    /Number\.isNaN\(end\) \|\| end < now\.getTime\(\)/.test(licensesSrc),
-  'isEntitlementActive fails closed on unparseable currentPeriodEnd'
+  !licensesSrc.includes('if (!Number.isNaN(end) && end < now.getTime()) return false;'),
+  'isEntitlementActive no longer fail-opens when period-end parse is NaN'
 );
 
 const dbSrc = fs.readFileSync(path.join(webRoot, 'lib/db.ts'), 'utf8');

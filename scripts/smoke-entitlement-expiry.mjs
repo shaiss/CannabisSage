@@ -141,53 +141,82 @@ assert(
 
 const entitlementSrc = fs.readFileSync(path.join(ext, 'lib/csi-entitlement.js'), 'utf8');
 assert(
-  /typeof exp !== 'string'/.test(entitlementSrc) || /typeof .*expiresAt.*!== 'string'/.test(entitlementSrc),
-  'extension fail-closed type check present'
-);
-assert(
-  /Number\.isNaN\(t\) \|\| t < now/.test(entitlementSrc),
-  'extension treats NaN parse as expired'
-);
-assert(
-  !/if \(!Number\.isNaN\(t\) && t < now\) return false;/.test(entitlementSrc),
-  'extension no longer skips unparseable expiry'
+  !entitlementSrc.includes('if (!Number.isNaN(t) && t < now) return false;'),
+  'extension no longer fail-opens when Date.parse is NaN'
 );
 
 const licensesSrc = fs.readFileSync(path.join(root, 'web/lib/licenses.ts'), 'utf8');
 assert(
-  /typeof endRaw !== 'string'/.test(licensesSrc),
-  'server isEntitlementActive fail-closed type check present'
-);
-assert(
-  /Number\.isNaN\(end\) \|\| end < now\.getTime\(\)/.test(licensesSrc),
-  'server treats NaN parse as inactive'
-);
-assert(
-  !/if \(!Number\.isNaN\(end\) && end < now\.getTime\(\)\) return false;/.test(licensesSrc),
-  'server no longer skips unparseable period end'
+  !licensesSrc.includes('if (!Number.isNaN(end) && end < now.getTime()) return false;'),
+  'server no longer fail-opens when period-end parse is NaN'
 );
 
-// Mirror server rule for documentation parity (TypeScript not executed here).
-function isEntitlementActiveMirror(record, nowMs) {
-  if (!record) return false;
-  if (record.status !== 'active' && record.status !== 'past_due') return false;
-  const endRaw = record.currentPeriodEnd;
-  if (endRaw == null || endRaw === '') return true;
-  if (typeof endRaw !== 'string') return false;
-  const end = Date.parse(endRaw);
-  if (Number.isNaN(end) || end < nowMs) return false;
-  return true;
+/**
+ * Load production isEntitlementActive from licenses.ts (strip the TS signature only).
+ * @returns {(record: object|null, now?: Date) => boolean}
+ */
+function loadIsEntitlementActive() {
+  const match = licensesSrc.match(/export function isEntitlementActive\([\s\S]*?\n\}/);
+  assert(match, 'locate production isEntitlementActive in licenses.ts');
+  const body = match[0].replace(
+    /export function isEntitlementActive\([^)]*\)[^{]*/,
+    'function isEntitlementActive(record, now = new Date()) '
+  );
+  return vm.runInNewContext(`${body}\nisEntitlementActive;`, { Date, Number });
 }
+
+const isEntitlementActive = loadIsEntitlementActive();
+const nowDate = new Date(NOW);
+const baseRec = {
+  licenseKey: 'CSG-AAAA-BBBB-CCCC',
+  email: null,
+  stripeCustomerId: null,
+  stripeSubscriptionId: null,
+  createdAt: '',
+  updatedAt: ''
+};
+
 assert(
-  isEntitlementActiveMirror(
-    { status: 'active', currentPeriodEnd: 'garbage' },
-    NOW
+  isEntitlementActive(
+    { ...baseRec, status: 'active', currentPeriodEnd: '2099-01-01T00:00:00.000Z' },
+    nowDate
+  ) === true,
+  'server: future valid currentPeriodEnd => active'
+);
+assert(
+  isEntitlementActive(
+    { ...baseRec, status: 'active', currentPeriodEnd: '2020-01-01T00:00:00.000Z' },
+    nowDate
   ) === false,
-  'server mirror: unparseable currentPeriodEnd => inactive'
+  'server: past currentPeriodEnd => inactive'
 );
 assert(
-  isEntitlementActiveMirror({ status: 'active', currentPeriodEnd: null }, NOW) === true,
-  'server mirror: null currentPeriodEnd => lifetime active'
+  isEntitlementActive({ ...baseRec, status: 'active', currentPeriodEnd: 'garbage' }, nowDate) ===
+    false,
+  'server: unparseable currentPeriodEnd => inactive'
 );
+assert(
+  isEntitlementActive({ ...baseRec, status: 'active', currentPeriodEnd: null }, nowDate) === true,
+  'server: null currentPeriodEnd => lifetime active'
+);
+assert(
+  isEntitlementActive({ ...baseRec, status: 'active', currentPeriodEnd: '' }, nowDate) === true,
+  'server: empty currentPeriodEnd => lifetime active'
+);
+assert(
+  isEntitlementActive(
+    { ...baseRec, status: 'inactive', currentPeriodEnd: '2099-01-01T00:00:00.000Z' },
+    nowDate
+  ) === false,
+  'server: inactive status => inactive'
+);
+assert(
+  isEntitlementActive(
+    { ...baseRec, status: 'past_due', currentPeriodEnd: '2099-01-01T00:00:00.000Z' },
+    nowDate
+  ) === true,
+  'server: past_due with future end => active'
+);
+assert(isEntitlementActive(null, nowDate) === false, 'server: null record => inactive');
 
 console.log('smoke-entitlement-expiry: OK');

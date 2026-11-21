@@ -1556,7 +1556,122 @@ assert(
 assert(/expectedRev:\s*basisRev/.test(popupJs), 'popup Apply passes expectedRev');
 assert(!/expectedUpdatedAt/.test(popupJs), 'popup no longer passes expectedUpdatedAt');
 assert(/basisRev:/.test(popupJs), 'popup stores basisRev from preview');
-assert(/currentAsNum > basisAsNum/.test(popupJs) || /currentRev/.test(popupJs), 'popup stale uses rev');
+
+{
+  // Behavioral stale-check: drive the real Apply handler (not a source regex).
+  // Preview at rev 20 + stored rev 21 must refresh preview and skip importTasteProfile.
+  // Matching revs must still call importTasteProfile with expectedRev.
+  const applyMatch = popupJs.match(
+    /document\.getElementById\('profile-import-confirm'\)\.addEventListener\('click', async \(\) => \{([\s\S]*?)\n  \}\);/
+  );
+  assert(applyMatch, 'extracted Apply click handler from popup.js');
+
+  const importValue = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['zenleaf'],
+    updatedAt: 100,
+    rev: 5
+  };
+  const currentAt21 = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['sunnyside'],
+    updatedAt: 200,
+    rev: 21
+  };
+  const currentAt20 = { ...currentAt21, rev: 20, watchedStores: ['sunnyside'] };
+
+  function makeApplySandbox(currentProfile) {
+    const statuses = [];
+    const previewCalls = [];
+    const importCalls = [];
+    const nodes = {
+      'profile-export-out': { hidden: false, value: '' }
+    };
+    const sandbox = {
+      pendingImport: { value: importValue, basisRev: 20 },
+      importPreviewSeq: 7,
+      importApplyBusy: false,
+      setImportApplyBusy(busy) {
+        sandbox.importApplyBusy = !!busy;
+      },
+      showStatus(msg) {
+        statuses.push(msg);
+      },
+      showImportPreview(preview) {
+        previewCalls.push(preview);
+        sandbox.pendingImport = {
+          value: preview.value,
+          basisRev: preview.currentRev == null ? null : preview.currentRev
+        };
+      },
+      hideImportPreview() {
+        sandbox.importPreviewSeq += 1;
+        sandbox.pendingImport = null;
+      },
+      async loadProfileUi() {},
+      async loadPicksUi() {},
+      document: {
+        getElementById(id) {
+          return nodes[id] || { hidden: true, textContent: '', value: '', disabled: false };
+        }
+      },
+      CSI: {
+        profile: CSI.profile,
+        storage: {
+          peekTasteProfile: async () => currentProfile,
+          loadTasteProfileStrict: async () => currentProfile,
+          importTasteProfile: async (value, opts) => {
+            importCalls.push({ value, opts });
+            return { ok: true, value: { ...value, enabled: true, rev: 22 } };
+          }
+        }
+      }
+    };
+    const handler = vm.runInNewContext(
+      `(async function applyPendingImport() {\n${applyMatch[1]}\n})`,
+      sandbox
+    );
+    return { handler, statuses, previewCalls, importCalls, sandbox };
+  }
+
+  {
+    const { handler, statuses, previewCalls, importCalls, sandbox } = makeApplySandbox(currentAt21);
+    await handler();
+    assert(importCalls.length === 0, 'stale Apply (rev 21 > basis 20) does not call importTasteProfile');
+    assert(previewCalls.length === 1, 'stale Apply refreshes import preview');
+    assert(previewCalls[0].currentRev === 21, 'stale Apply preview uses stored rev 21');
+    assert(previewCalls[0].value === importValue, 'stale Apply keeps pending import value');
+    assert(
+      sandbox.pendingImport && sandbox.pendingImport.basisRev === 21,
+      'stale Apply updates basisRev to current stored rev'
+    );
+    assert(
+      statuses.some((s) => /stored profile changed/i.test(s)),
+      'stale Apply status asks to review again'
+    );
+    assert(sandbox.importApplyBusy === false, 'stale Apply clears importApplyBusy');
+  }
+
+  {
+    const { handler, statuses, previewCalls, importCalls, sandbox } = makeApplySandbox(currentAt20);
+    await handler();
+    assert(importCalls.length === 1, 'matching-rev Apply calls importTasteProfile');
+    assert(
+      importCalls[0].opts && importCalls[0].opts.expectedRev === 20,
+      'matching-rev Apply passes expectedRev from basis'
+    );
+    assert(importCalls[0].value === importValue, 'matching-rev Apply imports preview value');
+    assert(previewCalls.length === 0, 'matching-rev Apply does not re-preview');
+    assert(
+      statuses.some((s) => /profile imported/i.test(s)),
+      'matching-rev Apply reports import success'
+    );
+    assert(sandbox.importApplyBusy === false, 'matching-rev Apply clears importApplyBusy');
+    assert(sandbox.pendingImport === null, 'matching-rev Apply hides preview after success');
+  }
+}
 
 // (2) Brand checkboxes: case-insensitive fill + preserve stored casing on save.
 assert(/caseInsensitive:\s*true/.test(popupJs), 'brand fillChecks use caseInsensitive');

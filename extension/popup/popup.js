@@ -731,7 +731,12 @@
         savedList.appendChild(li);
       });
     }
-    CSI.digest?.syncBadge?.(view && view.status === 'digest' ? CSI.digest.badgeCount(view) : 0);
+    // Failed digest writes leave pending restock in place — do not clear the badge.
+    if (view && view.status === 'digest') {
+      CSI.digest?.syncBadge?.(CSI.digest.badgeCount(view));
+    } else if (!view || view.status !== 'error') {
+      CSI.digest?.syncBadge?.(0);
+    }
   }
 
   async function loadDigestUi() {

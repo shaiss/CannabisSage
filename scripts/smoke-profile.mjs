@@ -1279,6 +1279,24 @@ assert(!/result\.ok === true/.test(popupJs.match(/commitSavedDigest[\s\S]{0,400}
   assert(rendered.status !== 'locked', 'does not render Pro upgrade/locked card');
 }
 
+{
+  // Error view must not clear the action badge (failed write did not clear pending restock).
+  const renderFn = popupJs.slice(
+    popupJs.indexOf('function renderDigestResult'),
+    popupJs.indexOf('async function loadDigestUi')
+  );
+  assert(renderFn.includes("view.status !== 'error'"), 'error path does not reset badge');
+  assert(!/syncBadge\?\.\(view && view\.status === ['"]digest['"] \?/.test(renderFn), 'badge sync is no longer unconditional ternary to 0');
+  let badgeCalls = [];
+  const view = { status: 'error', message: 'watch update failed' };
+  if (view && view.status === 'digest') {
+    badgeCalls.push(3);
+  } else if (!view || view.status !== 'error') {
+    badgeCalls.push(0);
+  }
+  assert(badgeCalls.length === 0, 'error path does not reset badge (behavioral)');
+}
+
 // (4) Cross-context csi_taste_profile writer via CSI_TASTE_PROFILE (mirrors CSI_SAVED_WATCH).
 const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
 const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');

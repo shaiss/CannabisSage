@@ -660,9 +660,11 @@
     }
 
     function nextProfileRev(storedProfile, incomingProfile) {
-      const storedRev = CSI.profile.profileRev(storedProfile);
-      const incomingRev = CSI.profile.profileRev(incomingProfile);
-      return Math.max(storedRev, incomingRev) + 1;
+      // See CSI.profile.nextRev: ignore absurd incoming; never exceed REV_HARD_CAP.
+      return CSI.profile.nextRev(
+        CSI.profile.profileRev(storedProfile),
+        CSI.profile.profileRev(incomingProfile)
+      );
     }
 
     try {
@@ -758,10 +760,16 @@
         error: (readErr && readErr.message) || 'storage read failed'
       };
     }
-    const diff = CSI.profile.diffProfiles(current, parsed.value);
+    let diff = CSI.profile.diffProfiles(current, parsed.value);
+    // Flag forged/huge incoming rev in the confirm UI (no numeric leak / no host DOM).
+    if (CSI.profile.annotateAbnormalRev) {
+      diff = CSI.profile.annotateAbnormalRev(diff, current, parsed.value);
+    }
     return {
       ok: true,
       value: parsed.value,
+      currentRev: CSI.profile.isStoredProfile(current) ? CSI.profile.profileRev(current) : null,
+      // updatedAt remains display metadata on the profile; not used for stale checks.
       currentUpdatedAt: CSI.profile.isStoredProfile(current) ? current.updatedAt : null,
       diff,
       lines: CSI.profile.formatDiffLines(diff)
@@ -771,8 +779,8 @@
   /**
    * Confirmed local import: write a full stored profile even when enabled:false
    * and even when no key exists yet (restore after Delete / off export).
-   * When opts.expectedUpdatedAt is set, re-reads storage immediately before
-   * writing and aborts if the stored updatedAt no longer matches the preview basis.
+   * When opts.expectedRev is set, re-reads storage immediately before writing
+   * and aborts if stored.rev > preview basis rev (concurrent commit).
    * Stale recheck + write run on the shared profile queue so concurrent saves
    * cannot slip between the compare and the write in this JS heap.
    */
@@ -788,9 +796,9 @@
     if (!tasteProfileUsesLocalQueue()) {
       return proxyTasteProfile('import', { raw: parsed.value, opts: opts || {} });
     }
-    const expectUpdatedAt =
-      opts && Object.prototype.hasOwnProperty.call(opts, 'expectedUpdatedAt')
-        ? opts.expectedUpdatedAt
+    const expectRev =
+      opts && Object.prototype.hasOwnProperty.call(opts, 'expectedRev')
+        ? opts.expectedRev
         : undefined;
     return enqueueTasteProfile(async () => {
       try {
@@ -806,7 +814,6 @@
         }
         const rawLatest = again[KEYS.PROFILE];
         let storedRev = 0;
-        let latestUpdatedAt = null;
         if (rawLatest != null) {
           const migrated = CSI.profile?.migrateIfNeeded?.(rawLatest);
           let latest;
@@ -822,18 +829,21 @@
             latest = normalizeStoredOrOff(rawLatest);
           }
           if (CSI.profile.isStoredProfile(latest)) {
-            latestUpdatedAt = latest.updatedAt;
             storedRev = CSI.profile.profileRev(latest);
           }
         }
-        if (expectUpdatedAt !== undefined && latestUpdatedAt !== expectUpdatedAt) {
-          return { ok: false, error: 'profile changed, re-run import', stale: true };
+        // Missing preview basis → oldest (0). Stale when stored advanced past basis.
+        if (expectRev !== undefined) {
+          const basisRev = expectRev == null ? 0 : CSI.profile.coerceRev(expectRev).value;
+          if (storedRev > basisRev) {
+            return { ok: false, error: 'profile changed, re-run import', stale: true };
+          }
         }
-        // Never let rev go backward relative to stored on commit.
+        // Never let rev go backward; ignore absurd incoming (see CSI.profile.nextRev).
         const incomingRev = CSI.profile.profileRev(parsed.value);
         const toWrite = {
           ...parsed.value,
-          rev: Math.max(storedRev, incomingRev) + 1
+          rev: CSI.profile.nextRev(storedRev, incomingRev)
         };
         await storageSet({ [KEYS.PROFILE]: toWrite });
         return { ok: true, value: toWrite };

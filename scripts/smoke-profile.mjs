@@ -457,59 +457,71 @@ assert(store.csi_taste_profile.schemaVersion === 1, 'import preview does not mig
 const previewOk = await CSI.storage.previewTasteProfileImport(exportRound.json);
 assert(previewOk.ok && previewOk.value.schemaVersion === 2, 'import preview accepts export');
 assert(Array.isArray(previewOk.lines) && previewOk.lines.length >= 0, 'import preview lists diff lines');
-assert(Object.prototype.hasOwnProperty.call(previewOk, 'currentUpdatedAt'), 'preview exposes basis updatedAt');
+assert(Object.prototype.hasOwnProperty.call(previewOk, 'currentRev'), 'preview exposes basis rev');
 
 const applied = await CSI.storage.importTasteProfile(previewOk.value);
 assert(applied.ok && applied.value.budget == null, 'confirmed import writes only after normalize');
+assert(typeof applied.value.rev === 'number' && applied.value.rev >= 1, 'import assigns rev');
 
-// Stale expectedUpdatedAt aborts immediately before write (import race guard).
+// Stale expectedRev aborts immediately before write (import race guard).
 const beforeStale = store.csi_taste_profile;
-const staleBasis = beforeStale.updatedAt;
-store.csi_taste_profile = { ...beforeStale, updatedAt: Number(staleBasis) + 99 };
+const staleBasisRev = CSI.profile.profileRev(beforeStale);
+store.csi_taste_profile = {
+  ...beforeStale,
+  rev: staleBasisRev + 1,
+  // Equal wall-clock would fool updatedAt checks — rev still detects stale.
+  updatedAt: beforeStale.updatedAt
+};
 const competingExport = CSI.profile.exportJson({
   ...CSI.profile.emptyEnabled(),
   enabled: true,
   watchedStores: ['zenleaf'],
   budget: { min: null, max: 33, currency: 'USD' },
-  updatedAt: 1
+  updatedAt: 1,
+  rev: 0
 });
 assert(competingExport.ok, 'competing import payload ok');
 const staleImport = await CSI.storage.importTasteProfile(competingExport.value, {
-  expectedUpdatedAt: staleBasis
+  expectedRev: staleBasisRev
 });
-assert(!staleImport.ok && staleImport.stale === true, 'stale expectedUpdatedAt aborts import');
+assert(!staleImport.ok && staleImport.stale === true, 'stale expectedRev aborts import');
 assert(/profile changed, re-run import/i.test(staleImport.error || ''), 'stale import error text');
-assert(store.csi_taste_profile.updatedAt === Number(staleBasis) + 99, 'stale import did not overwrite');
+assert(store.csi_taste_profile.rev === staleBasisRev + 1, 'stale import did not overwrite');
 assert(store.csi_taste_profile.watchedStores[0] !== 'zenleaf', 'stale import left prior stores');
 
-// Matching expectedUpdatedAt still writes.
+// Matching expectedRev still writes.
 const freshImport = await CSI.storage.importTasteProfile(competingExport.value, {
-  expectedUpdatedAt: store.csi_taste_profile.updatedAt
+  expectedRev: store.csi_taste_profile.rev
 });
 assert(freshImport.ok && freshImport.value.watchedStores[0] === 'zenleaf', 'matching basis imports');
+assert(
+  freshImport.value.rev === CSI.profile.nextRev(staleBasisRev + 1, CSI.profile.profileRev(competingExport.value)),
+  'import bumps rev from stored'
+);
 
 // Strict stale recheck: a failed storage read must not look like empty storage
-// (which would pass when expectedUpdatedAt is null) and must not write.
+// (which would pass when expectedRev is null) and must not write.
 await CSI.storage.deleteTasteProfile();
 const emptyBasisImport = CSI.profile.exportJson({
   ...CSI.profile.emptyEnabled(),
   enabled: true,
   watchedStores: ['sunnyside'],
-  updatedAt: 1
+  updatedAt: 1,
+  rev: 0
 });
 assert(emptyBasisImport.ok, 'empty-basis import payload ok');
 chromeOpts._getCalls = 0;
 chromeOpts.failGetOnCall = 1;
 const readFailImport = await CSI.storage.importTasteProfile(emptyBasisImport.value, {
-  expectedUpdatedAt: null
+  expectedRev: null
 });
 assert(!readFailImport.ok, 'import aborts when stale recheck read fails');
 assert(/storage read failed/i.test(readFailImport.error || ''), 'import reports strict read failure');
 assert(!readFailImport.stale, 'read failure is not reported as stale');
 assert(!Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'), 'failed recheck did not write');
-// Successful empty read (no key) with expectedUpdatedAt null must still allow the write.
+// Successful empty read (no key) with expectedRev null must still allow the write.
 const emptyOkImport = await CSI.storage.importTasteProfile(emptyBasisImport.value, {
-  expectedUpdatedAt: null
+  expectedRev: null
 });
 assert(emptyOkImport.ok && emptyOkImport.value.watchedStores[0] === 'sunnyside', 'empty-basis import writes');
 assert(
@@ -1360,6 +1372,191 @@ assert(
   flagAfterMerge.ok && flagAfterMerge.value.boughtBefore[raceKey] === 'fine',
   'setBoughtBeforeFlag still updates when basis matches'
 );
+
+// --- rev coerce / export / import floor / import stale (equal updatedAt) ---
+{
+  const cr = (v) => CSI.profile.coerceRev(v).value;
+  assert(cr(0) === 0 && cr(1) === 1 && cr(42) === 42, 'coerceRev accepts safe non-neg ints');
+  assert(cr(null) === 0 && cr(undefined) === 0, 'coerceRev missing → 0');
+  assert(cr(-1) === 0, 'coerceRev negative → 0');
+  assert(cr(NaN) === 0, 'coerceRev NaN → 0');
+  assert(cr('12') === 0, 'coerceRev string → 0');
+  assert(cr(true) === 0 && cr(false) === 0, 'coerceRev boolean → 0');
+  assert(cr({}) === 0 && cr([]) === 0, 'coerceRev object → 0');
+  assert(cr(1.5) === 0, 'coerceRev non-integer → 0');
+  assert(cr(1e16) === 0, 'coerceRev 1e16 → 0');
+  assert(cr(Number.MAX_SAFE_INTEGER) === 0, 'coerceRev MAX_SAFE_INTEGER → 0');
+  assert(cr(Infinity) === 0 && cr(-Infinity) === 0, 'coerceRev Infinity → 0');
+  assert(cr(CSI.profile.REV_HARD_CAP) === CSI.profile.REV_HARD_CAP, 'coerceRev hard cap allowed');
+  assert(cr(CSI.profile.REV_HARD_CAP + 1) === 0, 'coerceRev above hard cap → 0');
+}
+
+// Export includes rev; round-trip normalize keeps a sane rev.
+{
+  const expProf = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['sunnyside'],
+    updatedAt: 99,
+    rev: 7
+  };
+  const dumped = CSI.profile.exportJson(expProf);
+  assert(dumped.ok && /"rev": 7/.test(dumped.json), 'export includes rev');
+  const round = CSI.profile.normalize(JSON.parse(dumped.json));
+  assert(round.ok && round.value.rev === 7, 'export/import normalize keeps rev');
+}
+
+// Import floor: forged low and forged huge → new rev = nextRev(stored, incoming).
+{
+  await CSI.storage.deleteTasteProfile();
+  store.csi_taste_profile = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['sunnyside'],
+    updatedAt: 1000,
+    rev: 50
+  };
+  const lowImp = await CSI.storage.importTasteProfile({
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['zenleaf'],
+    updatedAt: 1,
+    rev: 1
+  });
+  assert(lowImp.ok, 'forged-low import ok');
+  assert(lowImp.value.rev === CSI.profile.nextRev(50, 1), 'forged-low uses max(stored,incoming)+1');
+  assert(lowImp.value.rev === 51, 'forged-low advances past stored');
+  assert(lowImp.value.rev > 50, 'import rev never goes backward');
+
+  store.csi_taste_profile = { ...store.csi_taste_profile, rev: 50, watchedStores: ['sunnyside'] };
+  const hugeIncoming = 50 + CSI.profile.REV_IMPORT_SLACK + 99;
+  const hugeImp = await CSI.storage.importTasteProfile({
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['curaleaf'],
+    updatedAt: 1,
+    rev: hugeIncoming
+  });
+  assert(hugeImp.ok, 'forged-huge import ok');
+  assert(
+    hugeImp.value.rev === CSI.profile.nextRev(50, hugeIncoming),
+    'forged-huge follows nextRev (ignore absurd incoming)'
+  );
+  assert(hugeImp.value.rev === 51, 'forged-huge advances from stored only');
+  assert(hugeImp.value.rev < hugeIncoming, 'forged-huge rev not adopted');
+
+  const previewHuge = await CSI.storage.previewTasteProfileImport(
+    JSON.stringify({
+      ...CSI.profile.emptyEnabled(),
+      enabled: true,
+      watchedStores: ['curaleaf'],
+      rev: hugeIncoming
+    })
+  );
+  assert(previewHuge.ok, 'preview with huge rev ok');
+  assert(
+    (previewHuge.lines || []).some((l) => /rev:.*abnormal/i.test(l)),
+    'preview notes abnormal incoming rev'
+  );
+}
+
+// Import stale-check: equal updatedAt but higher stored rev → stale.
+{
+  const eqAt = 7777;
+  store.csi_taste_profile = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['sunnyside'],
+    updatedAt: eqAt,
+    rev: 20
+  };
+  const eqPayload = CSI.profile.exportJson({
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    watchedStores: ['zenleaf'],
+    updatedAt: 1,
+    rev: 0
+  });
+  assert(eqPayload.ok, 'equal-ts stale payload ok');
+  // Concurrent flag/commit: same wall-clock, higher rev.
+  store.csi_taste_profile = {
+    ...store.csi_taste_profile,
+    boughtBefore: {
+      [CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/eq-stale-1')]: 'rebuy'
+    },
+    updatedAt: eqAt,
+    rev: 21
+  };
+  const eqStale = await CSI.storage.importTasteProfile(eqPayload.value, { expectedRev: 20 });
+  assert(!eqStale.ok && eqStale.stale === true, 'equal updatedAt + higher rev detected as stale');
+  assert(store.csi_taste_profile.rev === 21, 'equal-ts stale import did not write');
+  assert(
+    store.csi_taste_profile.boughtBefore[
+      CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/eq-stale-1')
+    ] === 'rebuy',
+    'equal-ts stale left concurrent flag'
+  );
+}
+
+// Huge import rev must not freeze counter: flag + stale Save still work.
+{
+  const freezeKey = CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/freeze-1');
+  await CSI.storage.deleteTasteProfile();
+  const seeded = await CSI.storage.saveTasteProfile({
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    formats: [{ id: 'flower', slot: null }],
+    sizes: ['3.5g'],
+    likedTerpenes: ['Limonene'],
+    avoidTerpenes: [],
+    watchedStores: ['sunnyside'],
+    brandLoves: ['Acme'],
+    brandAvoids: [],
+    dealTier: 'any',
+    boughtBefore: {}
+  });
+  assert(seeded.ok, 'freeze-test seed ok');
+  const storedBeforeHuge = CSI.profile.profileRev(store.csi_taste_profile);
+  const forged = Number.MAX_SAFE_INTEGER;
+  const hugeWrite = await CSI.storage.importTasteProfile({
+    ...store.csi_taste_profile,
+    rev: forged
+  });
+  assert(hugeWrite.ok, 'import with MAX_SAFE_INTEGER rev ok');
+  assert(hugeWrite.value.rev === storedBeforeHuge + 1, 'huge import did not adopt forged rev');
+  assert(hugeWrite.value.rev < Number.MAX_SAFE_INTEGER - 10, 'counter remains far from 2^53');
+
+  const basisRev = hugeWrite.value.rev;
+  const basisAt = hugeWrite.value.updatedAt;
+  // Concurrent flag after import.
+  const flagged = await CSI.storage.setBoughtBeforeFlag(
+    'https://www.sunnyside.shop/product/freeze-1',
+    'rebuy'
+  );
+  assert(flagged.ok && flagged.value.boughtBefore[freezeKey] === 'rebuy', 'flag after huge import');
+  assert(flagged.value.rev === basisRev + 1, 'flag still increments rev');
+
+  // Stale Save with equal/older wall-clock must keep the flag (rev orders).
+  const staleAfterHuge = await CSI.storage.saveTasteProfile({
+    ...flagged.value,
+    boughtBefore: {},
+    brandLoves: ['Acme', 'Savvy'],
+    updatedAt: basisAt,
+    rev: basisRev
+  });
+  assert(staleAfterHuge.ok, 'stale Save after huge import commits');
+  assert(
+    staleAfterHuge.value.boughtBefore[freezeKey] === 'rebuy',
+    'concurrent flag survives Save after huge-rev import'
+  );
+  assert(staleAfterHuge.value.rev > flagged.value.rev, 'rev keeps incrementing after huge import');
+}
+
+// Popup import Apply uses expectedRev (not updatedAt).
+assert(/expectedRev:\s*basisRev/.test(popupJs), 'popup Apply passes expectedRev');
+assert(!/expectedUpdatedAt/.test(popupJs), 'popup no longer passes expectedUpdatedAt');
+assert(/basisRev:/.test(popupJs), 'popup stores basisRev from preview');
+assert(/currentAsNum > basisAsNum/.test(popupJs) || /currentRev/.test(popupJs), 'popup stale uses rev');
 
 // (2) Brand checkboxes: case-insensitive fill + preserve stored casing on save.
 assert(/caseInsensitive:\s*true/.test(popupJs), 'brand fillChecks use caseInsensitive');

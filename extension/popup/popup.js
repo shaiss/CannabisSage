@@ -436,10 +436,12 @@
   function showImportPreview(preview) {
     pendingImport = {
       value: preview.value,
-      basisUpdatedAt: preview.currentUpdatedAt == null ? null : preview.currentUpdatedAt
+      // Stale-check basis is monotonic rev (updatedAt is display-only).
+      basisRev: preview.currentRev == null ? null : preview.currentRev
     };
     const box = document.getElementById('profile-import-preview');
     const diff = document.getElementById('profile-import-diff');
+    // Diff text stays inside the extension popup — never written to host DOM.
     diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
     box.hidden = false;
     setImportApplyBusy(importApplyBusy);
@@ -495,12 +497,12 @@
     }
     if (importApplyBusy) return;
     const importValue = snapshot.value;
-    const basisUpdatedAt = snapshot.basisUpdatedAt;
+    const basisRev = snapshot.basisRev;
     // Lock Cancel / Apply / Delete / file pick until importTasteProfile settles so a
     // mid-flight Cancel cannot persist the write while the UI reports cancelled.
     setImportApplyBusy(true);
     try {
-      // If the stored profile changed after preview, re-diff and require confirmation again.
+      // If the stored profile advanced after preview, re-diff and require confirmation again.
       let current;
       try {
         current =
@@ -515,19 +517,26 @@
         showStatus('Import cancelled');
         return;
       }
-      const currentUpdatedAt = CSI.profile.isStoredProfile(current) ? current.updatedAt : null;
-      if (currentUpdatedAt !== basisUpdatedAt) {
-        const diff = CSI.profile.diffProfiles(current, importValue);
+      const currentRev = CSI.profile.isStoredProfile(current)
+        ? CSI.profile.profileRev(current)
+        : null;
+      const basisAsNum = basisRev == null ? 0 : CSI.profile.coerceRev(basisRev).value;
+      const currentAsNum = currentRev == null ? 0 : currentRev;
+      if (currentAsNum > basisAsNum) {
+        let diff = CSI.profile.diffProfiles(current, importValue);
+        if (CSI.profile.annotateAbnormalRev) {
+          diff = CSI.profile.annotateAbnormalRev(diff, current, importValue);
+        }
         showImportPreview({
           value: importValue,
-          currentUpdatedAt,
+          currentRev,
           lines: CSI.profile.formatDiffLines(diff)
         });
         showStatus('Stored profile changed — review again, then Apply');
         return;
       }
       const saved = await CSI.storage.importTasteProfile(importValue, {
-        expectedUpdatedAt: basisUpdatedAt
+        expectedRev: basisRev
       });
       if (!saved.ok) {
         if (saved.stale) {
@@ -549,11 +558,16 @@
             showStatus('Import cancelled');
             return;
           }
-          const latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
-          const diff = CSI.profile.diffProfiles(latest, importValue);
+          const latestRev = CSI.profile.isStoredProfile(latest)
+            ? CSI.profile.profileRev(latest)
+            : null;
+          let diff = CSI.profile.diffProfiles(latest, importValue);
+          if (CSI.profile.annotateAbnormalRev) {
+            diff = CSI.profile.annotateAbnormalRev(diff, latest, importValue);
+          }
           showImportPreview({
             value: importValue,
-            currentUpdatedAt: latestUpdatedAt,
+            currentRev: latestRev,
             lines: CSI.profile.formatDiffLines(diff)
           });
           showStatus(saved.error || 'profile changed, re-run import');

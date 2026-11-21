@@ -699,27 +699,54 @@
   }
 
   /**
+   * Hard ceiling for profile.rev — well below Number.MAX_SAFE_INTEGER so
+   * rev + 1 never loses precision / freezes the counter (2^53 trap).
+   * Import slack: an incoming rev more than this far above stored is treated
+   * as forged and ignored when bumping (advance from stored only).
+   */
+  const REV_HARD_CAP = 1_000_000_000_000_000; // 1e15
+  const REV_IMPORT_SLACK = 1_000_000;
+
+  /**
    * Monotonic profile commit counter. Missing / null → 0 (oldest).
-   * Used to order boughtBefore merges; updatedAt is display metadata only.
+   * Accepts only Number.isSafeInteger(n) && n >= 0 && n <= REV_HARD_CAP;
+   * anything else (negative, float, NaN, Infinity, string, boolean, object,
+   * MAX_SAFE_INTEGER, 1e16, …) coerces to 0. updatedAt is display metadata only.
    */
   function coerceRev(raw) {
     if (raw == null) return { ok: true, value: 0 };
-    if (typeof raw === 'boolean' || (typeof raw === 'object' && raw !== null)) {
-      return fail('rev must be a non-negative integer');
+    if (typeof raw !== 'number') return { ok: true, value: 0 };
+    if (!Number.isSafeInteger(raw) || raw < 0 || raw > REV_HARD_CAP) {
+      return { ok: true, value: 0 };
     }
-    if (typeof raw !== 'number' && typeof raw !== 'string') {
-      return fail('rev must be a non-negative integer');
-    }
-    const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
-    if (!Number.isFinite(n) || n < 0) return fail('rev must be a non-negative integer');
-    return { ok: true, value: Math.floor(n) };
+    return { ok: true, value: raw };
   }
 
-  /** Read a profile's rev; missing treated as 0 (oldest). */
+  /** Read a profile's rev; missing / invalid treated as 0 (oldest). */
   function profileRev(profile) {
     if (!profile || typeof profile !== 'object') return 0;
-    const r = coerceRev(profile.rev);
-    return r.ok ? r.value : 0;
+    return coerceRev(profile.rev).value;
+  }
+
+  /** True when an import/payload rev is absurdly ahead of stored (forgery). */
+  function isAbnormalIncomingRev(storedRev, incomingRev) {
+    const s = coerceRev(storedRev).value;
+    const i = coerceRev(incomingRev).value;
+    return i > s + REV_IMPORT_SLACK;
+  }
+
+  /**
+   * Next commit rev under the write lock.
+   * newRev = max(stored, adoptedIncoming) + 1, never above REV_HARD_CAP.
+   * If incoming > stored + REV_IMPORT_SLACK, ignore incoming and advance from
+   * stored only — so a forged huge import rev cannot freeze the counter.
+   */
+  function nextRev(storedRev, incomingRev) {
+    const stored = coerceRev(storedRev).value;
+    let incoming = coerceRev(incomingRev).value;
+    if (incoming > stored + REV_IMPORT_SLACK) incoming = stored;
+    const next = Math.max(stored, incoming) + 1;
+    return next > REV_HARD_CAP ? REV_HARD_CAP : next;
   }
 
   function normalizeBudget(raw) {
@@ -996,8 +1023,29 @@
     if (!diff || !diff.ok) return [];
     return (diff.changes || []).map((c) => {
       if (c.key === '_') return 'Create a new local profile from this file.';
+      // Note only — do not echo forged numeric rev (and never into host DOM).
+      if (c.key === 'rev' && c.to === 'abnormal') {
+        return 'rev: incoming revision is abnormal and will not be adopted';
+      }
       return `${c.key}: ${stableStringify(c.from)} → ${stableStringify(c.to)}`;
     });
+  }
+
+  /**
+   * Append a rev-abnormal note to an import diff when the payload's rev is
+   * absurdly ahead of stored. Values are not shown (extension UI only).
+   */
+  function annotateAbnormalRev(diff, storedProfile, incomingProfile) {
+    const stored = profileRev(storedProfile);
+    const incoming = profileRev(incomingProfile);
+    if (!isAbnormalIncomingRev(stored, incoming)) {
+      return diff && diff.ok ? diff : { ok: true, changes: [] };
+    }
+    const changes = [...((diff && diff.changes) || [])];
+    if (!changes.some((c) => c && c.key === 'rev' && c.to === 'abnormal')) {
+      changes.push({ key: 'rev', from: null, to: 'abnormal' });
+    }
+    return { ok: true, changes };
   }
 
   /**
@@ -1139,8 +1187,13 @@
     migrateIfNeeded,
     migrateV1toV2,
     normalize,
+    REV_HARD_CAP,
+    REV_IMPORT_SLACK,
     coerceRev,
     profileRev,
+    isAbnormalIncomingRev,
+    nextRev,
+    annotateAbnormalRev,
     formatIds,
     formatMatchesProduct,
     budgetMax,

@@ -621,9 +621,9 @@
 
   async function saveTasteProfileUnlocked(raw) {
     const now = Date.now();
-    // Capture the caller's basis before normalize stamps updatedAt = now.
-    const incomingBasisUpdatedAt =
-      raw && typeof raw === 'object' && typeof raw.updatedAt === 'number' ? raw.updatedAt : null;
+    // Capture the caller's basis rev before normalize. Missing → oldest (0).
+    // updatedAt is display metadata only; merge order uses monotonic rev.
+    const incomingBasisRev = CSI.profile.profileRev(raw);
     const parsed = CSI.profile?.normalize?.(raw, { now });
     if (!parsed || !parsed.ok) {
       return { ok: false, error: (parsed && parsed.error) || 'invalid profile' };
@@ -633,12 +633,12 @@
      * Merge boughtBefore at commit time so a concurrent listing flag written
      * after the popup's Save read is not wiped when this Save commits.
      *
-     * Newer-wins on profile.updatedAt:
-     * - If stored.updatedAt > incoming basis updatedAt → use stored.boughtBefore
+     * Newer-wins on monotonic profile.rev (not wall-clock updatedAt):
+     * - If stored.rev > incoming basis rev → use stored.boughtBefore
      *   (a writer committed after the Save basis; keep those flags).
-     * - Otherwise → use incoming.boughtBefore (this queued mutation's map,
-     *   e.g. setBoughtBeforeFlag after a same-queue peek).
-     * - No stored profile / no basis timestamp → use incoming.
+     * - Otherwise (equal, or missing basis = 0/oldest) → use incoming.boughtBefore
+     *   (this queued mutation's map, e.g. setBoughtBeforeFlag after a same-queue peek).
+     * - No stored profile → use incoming.
      */
     function mergeBoughtBefore(storedProfile, incomingProfile) {
       const incomingBB =
@@ -649,18 +649,20 @@
           ? { ...incomingProfile.boughtBefore }
           : {};
       if (!storedProfile || !CSI.profile.isStoredProfile(storedProfile)) return incomingBB;
-      const storedAt = storedProfile.updatedAt;
-      if (
-        incomingBasisUpdatedAt != null &&
-        typeof storedAt === 'number' &&
-        storedAt > incomingBasisUpdatedAt
-      ) {
+      const storedRev = CSI.profile.profileRev(storedProfile);
+      if (storedRev > incomingBasisRev) {
         const storedBB = storedProfile.boughtBefore;
         return storedBB && typeof storedBB === 'object' && !Array.isArray(storedBB)
           ? { ...storedBB }
           : {};
       }
       return incomingBB;
+    }
+
+    function nextProfileRev(storedProfile, incomingProfile) {
+      const storedRev = CSI.profile.profileRev(storedProfile);
+      const incomingRev = CSI.profile.profileRev(incomingProfile);
+      return Math.max(storedRev, incomingRev) + 1;
     }
 
     try {
@@ -681,7 +683,8 @@
       if (parsed.value && parsed.value.enabled === true) {
         const toWrite = {
           ...parsed.value,
-          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value)
+          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value),
+          rev: nextProfileRev(storedProfile, parsed.value)
         };
         await storageSet({ [KEYS.PROFILE]: toWrite });
         return { ok: true, value: toWrite };
@@ -695,7 +698,8 @@
         }
         const toWrite = {
           ...parsed.value,
-          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value)
+          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value),
+          rev: nextProfileRev(storedProfile, parsed.value)
         };
         await storageSet({ [KEYS.PROFILE]: toWrite });
         return { ok: true, value: toWrite };
@@ -703,7 +707,12 @@
 
       // Bare { enabled: false }: flip the stored record off without wiping fields.
       if (hadStored) {
-        const disabled = { ...existing.value, enabled: false, updatedAt: now };
+        const disabled = {
+          ...existing.value,
+          enabled: false,
+          updatedAt: now,
+          rev: nextProfileRev(storedProfile, existing.value)
+        };
         await storageSet({ [KEYS.PROFILE]: disabled });
         return { ok: true, value: disabled };
       }
@@ -785,45 +794,52 @@
         : undefined;
     return enqueueTasteProfile(async () => {
       try {
-        if (expectUpdatedAt !== undefined) {
-          // Strict read: a failed get must not look like empty storage (which
-          // would pass when expectedUpdatedAt is null and then overwrite).
-          let again;
-          try {
-            again = await storageGetStrict([KEYS.PROFILE]);
-          } catch (readErr) {
-            return {
-              ok: false,
-              error: (readErr && readErr.message) || 'storage read failed'
-            };
+        // Strict read once: stale-check (when requested) + rev floor for the write.
+        let again;
+        try {
+          again = await storageGetStrict([KEYS.PROFILE]);
+        } catch (readErr) {
+          return {
+            ok: false,
+            error: (readErr && readErr.message) || 'storage read failed'
+          };
+        }
+        const rawLatest = again[KEYS.PROFILE];
+        let storedRev = 0;
+        let latestUpdatedAt = null;
+        if (rawLatest != null) {
+          const migrated = CSI.profile?.migrateIfNeeded?.(rawLatest);
+          let latest;
+          if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+            const normalizedMigrated = CSI.profile.normalize(migrated.value);
+            latest =
+              normalizedMigrated &&
+              normalizedMigrated.ok &&
+              CSI.profile.isStoredProfile(normalizedMigrated.value)
+                ? normalizedMigrated.value
+                : normalizeStoredOrOff(rawLatest);
+          } else {
+            latest = normalizeStoredOrOff(rawLatest);
           }
-          const rawLatest = again[KEYS.PROFILE];
-          let latestUpdatedAt = null;
-          if (rawLatest != null) {
-            const migrated = CSI.profile?.migrateIfNeeded?.(rawLatest);
-            let latest;
-            if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
-              const normalizedMigrated = CSI.profile.normalize(migrated.value);
-              latest =
-                normalizedMigrated &&
-                normalizedMigrated.ok &&
-                CSI.profile.isStoredProfile(normalizedMigrated.value)
-                  ? normalizedMigrated.value
-                  : normalizeStoredOrOff(rawLatest);
-            } else {
-              latest = normalizeStoredOrOff(rawLatest);
-            }
-            latestUpdatedAt = CSI.profile.isStoredProfile(latest) ? latest.updatedAt : null;
-          }
-          if (latestUpdatedAt !== expectUpdatedAt) {
-            return { ok: false, error: 'profile changed, re-run import', stale: true };
+          if (CSI.profile.isStoredProfile(latest)) {
+            latestUpdatedAt = latest.updatedAt;
+            storedRev = CSI.profile.profileRev(latest);
           }
         }
-        await storageSet({ [KEYS.PROFILE]: parsed.value });
+        if (expectUpdatedAt !== undefined && latestUpdatedAt !== expectUpdatedAt) {
+          return { ok: false, error: 'profile changed, re-run import', stale: true };
+        }
+        // Never let rev go backward relative to stored on commit.
+        const incomingRev = CSI.profile.profileRev(parsed.value);
+        const toWrite = {
+          ...parsed.value,
+          rev: Math.max(storedRev, incomingRev) + 1
+        };
+        await storageSet({ [KEYS.PROFILE]: toWrite });
+        return { ok: true, value: toWrite };
       } catch (e) {
         return { ok: false, error: (e && e.message) || 'storage write failed' };
       }
-      return { ok: true, value: parsed.value };
     });
   }
 

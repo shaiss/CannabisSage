@@ -91,6 +91,7 @@
     'schemaVersion',
     'enabled',
     'updatedAt',
+    'rev',
     'goals',
     'timeOfUse',
     'formats',
@@ -275,6 +276,7 @@
       schemaVersion: SCHEMA_VERSION,
       enabled: true,
       updatedAt: 0,
+      rev: 0,
       goals: [],
       timeOfUse: [],
       formats: [],
@@ -696,6 +698,30 @@
     return { ok: true, value: Math.floor(n) };
   }
 
+  /**
+   * Monotonic profile commit counter. Missing / null → 0 (oldest).
+   * Used to order boughtBefore merges; updatedAt is display metadata only.
+   */
+  function coerceRev(raw) {
+    if (raw == null) return { ok: true, value: 0 };
+    if (typeof raw === 'boolean' || (typeof raw === 'object' && raw !== null)) {
+      return fail('rev must be a non-negative integer');
+    }
+    if (typeof raw !== 'number' && typeof raw !== 'string') {
+      return fail('rev must be a non-negative integer');
+    }
+    const n = typeof raw === 'string' ? Number(raw.trim()) : raw;
+    if (!Number.isFinite(n) || n < 0) return fail('rev must be a non-negative integer');
+    return { ok: true, value: Math.floor(n) };
+  }
+
+  /** Read a profile's rev; missing treated as 0 (oldest). */
+  function profileRev(profile) {
+    if (!profile || typeof profile !== 'object') return 0;
+    const r = coerceRev(profile.rev);
+    return r.ok ? r.value : 0;
+  }
+
   function normalizeBudget(raw) {
     if (raw == null) return { ok: true, value: null };
     if (typeof raw !== 'object' || Array.isArray(raw)) return fail('budget must be an object');
@@ -897,10 +923,14 @@
       updatedAt = ts.value;
     }
 
+    const revRes = coerceRev(working.rev);
+    if (!revRes.ok) return revRes;
+
     const value = {
       schemaVersion: SCHEMA_VERSION,
       enabled: working.enabled === true,
       updatedAt,
+      rev: revRes.value,
       goals: goals.values,
       timeOfUse: timeOfUse.values,
       formats: formats.values,
@@ -942,11 +972,11 @@
     if (!nxt || typeof nxt !== 'object') return { ok: false, error: 'nothing to diff', changes: [] };
 
     const keys = new Set([
-      ...ALLOWED_KEYS.filter((k) => k !== 'updatedAt'),
+      ...ALLOWED_KEYS.filter((k) => k !== 'updatedAt' && k !== 'rev'),
       ...(cur ? Object.keys(cur) : [])
     ]);
     keys.forEach((k) => {
-      if (k === 'updatedAt' || k === 'schemaVersion') return;
+      if (k === 'updatedAt' || k === 'rev' || k === 'schemaVersion') return;
       const a = cur ? cur[k] : undefined;
       const b = nxt[k];
       if (stableStringify(a) === stableStringify(b)) return;
@@ -1109,6 +1139,8 @@
     migrateIfNeeded,
     migrateV1toV2,
     normalize,
+    coerceRev,
+    profileRev,
     formatIds,
     formatMatchesProduct,
     budgetMax,

@@ -1221,34 +1221,42 @@ assert(
   'preview lists budget change for replace'
 );
 
-// (1c) Concurrent boughtBefore after Save basis: newer stored map wins at commit.
+// (1c) Concurrent boughtBefore after Save basis: higher stored rev wins at commit.
+// updatedAt is display metadata only — merge order uses monotonic rev.
 const raceKey = CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/race-bb-1');
-const raceBasis = 5_000;
-store.csi_taste_profile = {
-  ...CSI.profile.emptyEnabled(),
-  enabled: true,
-  formats: [{ id: 'flower', slot: null }],
-  sizes: ['3.5g'],
-  likedTerpenes: ['Limonene'],
-  avoidTerpenes: [],
-  watchedStores: ['sunnyside'],
-  brandLoves: ['Acme'],
-  brandAvoids: [],
-  dealTier: 'any',
-  boughtBefore: {},
-  updatedAt: raceBasis
-};
-// Simulate listing flag committed after the popup read (newer updatedAt).
-store.csi_taste_profile = {
-  ...store.csi_taste_profile,
+const raceBasisAt = 5_000;
+const raceBasisRev = 10;
+function plantRaceProfile(overrides) {
+  store.csi_taste_profile = {
+    ...CSI.profile.emptyEnabled(),
+    enabled: true,
+    formats: [{ id: 'flower', slot: null }],
+    sizes: ['3.5g'],
+    likedTerpenes: ['Limonene'],
+    avoidTerpenes: [],
+    watchedStores: ['sunnyside'],
+    brandLoves: ['Acme'],
+    brandAvoids: [],
+    dealTier: 'any',
+    boughtBefore: {},
+    updatedAt: raceBasisAt,
+    rev: raceBasisRev,
+    ...overrides
+  };
+}
+
+// Newer case (stored rev > basis rev; also newer updatedAt).
+plantRaceProfile({
   boughtBefore: { [raceKey]: 'rebuy' },
-  updatedAt: raceBasis + 50
-};
+  updatedAt: raceBasisAt + 50,
+  rev: raceBasisRev + 1
+});
 const staleSave = await CSI.storage.saveTasteProfile({
   ...store.csi_taste_profile,
   boughtBefore: {}, // popup's stale map from raceBasis
   brandLoves: ['Acme', 'Savvy'],
-  updatedAt: raceBasis
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev
 });
 assert(staleSave.ok, 'stale-basis Save still commits form edits');
 assert(
@@ -1257,8 +1265,93 @@ assert(
 );
 assert(staleSave.value.brandLoves.includes('Savvy'), 'form edits still applied when merging boughtBefore');
 assert(store.csi_taste_profile.boughtBefore[raceKey] === 'rebuy', 'storage kept concurrent flag');
+assert(
+  typeof staleSave.value.rev === 'number' && staleSave.value.rev > raceBasisRev + 1,
+  'Save bumps rev past stored and basis'
+);
 
-// Same-queue setBoughtBeforeFlag still applies (basis matches stored updatedAt).
+// Equal-timestamp: stored updatedAt == basis, but stored rev is higher.
+plantRaceProfile({
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev + 1
+});
+const equalTsSave = await CSI.storage.saveTasteProfile({
+  ...store.csi_taste_profile,
+  boughtBefore: {},
+  brandLoves: ['Acme', 'Savvy'],
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev
+});
+assert(equalTsSave.ok, 'equal-timestamp Save commits');
+assert(
+  equalTsSave.value.boughtBefore[raceKey] === 'rebuy',
+  'concurrent flag survives equal updatedAt (rev orders)'
+);
+assert(equalTsSave.value.brandLoves.includes('Savvy'), 'form edits apply on equal-timestamp Save');
+
+// Clock-rollback: stored updatedAt older than basis, but stored rev higher.
+plantRaceProfile({
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasisAt - 100,
+  rev: raceBasisRev + 1
+});
+const rollbackSave = await CSI.storage.saveTasteProfile({
+  ...store.csi_taste_profile,
+  boughtBefore: {},
+  brandLoves: ['Acme', 'Savvy'],
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev
+});
+assert(rollbackSave.ok, 'clock-rollback Save commits');
+assert(
+  rollbackSave.value.boughtBefore[raceKey] === 'rebuy',
+  'concurrent flag survives clock-rollback (stored updatedAt older, rev higher)'
+);
+assert(rollbackSave.value.brandLoves.includes('Savvy'), 'form edits apply on clock-rollback Save');
+
+// Missing-basis: no rev on incoming (treated as oldest); stored flag kept.
+plantRaceProfile({
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasisAt + 50,
+  rev: raceBasisRev + 1
+});
+const missingBasisPayload = {
+  ...store.csi_taste_profile,
+  boughtBefore: {},
+  brandLoves: ['Acme', 'Savvy'],
+  updatedAt: raceBasisAt
+};
+delete missingBasisPayload.rev;
+const missingBasisSave = await CSI.storage.saveTasteProfile(missingBasisPayload);
+assert(missingBasisSave.ok, 'missing-basis Save commits');
+assert(
+  missingBasisSave.value.boughtBefore[raceKey] === 'rebuy',
+  'concurrent flag survives missing basis rev (oldest)'
+);
+assert(missingBasisSave.value.brandLoves.includes('Savvy'), 'form edits apply on missing-basis Save');
+
+// Non-stale Save: matching basis rev — Save's own boughtBefore change applies.
+plantRaceProfile({
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev
+});
+const freshSave = await CSI.storage.saveTasteProfile({
+  ...store.csi_taste_profile,
+  boughtBefore: { [raceKey]: 'never' },
+  brandLoves: ['Acme', 'Savvy'],
+  updatedAt: raceBasisAt,
+  rev: raceBasisRev
+});
+assert(freshSave.ok, 'non-stale Save commits');
+assert(
+  freshSave.value.boughtBefore[raceKey] === 'never',
+  'non-stale Save applies its own boughtBefore change'
+);
+assert(freshSave.value.brandLoves.includes('Savvy'), 'form edits apply on non-stale Save');
+
+// Same-queue setBoughtBeforeFlag still applies (basis rev matches stored rev).
 const flagAfterMerge = await CSI.storage.setBoughtBeforeFlag(
   'https://www.sunnyside.shop/product/race-bb-1',
   'fine'

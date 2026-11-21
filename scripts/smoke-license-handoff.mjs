@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /**
  * License handoff smoke: openManage must not put the key in a query string.
- * Fragment (#key=…) is OK; the account page clears it client-side.
+ * Fragment (#key=…) is OK; the account page clears it client-side by replacing
+ * the history entry (no Back to #key=). Also guards /account against third-party
+ * scripts and keeps /api/license/validate POST-only.
  * Run: node scripts/smoke-license-handoff.mjs
  * (Node 20+ — transpiles web/lib/license-handoff.ts via typescript; no strip-types)
  */
@@ -30,6 +32,14 @@ assert(
   'openManage must hand the key in the URL fragment (#key=…)'
 );
 assert(/openManage/.test(entitlementSrc), 'openManage present');
+assert(
+  /method:\s*['"]POST['"]/.test(entitlementSrc) && /\/api\/license\/validate/.test(entitlementSrc),
+  'extension validates via POST body, not GET ?key='
+);
+assert(
+  !/\/api\/license\/validate\?/.test(entitlementSrc),
+  'extension must not call validate with a query string'
+);
 
 const accountSrc = fs.readFileSync(path.join(web, 'app/account/page.tsx'), 'utf8');
 assert(
@@ -41,17 +51,60 @@ assert(
   /method:\s*['"]POST['"]/.test(accountSrc) && /\/api\/license\/validate/.test(accountSrc),
   'account page validates via POST body, not a query string'
 );
+assert(
+  !/\/api\/license\/validate\?/.test(accountSrc),
+  'account page must not call validate with a query string'
+);
 
 const handoffTsPath = path.join(web, 'lib/license-handoff.ts');
 const handoffSrc = fs.readFileSync(handoffTsPath, 'utf8');
 assert(/loc\.hash/.test(handoffSrc), 'handoff helper reads hash');
-assert(/replaceState/.test(handoffSrc), 'handoff helper clears URL via replaceState');
+assert(/replaceState/.test(handoffSrc), 'handoff helper clears URL via replaceState (history replace)');
+assert(
+  !/\.pushState\s*\(/.test(handoffSrc),
+  'handoff must not call pushState (would leave #key= in history)'
+);
 assert(/searchParams\.delete\(\s*['"]key['"]\s*\)/.test(handoffSrc), 'handoff strips legacy ?key=');
 
 const nextConfigSrc = fs.readFileSync(path.join(web, 'next.config.js'), 'utf8');
 assert(/Referrer-Policy/.test(nextConfigSrc), 'Referrer-Policy configured');
 assert(/no-referrer/.test(nextConfigSrc), 'account page uses Referrer-Policy: no-referrer');
 assert(/['"]\/account['"]/.test(nextConfigSrc), 'Referrer-Policy scoped to /account');
+assert(/Content-Security-Policy/.test(nextConfigSrc), 'CSP configured for /account');
+assert(/script-src 'self'/.test(nextConfigSrc), 'CSP script-src is self-only (no third-party hosts)');
+
+// Item 2: /account must stay free of third-party scripts (any could read #key= before cleanup).
+const layoutSrc = fs.readFileSync(path.join(web, 'app/layout.tsx'), 'utf8');
+const accountLayoutPath = path.join(web, 'app/account/layout.tsx');
+const accountLayoutSrc = fs.existsSync(accountLayoutPath)
+  ? fs.readFileSync(accountLayoutPath, 'utf8')
+  : '';
+const THIRD_PARTY_SCRIPT_RE =
+  /googletagmanager|google-analytics|gtag\(|plausible\.io|segment\.(io|com)|hotjar|facebook\.net|doubleclick|clarity\.ms|cdn\.amplitude|fullstory|heap-api|newrelic|sentry\.io\/scripts|js\.stripe\.com|checkout\.stripe\.com/i;
+
+function assertNoThirdPartyScripts(label, src) {
+  assert(!/<script[^>]+src=["']https?:\/\//i.test(src), `${label}: no external <script src=http(s)>`);
+  assert(
+    !/\bnext\/script\b/.test(src) || !/src=["']https?:\/\//i.test(src),
+    `${label}: next/script must not load an external https? URL`
+  );
+  assert(!THIRD_PARTY_SCRIPT_RE.test(src), `${label}: no third-party analytics/script hosts`);
+}
+
+assertNoThirdPartyScripts('account page', accountSrc);
+assertNoThirdPartyScripts('root layout', layoutSrc);
+if (accountLayoutSrc) assertNoThirdPartyScripts('account layout', accountLayoutSrc);
+
+// Item 4: validate is POST-only; GET returns 405 (no query-string key path).
+const validateSrc = fs.readFileSync(path.join(web, 'app/api/license/validate/route.ts'), 'utf8');
+assert(/export async function POST/.test(validateSrc), 'validate exports POST');
+assert(/export async function GET/.test(validateSrc), 'validate exports GET (405 only)');
+assert(/status:\s*405/.test(validateSrc), 'validate GET returns 405');
+assert(/Allow['"]?\s*:\s*['"]POST['"]/.test(validateSrc), 'validate GET Allow: POST');
+assert(
+  !/searchParams\.get\(\s*['"]key['"]\s*\)/.test(validateSrc),
+  'validate must not read key from query string'
+);
 
 /** Load the real helper via typescript transpile (works on Node 20 without strip-types). */
 async function loadHandoffHelper() {
@@ -74,9 +127,13 @@ async function loadHandoffHelper() {
 const { takeLicenseKeyFromUrl } = await loadHandoffHelper();
 assert(typeof takeLicenseKeyFromUrl === 'function', 'transpiled takeLicenseKeyFromUrl loaded');
 
-/** Mutable location + history stand-in for table-driven helper checks. */
+/**
+ * Mutable location + history stand-in. replaceState replaces the current history
+ * entry (location.replace equivalent for history); pushState must never be used.
+ */
 function makeBrowse(href) {
   const u = new URL(href);
+  const stack = [u.href];
   const loc = {
     get href() {
       return u.href;
@@ -91,15 +148,21 @@ function makeBrowse(href) {
       return u.pathname;
     }
   };
+  let replaceCalls = 0;
   const hist = {
     replaceState(_data, _title, next) {
+      replaceCalls += 1;
       const resolved = new URL(String(next), u.origin);
       u.pathname = resolved.pathname;
       u.search = resolved.search;
       u.hash = resolved.hash;
+      stack[stack.length - 1] = u.href;
+    },
+    pushState() {
+      throw new Error('pushState must not be used — would leave #key= in history');
     }
   };
-  return { loc, hist, url: u };
+  return { loc, hist, url: u, stack, get replaceCalls() { return replaceCalls; } };
 }
 
 const FRAG = 'CSG-FRAG-AAAA-BBBB';
@@ -110,36 +173,42 @@ const cases = [
     name: 'fragment precedence over query',
     href: `https://cannabissage.app/account?key=${QUERY}&utm=1#key=${FRAG}`,
     wantKey: FRAG,
-    wantHref: 'https://cannabissage.app/account?utm=1'
+    wantHref: 'https://cannabissage.app/account?utm=1',
+    expectReplace: true
   },
   {
     name: 'legacy query fallback',
     href: `https://cannabissage.app/account?key=${QUERY}&ref=ext`,
     wantKey: QUERY,
-    wantHref: 'https://cannabissage.app/account?ref=ext'
+    wantHref: 'https://cannabissage.app/account?ref=ext',
+    expectReplace: true
   },
   {
     name: 'fragment only',
     href: `https://cannabissage.app/account#key=${FRAG}`,
     wantKey: FRAG,
-    wantHref: 'https://cannabissage.app/account'
+    wantHref: 'https://cannabissage.app/account',
+    expectReplace: true
   },
   {
     name: 'no key leaves unrelated query intact',
     href: 'https://cannabissage.app/account?utm=keep',
     wantKey: '',
-    wantHref: 'https://cannabissage.app/account?utm=keep'
+    wantHref: 'https://cannabissage.app/account?utm=keep',
+    expectReplace: false
   },
   {
     name: 'empty hash and search',
     href: 'https://cannabissage.app/account',
     wantKey: '',
-    wantHref: 'https://cannabissage.app/account'
+    wantHref: 'https://cannabissage.app/account',
+    expectReplace: false
   }
 ];
 
 for (const c of cases) {
-  const { loc, hist, url } = makeBrowse(c.href);
+  const browse = makeBrowse(c.href);
+  const { loc, hist, url, stack } = browse;
   const got = takeLicenseKeyFromUrl(loc, hist);
   assert(got === c.wantKey, `${c.name}: key want ${c.wantKey || '(empty)'} got ${got || '(empty)'}`);
   assert(
@@ -147,10 +216,30 @@ for (const c of cases) {
     `${c.name}: href want ${c.wantHref} got ${url.href}`
   );
   assert(!/[?#]key=/.test(url.href), `${c.name}: cleaned URL must not retain key=`);
+  if (c.expectReplace) {
+    assert(browse.replaceCalls === 1, `${c.name}: must replace history entry once`);
+    assert(stack.length === 1, `${c.name}: history length must stay 1 (replace, not push)`);
+    assert(!/[?#]key=/.test(stack[0]), `${c.name}: history entry must not retain key=`);
+  } else {
+    assert(browse.replaceCalls === 0, `${c.name}: no replace when nothing to clear`);
+  }
   // Second call after cleanup returns empty and stays clean.
   const again = takeLicenseKeyFromUrl(loc, hist);
   assert(again === '', `${c.name}: second call must return empty`);
   assert(url.href === c.wantHref, `${c.name}: second call must not change URL`);
+}
+
+// Item 7: dedicated "second call after cleanup" case.
+{
+  const browse = makeBrowse(`https://cannabissage.app/account#key=${FRAG}`);
+  const first = takeLicenseKeyFromUrl(browse.loc, browse.hist);
+  assert(first === FRAG, 'second-call case: first call returns fragment key');
+  assert(browse.url.href === 'https://cannabissage.app/account', 'second-call case: URL cleared');
+  assert(browse.replaceCalls === 1, 'second-call case: history entry replaced');
+  assert(!/[?#]key=/.test(browse.stack[0]), 'second-call case: history has no key=');
+  const second = takeLicenseKeyFromUrl(browse.loc, browse.hist);
+  assert(second === '', 'second-call case: after cleanup, takeLicenseKeyFromUrl returns no key');
+  assert(browse.replaceCalls === 1, 'second-call case: second call does not replace again');
 }
 
 /** Promise-aware chrome.storage.local matching MV3 (no callback → Promise). */

@@ -116,7 +116,16 @@ assert(accountSrc.includes('@/lib/license-handoff'), 'account imports license-ha
 assert(accountSrc.includes('takeLicenseKeyFromUrl'), 'account calls takeLicenseKeyFromUrl');
 const handoffSrc = fs.readFileSync(path.join(webRoot, 'lib/license-handoff.ts'), 'utf8');
 assert(handoffSrc.includes('replaceState'), 'handoff clears fragment/query key from URL');
+assert(!/\.pushState\s*\(/.test(handoffSrc), 'handoff must replace history, not push');
 assert(/loc\.hash/.test(handoffSrc), 'handoff reads fragment');
+
+const validateSrc = fs.readFileSync(path.join(webRoot, 'app/api/license/validate/route.ts'), 'utf8');
+assert(/status:\s*405/.test(validateSrc), 'validate GET returns 405');
+assert(!/searchParams\.get\(\s*['"]key['"]\s*\)/.test(validateSrc), 'validate has no GET ?key= path');
+
+const nextConfigSrc = fs.readFileSync(path.join(webRoot, 'next.config.js'), 'utf8');
+assert(/Content-Security-Policy/.test(nextConfigSrc), 'account CSP present');
+assert(/script-src 'self'/.test(nextConfigSrc), 'account CSP blocks third-party scripts');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.32', 'extension 1.3.32');

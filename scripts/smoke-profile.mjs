@@ -725,11 +725,18 @@ const hostileProto = CSI.profile.parseImportJson(
   '{"enabled":true,"schemaVersion":2,"__proto__":{"polluted":true}}'
 );
 assert(!hostileProto.ok, '__proto__ key rejected');
+assert(hostileProto.error === 'forbidden key', '__proto__ reports forbidden key');
 
 const hostileCtor = CSI.profile.parseImportJson(
   '{"enabled":true,"schemaVersion":2,"constructor":{"prototype":{"x":1}}}'
 );
 assert(!hostileCtor.ok, 'constructor key rejected');
+assert(hostileCtor.error === 'forbidden key', 'constructor reports forbidden key');
+
+const hostilePrototype = CSI.profile.parseImportJson(
+  '{"enabled":true,"schemaVersion":2,"prototype":{"x":1}}'
+);
+assert(!hostilePrototype.ok && hostilePrototype.error === 'forbidden key', 'prototype reports forbidden key');
 
 const hostileUnknown = CSI.profile.parseImportJson(
   JSON.stringify({ enabled: true, schemaVersion: 2, evilKey: 1 })
@@ -1163,12 +1170,16 @@ assert(store.csi_taste_profile.enabled === true, 'failed disable read did not wi
 assert(store.csi_taste_profile.brandLoves.includes('Acme'), 'failed disable read kept brandLoves');
 
 // (1b) Failed-read peek / import preview must surface error (not "create" diff).
-assert(
-  /peekTasteProfile[\s\S]{0,80}loadTasteProfileStrict|storageGetStrict/.test(
-    fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8')
-  ),
-  'peekTasteProfile uses strict read'
-);
+{
+  const storageSrcPeek = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
+  const peekFnStart = storageSrcPeek.indexOf('async function peekTasteProfile');
+  const peekFn = storageSrcPeek.slice(peekFnStart, peekFnStart + 200);
+  assert(peekFnStart >= 0, 'peekTasteProfile found');
+  assert(
+    /loadTasteProfileStrict/.test(peekFn),
+    'peekTasteProfile uses loadTasteProfileStrict'
+  );
+}
 {
   const storageSrcForPreview = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
   const previewFnStart = storageSrcForPreview.indexOf('async function previewTasteProfileImport');
@@ -1257,6 +1268,25 @@ assert(
 );
 assert(staleSave.value.brandLoves.includes('Savvy'), 'form edits still applied when merging boughtBefore');
 assert(store.csi_taste_profile.boughtBefore[raceKey] === 'rebuy', 'storage kept concurrent flag');
+
+// Missing updatedAt on the Save basis is oldest: must not wipe a newer stored map.
+store.csi_taste_profile = {
+  ...staleSave.value,
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasis + 100
+};
+const missingAtSave = await CSI.storage.saveTasteProfile({
+  ...staleSave.value,
+  brandLoves: ['MissingAt'],
+  boughtBefore: {}, // empty map with no basis timestamp
+  updatedAt: undefined
+});
+assert(missingAtSave.ok, 'Save with missing updatedAt still ok');
+assert(
+  missingAtSave.value.boughtBefore[raceKey] === 'rebuy',
+  'missing incoming updatedAt treated as oldest (stored map wins)'
+);
+assert(store.csi_taste_profile.boughtBefore[raceKey] === 'rebuy', 'storage kept newer map when basis missing');
 
 // Same-queue setBoughtBeforeFlag still applies (basis matches stored updatedAt).
 const flagAfterMerge = await CSI.storage.setBoughtBeforeFlag(
@@ -1438,6 +1468,65 @@ assert(
     'error message rendered from view'
   );
   assert(nodes['digest-locked'].hidden === true, 'error path does not show locked/upgrade card');
+
+  // Exercise real loadDigestUi with commitSavedDigest {ok:false}.
+  const loadDigestSrc = popupJs.slice(
+    popupJs.indexOf('async function loadDigestUi'),
+    popupJs.indexOf("document.getElementById('digest-upgrade')")
+  );
+  assert(loadDigestSrc.includes('commitSavedDigest'), 'extracted loadDigestUi');
+  nodes['digest-status'].hidden = true;
+  nodes['digest-status'].textContent = '';
+  badgeCalls.length = 0;
+  digestCtx.CSI.features = { can: () => true };
+  digestCtx.CSI.storage = {
+    loadSavedItems: async () => [{ url: 'https://www.sunnyside.shop/product/watched-1' }],
+    commitSavedDigest: async () => ({ ok: false, error: 'Saved-watch write failed' })
+  };
+  const loadDigestUi = vm.runInNewContext(
+    `${escapeSrc[0]}\n${renderSrc}\n${loadDigestSrc}\nloadDigestUi`,
+    digestCtx
+  );
+  await loadDigestUi();
+  assert(nodes['digest-status'].hidden === false, 'loadDigestUi ok:false shows status');
+  assert(
+    nodes['digest-status'].textContent === 'Saved-watch write failed',
+    'loadDigestUi ok:false surfaces commit error'
+  );
+  assert(nodes['digest-locked'].hidden === true, 'loadDigestUi ok:false does not show upgrade card');
+  assert(badgeCalls.length === 0, 'loadDigestUi ok:false does not clear badge');
+}
+
+// Import Apply showStatus catch path (strict peek failure during Apply).
+{
+  const confirmIdx = popupJs.indexOf(
+    "getElementById('profile-import-confirm').addEventListener"
+  );
+  assert(confirmIdx >= 0, 'profile-import-confirm listener found');
+  const confirmChunk = popupJs.slice(confirmIdx, confirmIdx + 4500);
+  assert(
+    /catch\s*\(\s*e\s*\)\s*\{[\s\S]{0,120}Could not read profile/.test(confirmChunk),
+    'import Apply catch shows Could not read profile'
+  );
+  // Extract the showStatus expression used in Apply peek catches (literal from popup).
+  const statusExpr = confirmChunk.match(
+    /showStatus\(\(e && e\.message\) \|\| 'Could not read profile'\)/
+  );
+  assert(statusExpr, 'Apply catch uses showStatus((e && e.message) || …)');
+  const statusCalls = [];
+  const evalStatus = vm.runInNewContext(
+    `(function (e) { ${statusExpr[0]}; })`,
+    {
+      showStatus(msg) {
+        statusCalls.push(msg);
+      }
+    }
+  );
+  evalStatus(new Error('storage read failed'));
+  assert(statusCalls[0] === 'storage read failed', 'Apply catch showStatus uses error message');
+  statusCalls.length = 0;
+  evalStatus({});
+  assert(statusCalls[0] === 'Could not read profile', 'Apply catch falls back when message missing');
 }
 
 // (4) Cross-context csi_taste_profile writer via CSI_TASTE_PROFILE (mirrors CSI_SAVED_WATCH).
@@ -1556,11 +1645,11 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
   });
   assert(listeners.length === 1, 'profile worker registers one message listener');
 
-  function dispatch(message) {
+  function dispatch(message, senderExtra = {}) {
     return new Promise((resolve) => {
       const keep = listeners[0](
         message,
-        { id: workerChrome.runtime.id },
+        { id: workerChrome.runtime.id, ...senderExtra },
         (value) => resolve(value)
       );
       if (keep !== true) resolve(undefined);
@@ -1572,9 +1661,36 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
     op: 'save',
     payload: { raw: { enabled: true, watchedStores: ['sunnyside'] } }
   });
-  // Unauthorized would be blocked by sender check — same-extension sender is ok.
+  // Extension-page sender (no tab) may save/delete/import.
   assert(denied && denied.ok === true, 'SW save writes a valid profile');
   assert(workerStore.csi_taste_profile && workerStore.csi_taste_profile.enabled === true, 'SW save persisted');
+
+  const tabSender = { tab: { id: 42 } };
+  const tabSave = await dispatch(
+    {
+      type: 'CSI_TASTE_PROFILE',
+      op: 'save',
+      payload: { raw: { enabled: true, watchedStores: ['evil'] } }
+    },
+    tabSender
+  );
+  assert(tabSave && tabSave.ok === false, 'content-script save rejected');
+  assert(/content script/i.test(tabSave.error || ''), 'content-script save error names scope');
+  assert(workerStore.csi_taste_profile.watchedStores[0] === 'sunnyside', 'rejected save did not write');
+
+  const tabDelete = await dispatch({ type: 'CSI_TASTE_PROFILE', op: 'delete' }, tabSender);
+  assert(tabDelete && tabDelete.ok === false, 'content-script delete rejected');
+  assert(workerStore.csi_taste_profile, 'rejected delete left profile');
+
+  const tabImport = await dispatch(
+    {
+      type: 'CSI_TASTE_PROFILE',
+      op: 'import',
+      payload: { raw: { enabled: true, watchedStores: ['sunnyside'] }, opts: {} }
+    },
+    tabSender
+  );
+  assert(tabImport && tabImport.ok === false, 'content-script import rejected');
 
   const foreign = await new Promise((resolve) => {
     const keep = listeners[0](
@@ -1617,6 +1733,34 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
   assert(migWrite && migWrite.ok, 'migrateWrite ok');
   assert(workerStore.csi_taste_profile.schemaVersion === 2, 'migrateWrite persisted v2');
 
+  // Content scripts may migrateWrite (and boughtBefore); payload shape is validated.
+  workerStore.csi_taste_profile = { ...v1raw };
+  const tabMig = await dispatch(
+    {
+      type: 'CSI_TASTE_PROFILE',
+      op: 'migrateWrite',
+      payload: { value: normalized.value }
+    },
+    tabSender
+  );
+  assert(tabMig && tabMig.ok, 'content-script migrateWrite allowed');
+  assert(workerStore.csi_taste_profile.schemaVersion === 2, 'tab migrateWrite persisted v2');
+
+  const badMigShape = await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'migrateWrite',
+    payload: { value: 'not-an-object' }
+  });
+  assert(badMigShape && badMigShape.ok === false, 'migrateWrite rejects non-object payload');
+  assert(/invalid migration payload/i.test(badMigShape.error || ''), 'migrateWrite shape error');
+
+  const hostileMig = await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'migrateWrite',
+    payload: { value: { enabled: true, schemaVersion: 2, evilKey: 1, watchedStores: [] } }
+  });
+  assert(hostileMig && hostileMig.ok === false, 'migrateWrite re-normalize rejects unknown fields');
+
   await dispatch({ type: 'CSI_TASTE_PROFILE', op: 'delete' });
   assert(!Object.prototype.hasOwnProperty.call(workerStore, 'csi_taste_profile'), 'SW delete removed key');
   const migAfterDelete = await dispatch({
@@ -1640,8 +1784,8 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
       lastError: null,
       sendMessage(msg, cb) {
         pageSends.push(msg);
-        // Echo through the worker listener so the proxy round-trips.
-        dispatch(msg).then((response) => cb && cb(response));
+        // Content-script-shaped sender (tab set) round-trips through the worker.
+        dispatch(msg, tabSender).then((response) => cb && cb(response));
       }
     },
     storage: {
@@ -1690,26 +1834,48 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
     pageCtx
   );
   const pageCSI = pageSandbox.CSI;
+  // Seed via extension-page sender so boughtBefore has a profile to mutate.
+  await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'save',
+    payload: {
+      raw: {
+        enabled: true,
+        formats: [{ id: 'flower', slot: null }],
+        sizes: [],
+        likedTerpenes: [],
+        avoidTerpenes: [],
+        watchedStores: ['zenleaf'],
+        dealTier: 'any',
+        boughtBefore: {}
+      }
+    }
+  });
+
   const proxiedSave = await pageCSI.storage.saveTasteProfile({
     enabled: true,
     formats: [{ id: 'flower', slot: null }],
     sizes: [],
     likedTerpenes: [],
     avoidTerpenes: [],
-    watchedStores: ['zenleaf'],
+    watchedStores: ['evil-from-content'],
     dealTier: 'any',
     boughtBefore: {}
   });
-  assert(proxiedSave.ok, 'page save proxied ok');
+  assert(proxiedSave && proxiedSave.ok === false, 'content-script proxied save rejected');
   assert(
     pageSends.some((m) => m.type === 'CSI_TASTE_PROFILE' && m.op === 'save'),
     'page save sent CSI_TASTE_PROFILE'
   );
   assert(
     workerStore.csi_taste_profile && workerStore.csi_taste_profile.watchedStores[0] === 'zenleaf',
-    'proxied save landed in worker store'
+    'rejected content save did not overwrite worker store'
   );
   assert(!pageStore.csi_taste_profile, 'page heap did not write local storage directly');
+
+  const proxiedDelete = await pageCSI.storage.deleteTasteProfile();
+  assert(proxiedDelete && proxiedDelete.ok === false, 'content-script proxied delete rejected');
+  assert(workerStore.csi_taste_profile, 'rejected content delete left worker profile');
 
   const boughtUrl = pageCSI.profile.productKeyFromUrl(
     'https://www.sunnyside.shop/product/proxied-flag-item'
@@ -1723,6 +1889,34 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
   assert(
     workerStore.csi_taste_profile.boughtBefore[boughtUrl] === 'rebuy',
     'proxied bought-before landed in worker store'
+  );
+}
+
+// Concurrent Delete during v1→v2 upgrade: queued write-back must not resurrect.
+{
+  await CSI.storage.deleteTasteProfile();
+  store.csi_taste_profile = {
+    schemaVersion: 1,
+    enabled: true,
+    forms: ['flower'],
+    sizes: [],
+    likedTerpenes: [],
+    avoidTerpenes: [],
+    tripBudgetUsd: 40,
+    homeStore: 'sunnyside',
+    secondaryStores: [],
+    brandLoyal: [],
+    brandAvoid: [],
+    dealTier: 'any',
+    boughtBefore: {}
+  };
+  const loadP = CSI.storage.loadTasteProfile();
+  const delP = CSI.storage.deleteTasteProfile();
+  const [, deleted] = await Promise.all([loadP, delP]);
+  assert(deleted && deleted.ok, 'concurrent delete ok');
+  assert(
+    !Object.prototype.hasOwnProperty.call(store, 'csi_taste_profile'),
+    'Delete during upgrade wins (no resurrected key)'
   );
 }
 

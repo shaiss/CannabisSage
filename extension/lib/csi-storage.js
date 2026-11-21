@@ -575,10 +575,24 @@
     return enqueueTasteProfile(() => migrateTasteProfileWriteUnlocked(normalizedValue));
   }
 
-  async function migrateTasteProfileWriteUnlocked(normalizedValue) {
+  async function migrateTasteProfileWriteUnlocked(payloadValue) {
+    // Re-validate at write time: proxied migrateWrite must not skip normalize /
+    // isStoredProfile the way save/import enforce on every mutation.
+    if (payloadValue == null || typeof payloadValue !== 'object' || Array.isArray(payloadValue)) {
+      return { ok: false, error: 'invalid migration payload' };
+    }
+    const normalized = CSI.profile?.normalize?.(payloadValue);
+    if (!normalized || !normalized.ok || !CSI.profile.isStoredProfile(normalized.value)) {
+      return {
+        ok: false,
+        error: (normalized && normalized.error) || 'invalid migration profile'
+      };
+    }
+    const normalizedValue = normalized.value;
     try {
       const again = await storageGetStrict([KEYS.PROFILE]);
       const current = again[KEYS.PROFILE];
+      // Delete (or never-stored) wins: do not resurrect the key.
       if (current == null) return { ok: true, value: { enabled: false } };
       const remig = CSI.profile.migrateIfNeeded(current);
       if (remig && remig.ok && !remig.didMigrate) {
@@ -638,7 +652,10 @@
      *   (a writer committed after the Save basis; keep those flags).
      * - Otherwise → use incoming.boughtBefore (this queued mutation's map,
      *   e.g. setBoughtBeforeFlag after a same-queue peek).
-     * - No stored profile / no basis timestamp → use incoming.
+     * - Missing updatedAt is treated as oldest so an older/untimestamped map
+     *   cannot overwrite a newer one (and a clock-backward basis still loses
+     *   to a later stored commit).
+     * - No stored profile → use incoming.
      */
     function mergeBoughtBefore(storedProfile, incomingProfile) {
       const incomingBB =
@@ -649,12 +666,13 @@
           ? { ...incomingProfile.boughtBefore }
           : {};
       if (!storedProfile || !CSI.profile.isStoredProfile(storedProfile)) return incomingBB;
-      const storedAt = storedProfile.updatedAt;
-      if (
-        incomingBasisUpdatedAt != null &&
-        typeof storedAt === 'number' &&
-        storedAt > incomingBasisUpdatedAt
-      ) {
+      const storedAt =
+        typeof storedProfile.updatedAt === 'number'
+          ? storedProfile.updatedAt
+          : Number.NEGATIVE_INFINITY;
+      const incomingAt =
+        incomingBasisUpdatedAt != null ? incomingBasisUpdatedAt : Number.NEGATIVE_INFINITY;
+      if (storedAt > incomingAt) {
         const storedBB = storedProfile.boughtBefore;
         return storedBB && typeof storedBB === 'object' && !Array.isArray(storedBB)
           ? { ...storedBB }

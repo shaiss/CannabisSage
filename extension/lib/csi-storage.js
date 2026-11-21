@@ -575,23 +575,46 @@
     return enqueueTasteProfile(() => migrateTasteProfileWriteUnlocked(normalizedValue));
   }
 
-  async function migrateTasteProfileWriteUnlocked(normalizedValue) {
+  async function migrateTasteProfileWriteUnlocked(payloadValue) {
+    // Re-validate at write time: proxied migrateWrite must not skip normalize /
+    // isStoredProfile the way save/import enforce on every mutation.
+    // The caller's payload is only a gate; the persisted value is always derived
+    // from the re-read stored profile so a content script cannot replace v1.
+    if (payloadValue == null || typeof payloadValue !== 'object' || Array.isArray(payloadValue)) {
+      return { ok: false, error: 'invalid migration payload' };
+    }
+    const normalized = CSI.profile?.normalize?.(payloadValue);
+    if (!normalized || !normalized.ok || !CSI.profile.isStoredProfile(normalized.value)) {
+      return {
+        ok: false,
+        error: (normalized && normalized.error) || 'invalid migration profile'
+      };
+    }
+    const normalizedValue = normalized.value;
     try {
       const again = await storageGetStrict([KEYS.PROFILE]);
       const current = again[KEYS.PROFILE];
+      // Delete (or never-stored) wins: do not resurrect the key.
       if (current == null) return { ok: true, value: { enabled: false } };
       const remig = CSI.profile.migrateIfNeeded(current);
       if (remig && remig.ok && !remig.didMigrate) {
         return { ok: true, value: normalizeStoredOrOff(current) };
       }
+      // Persist only the upgrade of `current`, never the caller's payload.
+      const upgraded =
+        remig && remig.ok && remig.value ? CSI.profile.normalize(remig.value) : null;
+      if (!upgraded || !upgraded.ok || !CSI.profile.isStoredProfile(upgraded.value)) {
+        return { ok: false, error: 'invalid migration profile' };
+      }
       try {
-        await storageSet({ [KEYS.PROFILE]: normalizedValue });
+        await storageSet({ [KEYS.PROFILE]: upgraded.value });
       } catch (writeErr) {
         CSI.warn('profile migration write failed', writeErr);
       }
-      return { ok: true, value: normalizedValue };
+      return { ok: true, value: upgraded.value };
     } catch (readErr) {
       CSI.warn('profile migration recheck read failed', readErr);
+      // Read failed: keep caller's in-memory value for loadTasteProfile (no write).
       return { ok: true, value: normalizedValue };
     }
   }

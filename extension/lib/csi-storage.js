@@ -473,63 +473,79 @@
   }
 
   /**
+   * In-memory materialize (migrate without write). Shared by peek / strict Save read.
+   */
+  function materializeTasteProfile(raw) {
+    if (raw == null) return { enabled: false };
+
+    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
+    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+      const normalizedMigrated = CSI.profile.normalize(migrated.value);
+      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
+        return normalizedMigrated.value;
+      }
+    }
+    return normalizeStoredOrOff(raw);
+  }
+
+  /**
    * Read profile without write-back. Used for import preview so Cancel cannot
    * leave a migrated v2 key behind.
    */
   async function peekTasteProfile() {
     const data = await storageGet([KEYS.PROFILE]);
-    const raw = data[KEYS.PROFILE];
-    if (raw == null) return { enabled: false };
-
-    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
-    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
-      const normalizedMigrated = CSI.profile.normalize(migrated.value);
-      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
-        return normalizedMigrated.value;
-      }
-    }
-    return normalizeStoredOrOff(raw);
+    return materializeTasteProfile(data[KEYS.PROFILE]);
   }
 
-  async function loadTasteProfile() {
-    const data = await storageGet([KEYS.PROFILE]);
-    const raw = data[KEYS.PROFILE];
-    if (raw == null) return { enabled: false };
+  /**
+   * Strict read for Save: a chrome.storage failure must not look like an empty
+   * profile (which would seed emptyEnabled and wipe stored fields on write).
+   * Migrates in memory only — persistence goes through saveTasteProfile.
+   */
+  async function loadTasteProfileStrict() {
+    const data = await storageGetStrict([KEYS.PROFILE]);
+    return materializeTasteProfile(data[KEYS.PROFILE]);
+  }
 
-    // One-time idempotent v1 → v2 migration; write back only when shape changes.
-    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
-    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
-      const normalizedMigrated = CSI.profile.normalize(migrated.value);
-      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
-        // Re-read before write so a concurrent Delete / other migration wins.
-        // Read failure must not look like deletion — keep the in-memory v2 profile.
-        try {
-          const again = await storageGetStrict([KEYS.PROFILE]);
-          const current = again[KEYS.PROFILE];
-          if (current == null) return { enabled: false };
-          const remig = CSI.profile.migrateIfNeeded(current);
-          if (remig && remig.ok && !remig.didMigrate) {
-            return normalizeStoredOrOff(current);
-          }
-          try {
-            await storageSet({ [KEYS.PROFILE]: normalizedMigrated.value });
-          } catch (writeErr) {
-            CSI.warn('profile migration write failed', writeErr);
-          }
-        } catch (readErr) {
-          CSI.warn('profile migration recheck read failed', readErr);
-          return normalizedMigrated.value;
-        }
-        return normalizedMigrated.value;
-      }
+  /**
+   * Content scripts and the popup each have their own JS heap. Taste-profile
+   * mutations go through the service worker so a listing bought-before flag
+   * cannot race a popup import/save. Tests and the worker itself run the queue
+   * locally (no runtime.id, or this is the worker).
+   */
+  function tasteProfileUsesLocalQueue() {
+    if (typeof ServiceWorkerGlobalScope !== 'undefined') return true;
+    try {
+      return !chrome.runtime?.id;
+    } catch {
+      return true;
     }
+  }
 
-    return normalizeStoredOrOff(raw);
+  function proxyTasteProfile(op, payload) {
+    return new Promise((resolve) => {
+      try {
+        chrome.runtime.sendMessage(
+          { type: 'CSI_TASTE_PROFILE', op, payload: payload || {} },
+          (response) => {
+            const err = chrome.runtime.lastError;
+            if (err || !response) {
+              resolve({ ok: false, error: (err && err.message) || 'profile update failed' });
+              return;
+            }
+            resolve(response);
+          }
+        );
+      } catch (e) {
+        resolve({ ok: false, error: (e && e.message) || 'profile update failed' });
+      }
+    });
   }
 
   /**
    * Serialize taste-profile read/compare/write so import stale checks cannot
    * race other profile writers (save / delete / bought-before) in this JS heap.
+   * Cross-context writers use proxyTasteProfile → service worker instead.
    */
   let tasteProfileWrite = Promise.resolve();
 
@@ -542,7 +558,64 @@
     return run;
   }
 
+  /**
+   * One-time v1→v2 write-back on the shared writer (SW when cross-context).
+   * Recheck before write so a concurrent Delete wins; read/write failures keep
+   * the in-memory v2 return value (load must not abort).
+   */
+  async function migrateTasteProfileWrite(normalizedValue) {
+    if (!tasteProfileUsesLocalQueue()) {
+      const result = await proxyTasteProfile('migrateWrite', { value: normalizedValue });
+      if (!result || result.ok === false) {
+        CSI.warn('profile migration write failed', result && result.error);
+        return { ok: true, value: normalizedValue };
+      }
+      return result;
+    }
+    return enqueueTasteProfile(() => migrateTasteProfileWriteUnlocked(normalizedValue));
+  }
+
+  async function migrateTasteProfileWriteUnlocked(normalizedValue) {
+    try {
+      const again = await storageGetStrict([KEYS.PROFILE]);
+      const current = again[KEYS.PROFILE];
+      if (current == null) return { ok: true, value: { enabled: false } };
+      const remig = CSI.profile.migrateIfNeeded(current);
+      if (remig && remig.ok && !remig.didMigrate) {
+        return { ok: true, value: normalizeStoredOrOff(current) };
+      }
+      try {
+        await storageSet({ [KEYS.PROFILE]: normalizedValue });
+      } catch (writeErr) {
+        CSI.warn('profile migration write failed', writeErr);
+      }
+      return { ok: true, value: normalizedValue };
+    } catch (readErr) {
+      CSI.warn('profile migration recheck read failed', readErr);
+      return { ok: true, value: normalizedValue };
+    }
+  }
+
+  async function loadTasteProfile() {
+    const data = await storageGet([KEYS.PROFILE]);
+    const raw = data[KEYS.PROFILE];
+    if (raw == null) return { enabled: false };
+
+    // One-time idempotent v1 → v2 migration; write back only when shape changes.
+    const migrated = CSI.profile?.migrateIfNeeded?.(raw);
+    if (migrated && migrated.ok && migrated.didMigrate && migrated.value) {
+      const normalizedMigrated = CSI.profile.normalize(migrated.value);
+      if (normalizedMigrated && normalizedMigrated.ok && CSI.profile.isStoredProfile(normalizedMigrated.value)) {
+        const result = await migrateTasteProfileWrite(normalizedMigrated.value);
+        return (result && result.value) || normalizedMigrated.value;
+      }
+    }
+
+    return normalizeStoredOrOff(raw);
+  }
+
   async function saveTasteProfile(raw) {
+    if (!tasteProfileUsesLocalQueue()) return proxyTasteProfile('save', { raw });
     return enqueueTasteProfile(() => saveTasteProfileUnlocked(raw));
   }
 
@@ -561,7 +634,14 @@
       }
 
       // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
-      const existingData = await storageGet([KEYS.PROFILE]);
+      // Strict read: a failed get must not look like !hadStored (which skips the write
+      // and can leave callers thinking the wipe succeeded — or overwrite after a soft read).
+      let existingData;
+      try {
+        existingData = await storageGetStrict([KEYS.PROFILE]);
+      } catch (readErr) {
+        return { ok: false, error: (readErr && readErr.message) || 'storage read failed' };
+      }
       const existing = CSI.profile?.normalize?.(existingData[KEYS.PROFILE]);
       const hadStored =
         existing && existing.ok && CSI.profile.isStoredProfile(existing.value);
@@ -589,6 +669,7 @@
   }
 
   async function deleteTasteProfile() {
+    if (!tasteProfileUsesLocalQueue()) return proxyTasteProfile('delete');
     return enqueueTasteProfile(async () => {
       try {
         await storageRemoveStrict([KEYS.PROFILE]);
@@ -641,6 +722,9 @@
     if (!CSI.profile.isStoredProfile(parsed.value)) {
       return { ok: false, error: 'import must be a full profile' };
     }
+    if (!tasteProfileUsesLocalQueue()) {
+      return proxyTasteProfile('import', { raw: parsed.value, opts: opts || {} });
+    }
     const expectUpdatedAt =
       opts && Object.prototype.hasOwnProperty.call(opts, 'expectedUpdatedAt')
         ? opts.expectedUpdatedAt
@@ -690,11 +774,14 @@
   }
 
   async function setBoughtBeforeFlag(url, flag) {
+    if (!tasteProfileUsesLocalQueue()) return proxyTasteProfile('boughtBefore', { url, flag });
     return enqueueTasteProfile(() => setBoughtBeforeFlagUnlocked(url, flag));
   }
 
   async function setBoughtBeforeFlagUnlocked(url, flag) {
-    const profile = await loadTasteProfile();
+    // Peek (no migrate write) — already on the writer queue; nested migrate enqueue
+    // would deadlock. Saving the flag persists any in-memory v1→v2 materialization.
+    const profile = await peekTasteProfile();
     if (!profile.enabled) return { ok: false, error: 'profile is not enabled' };
     const key = CSI.profile.productKeyFromUrl(url);
     if (!key) return { ok: false, error: 'unsupported product URL' };
@@ -908,6 +995,7 @@
     loadSoftUnlockDismissed,
     saveSoftUnlockDismissed,
     loadTasteProfile,
+    loadTasteProfileStrict,
     peekTasteProfile,
     saveTasteProfile,
     deleteTasteProfile,
@@ -915,6 +1003,7 @@
     previewTasteProfileImport,
     importTasteProfile,
     setBoughtBeforeFlag,
+    migrateTasteProfileWrite,
     loadSavedWatch,
     loadSavedItems,
     toggleSavedItem,

@@ -1100,4 +1100,469 @@ assert(
   'profile content script'
 );
 
+// --- Fix-first blockers (independent review) ---
+
+// (1) Strict Save read: storage failure must not look like empty → wipe.
+assert(typeof CSI.storage.loadTasteProfileStrict === 'function', 'loadTasteProfileStrict exported');
+assert(popupJs.includes('loadTasteProfileStrict'), 'Save uses loadTasteProfileStrict');
+assert(
+  /loadTasteProfileStrict[\s\S]{0,200}Could not read profile/.test(popupJs) ||
+    /loadTasteProfileStrict\(\)[\s\S]{0,300}showStatus/.test(popupJs),
+  'Save shows error status on strict read failure'
+);
+assert(
+  /saveTasteProfileUnlocked[\s\S]{0,800}storageGetStrict/.test(
+    fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8')
+  ),
+  'disable path uses storageGetStrict'
+);
+
+await CSI.storage.deleteTasteProfile();
+const wipeGuard = await CSI.storage.saveTasteProfile({
+  enabled: true,
+  formats: [{ id: 'flower', slot: null }],
+  sizes: ['3.5g'],
+  likedTerpenes: ['Limonene'],
+  avoidTerpenes: [],
+  watchedStores: ['sunnyside'],
+  brandLoves: ['Acme'],
+  brandAvoids: [],
+  dealTier: 'any',
+  boughtBefore: {}
+});
+assert(wipeGuard.ok && wipeGuard.value.enabled, 'wipe-guard profile saved');
+const beforeWipe = JSON.stringify(store.csi_taste_profile);
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+let strictThrew = false;
+try {
+  await CSI.storage.loadTasteProfileStrict();
+} catch (e) {
+  strictThrew = /storage read failed/i.test((e && e.message) || '');
+}
+assert(strictThrew, 'loadTasteProfileStrict throws on read failure');
+assert(JSON.stringify(store.csi_taste_profile) === beforeWipe, 'strict read failure did not mutate storage');
+
+// Soft load still returns empty-shaped off on the same failure mode (best-effort).
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+const softOnFail = await CSI.storage.loadTasteProfile();
+assert(softOnFail.enabled === false, 'best-effort loadTasteProfile soft-fails to off');
+assert(JSON.stringify(store.csi_taste_profile) === beforeWipe, 'soft load failure left profile intact');
+
+// Disable-path strict read: error must not be treated as !hadStored.
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+const disableOnReadFail = await CSI.storage.saveTasteProfile({
+  ...wipeGuard.value,
+  enabled: false
+});
+assert(!disableOnReadFail.ok, 'disable save aborts when strict read fails');
+assert(/storage read failed/i.test(disableOnReadFail.error || ''), 'disable save reports read failure');
+assert(store.csi_taste_profile.enabled === true, 'failed disable read did not wipe enabled profile');
+assert(store.csi_taste_profile.brandLoves.includes('Acme'), 'failed disable read kept brandLoves');
+
+// (2) Brand checkboxes: case-insensitive fill + preserve stored casing on save.
+assert(/caseInsensitive:\s*true/.test(popupJs), 'brand fillChecks use caseInsensitive');
+assert(
+  /readChecks\(document\.getElementById\('profile-brand-loyal'\),\s*base\.brandLoves/.test(popupJs),
+  'brandLoves read preserves preferred casing'
+);
+assert(
+  /readChecks\(document\.getElementById\('profile-brand-avoid'\),\s*base\.brandAvoids/.test(popupJs),
+  'brandAvoids read preserves preferred casing'
+);
+
+{
+  // DOM-driven fillChecks / readChecks extracted from popup.js
+  function makeNode(tag) {
+    const kids = [];
+    const node = {
+      tagName: String(tag).toUpperCase(),
+      childNodes: kids,
+      children: kids,
+      parentNode: null,
+      checked: false,
+      value: '',
+      type: '',
+      textContent: '',
+      appendChild(child) {
+        kids.push(child);
+        child.parentNode = node;
+        return child;
+      },
+      querySelectorAll(sel) {
+        const walk = (n, out = []) => {
+          if (n.tagName === 'INPUT') out.push(n);
+          (n.childNodes || []).forEach((c) => walk(c, out));
+          return out;
+        };
+        const inputs = walk(node);
+        if (sel === 'input:checked') return inputs.filter((i) => i.checked);
+        if (sel === 'input') return inputs;
+        return [];
+      }
+    };
+    Object.defineProperty(node, 'innerHTML', {
+      get() {
+        return '';
+      },
+      set() {
+        kids.length = 0;
+      }
+    });
+    return node;
+  }
+  const doc = {
+    createElement: (tag) => makeNode(tag),
+    createTextNode: (t) => ({ nodeType: 3, textContent: t })
+  };
+  const fillMatch = popupJs.match(/function fillChecks\(container, items, selected, opts\) \{[\s\S]*?\n  \}/);
+  const readMatch = popupJs.match(/function readChecks\(container, preferred\) \{[\s\S]*?\n  \}/);
+  assert(fillMatch && readMatch, 'extracted fillChecks/readChecks from popup');
+  const brandFns = vm.runInNewContext(
+    `${fillMatch[0]}\n${readMatch[0]}\n({ fillChecks, readChecks })`,
+    { document: doc }
+  );
+  const brandBox = makeNode('div');
+  brandFns.fillChecks(
+    brandBox,
+    [
+      { id: 'ACME', label: 'ACME' },
+      { id: 'Other', label: 'Other' }
+    ],
+    ['Acme'],
+    { caseInsensitive: true }
+  );
+  const checkedVals = brandBox.querySelectorAll('input:checked').map((el) => el.value);
+  assert(checkedVals.length === 1 && checkedVals[0] === 'ACME', 'case-insensitive fill checks ACME for Acme');
+  const preserved = brandFns.readChecks(brandBox, ['Acme']);
+  assert(preserved.length === 1 && preserved[0] === 'Acme', 'readChecks preserves stored Acme casing');
+  // Exact matching elsewhere: forms must not use caseInsensitive.
+  assert(
+    /fillChecks\(\s*document\.getElementById\('profile-forms'\)[\s\S]*?\);/.test(popupJs) &&
+      !/fillChecks\(\s*document\.getElementById\('profile-forms'\)[\s\S]{0,200}caseInsensitive/.test(
+        popupJs
+      ),
+    'profile-forms fillChecks stays exact'
+  );
+}
+
+// (3) commitSavedDigest ok===false must take the error path (not Pro upgrade card).
+assert(
+  /commitSavedDigest[\s\S]{0,200}result\.ok === false[\s\S]{0,120}throw new Error/.test(popupJs),
+  'commitSavedDigest ok===false throws before renderDigestResult'
+);
+assert(!/result\.ok === true/.test(popupJs.match(/commitSavedDigest[\s\S]{0,400}/)[0]), 'does not require ok===true');
+
+{
+  // Behavioral: simulate the popup guard against a proxied {ok:false} result.
+  let rendered = null;
+  function renderDigestResult(view) {
+    rendered = view;
+  }
+  const result = { ok: false, error: 'watch update failed' };
+  let threw = null;
+  try {
+    if (result && result.ok === false) throw new Error(result.error || 'Saved-watch write failed');
+    renderDigestResult(result && result.view);
+  } catch (e) {
+    threw = e;
+    renderDigestResult({
+      status: 'error',
+      message: (e && e.message) || 'Saved-watch write failed'
+    });
+  }
+  assert(threw, 'ok===false throws');
+  assert(rendered && rendered.status === 'error', 'error status rendered');
+  assert(rendered.message === 'watch update failed', 'error message from result.error');
+  assert(rendered.status !== 'locked', 'does not render Pro upgrade/locked card');
+}
+
+// (4) Cross-context csi_taste_profile writer via CSI_TASTE_PROFILE (mirrors CSI_SAVED_WATCH).
+const storageSrc = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
+const bgSrc = fs.readFileSync(path.join(ext, 'background.js'), 'utf8');
+assert(storageSrc.includes('CSI_TASTE_PROFILE'), 'storage proxies taste-profile mutations');
+assert(storageSrc.includes('tasteProfileUsesLocalQueue'), 'taste profile local-queue gate');
+assert(storageSrc.includes('migrateTasteProfileWrite'), 'migration write-back is a queued mutation');
+assert(bgSrc.includes('CSI_TASTE_PROFILE'), 'service worker handles CSI_TASTE_PROFILE');
+assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile modules');
+{
+  const workerStore = {};
+  const listeners = [];
+  const profileSends = [];
+  const workerChrome = {
+    runtime: {
+      id: 'csi-test-extension',
+      getURL: (p) => p,
+      lastError: null,
+      onInstalled: { addListener() {} },
+      onStartup: { addListener() {} },
+      onMessage: {
+        addListener(fn) {
+          listeners.push(fn);
+        }
+      },
+      sendMessage(msg, cb) {
+        profileSends.push(msg);
+        if (cb) cb({ ok: true });
+      }
+    },
+    storage: {
+      local: {
+        get(keys, cb) {
+          const out = {};
+          if (keys == null) Object.assign(out, workerStore);
+          else {
+            const list = Array.isArray(keys)
+              ? keys
+              : typeof keys === 'string'
+                ? [keys]
+                : Object.keys(keys);
+            list.forEach((k) => {
+              if (Object.prototype.hasOwnProperty.call(workerStore, k)) out[k] = workerStore[k];
+            });
+          }
+          if (typeof cb === 'function') {
+            cb(out);
+            return undefined;
+          }
+          return Promise.resolve(out);
+        },
+        set(obj, cb) {
+          Object.assign(workerStore, obj);
+          if (typeof cb === 'function') cb();
+          else return Promise.resolve();
+        },
+        remove(keys, cb) {
+          (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete workerStore[k]);
+          if (typeof cb === 'function') cb();
+          else return Promise.resolve();
+        }
+      }
+    },
+    action: {
+      setBadgeBackgroundColor(_d, cb) {
+        if (cb) cb();
+      },
+      setBadgeText(_d, cb) {
+        if (cb) cb();
+      }
+    }
+  };
+  const workerSandbox = {
+    console,
+    URL,
+    fetch: () => Promise.reject(new Error('profile worker must not fetch')),
+    XMLHttpRequest: function XMLHttpRequest() {
+      throw new Error('profile worker must not XHR');
+    },
+    chrome: workerChrome,
+    ServiceWorkerGlobalScope: function ServiceWorkerGlobalScope() {},
+    importScripts() {},
+    globalThis: null,
+    window: null,
+    self: null,
+    location: { href: 'https://chrome-extension.invalid/background' }
+  };
+  workerSandbox.globalThis = workerSandbox;
+  workerSandbox.window = workerSandbox;
+  workerSandbox.self = workerSandbox;
+  const workerContext = vm.createContext(workerSandbox);
+  loadScripts(
+    [
+      'lib/csi-packaged-paths.js',
+      'lib/csi-core.js',
+      'adapters/interface.js',
+      'adapters/sunnyside.js',
+      'adapters/zenleaf.js',
+      'adapters/terravida.js',
+      'adapters/curaleaf.js',
+      'adapters/iheartjane.js',
+      'adapters/dutchie.js',
+      'adapters/shopd.js',
+      'adapters/registry.js',
+      'lib/csi-entitlement.js',
+      'lib/csi-features.js',
+      'lib/csi-storage.js',
+      'lib/csi-profile.js',
+      'lib/csi-digest.js'
+    ],
+    workerContext
+  );
+  vm.runInContext(fs.readFileSync(path.join(ext, 'background.js'), 'utf8'), workerContext, {
+    filename: 'background.js'
+  });
+  assert(listeners.length === 1, 'profile worker registers one message listener');
+
+  function dispatch(message) {
+    return new Promise((resolve) => {
+      const keep = listeners[0](
+        message,
+        { id: workerChrome.runtime.id },
+        (value) => resolve(value)
+      );
+      if (keep !== true) resolve(undefined);
+    });
+  }
+
+  const denied = await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'save',
+    payload: { raw: { enabled: true, watchedStores: ['sunnyside'] } }
+  });
+  // Unauthorized would be blocked by sender check — same-extension sender is ok.
+  assert(denied && denied.ok === true, 'SW save writes a valid profile');
+  assert(workerStore.csi_taste_profile && workerStore.csi_taste_profile.enabled === true, 'SW save persisted');
+
+  const foreign = await new Promise((resolve) => {
+    const keep = listeners[0](
+      { type: 'CSI_TASTE_PROFILE', op: 'delete' },
+      { id: 'not-this-extension' },
+      (value) => resolve(value)
+    );
+    if (keep !== true) resolve(undefined);
+  });
+  assert(foreign && foreign.ok === false, 'foreign sender blocked');
+  assert(workerStore.csi_taste_profile, 'foreign delete did not remove profile');
+
+  // migrateWrite on the queue: v1 on disk → v2 write-back; Delete wins if key gone.
+  workerStore.csi_taste_profile = {
+    schemaVersion: 1,
+    enabled: true,
+    forms: ['flower'],
+    sizes: [],
+    likedTerpenes: [],
+    avoidTerpenes: [],
+    tripBudgetUsd: 40,
+    homeStore: 'sunnyside',
+    secondaryStores: [],
+    brandLoyal: [],
+    brandAvoid: [],
+    dealTier: 'any',
+    boughtBefore: {}
+  };
+  const W = workerSandbox.CSI;
+  const v1raw = workerStore.csi_taste_profile;
+  const migrated = W.profile.migrateIfNeeded(v1raw);
+  assert(migrated.ok && migrated.didMigrate, 'fixture migrates');
+  const normalized = W.profile.normalize(migrated.value);
+  assert(normalized.ok, 'migrated normalizes');
+  const migWrite = await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'migrateWrite',
+    payload: { value: normalized.value }
+  });
+  assert(migWrite && migWrite.ok, 'migrateWrite ok');
+  assert(workerStore.csi_taste_profile.schemaVersion === 2, 'migrateWrite persisted v2');
+
+  await dispatch({ type: 'CSI_TASTE_PROFILE', op: 'delete' });
+  assert(!Object.prototype.hasOwnProperty.call(workerStore, 'csi_taste_profile'), 'SW delete removed key');
+  const migAfterDelete = await dispatch({
+    type: 'CSI_TASTE_PROFILE',
+    op: 'migrateWrite',
+    payload: { value: normalized.value }
+  });
+  assert(migAfterDelete && migAfterDelete.value && migAfterDelete.value.enabled === false, 'migrate after delete yields off');
+  assert(
+    !Object.prototype.hasOwnProperty.call(workerStore, 'csi_taste_profile'),
+    'migrateWrite does not resurrect a deleted key'
+  );
+
+  // Content-script-shaped heap proxies mutations (runtime.id set, not a ServiceWorker).
+  const pageStore = {};
+  const pageSends = [];
+  const pageChrome = {
+    runtime: {
+      id: 'csi-test-extension',
+      getURL: (p) => p,
+      lastError: null,
+      sendMessage(msg, cb) {
+        pageSends.push(msg);
+        // Echo through the worker listener so the proxy round-trips.
+        dispatch(msg).then((response) => cb && cb(response));
+      }
+    },
+    storage: {
+      local: {
+        get(keys, cb) {
+          const out = {};
+          const list = Array.isArray(keys)
+            ? keys
+            : typeof keys === 'string'
+              ? [keys]
+              : Object.keys(keys || {});
+          list.forEach((k) => {
+            if (Object.prototype.hasOwnProperty.call(pageStore, k)) out[k] = pageStore[k];
+          });
+          cb && cb(out);
+        },
+        set(obj, cb) {
+          Object.assign(pageStore, obj);
+          cb && cb();
+        },
+        remove(keys, cb) {
+          (Array.isArray(keys) ? keys : [keys]).forEach((k) => delete pageStore[k]);
+          cb && cb();
+        }
+      }
+    }
+  };
+  const pageSandbox = {
+    console,
+    URL,
+    chrome: pageChrome,
+    globalThis: null,
+    window: null,
+    location: { href: 'https://www.sunnyside.shop/product/x' }
+  };
+  pageSandbox.globalThis = pageSandbox;
+  pageSandbox.window = pageSandbox;
+  const pageCtx = vm.createContext(pageSandbox);
+  loadScripts(
+    [
+      'lib/csi-packaged-paths.js',
+      'lib/csi-core.js',
+      'lib/csi-profile.js',
+      'lib/csi-storage.js'
+    ],
+    pageCtx
+  );
+  const pageCSI = pageSandbox.CSI;
+  const proxiedSave = await pageCSI.storage.saveTasteProfile({
+    enabled: true,
+    formats: [{ id: 'flower', slot: null }],
+    sizes: [],
+    likedTerpenes: [],
+    avoidTerpenes: [],
+    watchedStores: ['zenleaf'],
+    dealTier: 'any',
+    boughtBefore: {}
+  });
+  assert(proxiedSave.ok, 'page save proxied ok');
+  assert(
+    pageSends.some((m) => m.type === 'CSI_TASTE_PROFILE' && m.op === 'save'),
+    'page save sent CSI_TASTE_PROFILE'
+  );
+  assert(
+    workerStore.csi_taste_profile && workerStore.csi_taste_profile.watchedStores[0] === 'zenleaf',
+    'proxied save landed in worker store'
+  );
+  assert(!pageStore.csi_taste_profile, 'page heap did not write local storage directly');
+
+  const boughtUrl = pageCSI.profile.productKeyFromUrl(
+    'https://www.sunnyside.shop/product/proxied-flag-item'
+  );
+  const proxiedFlag = await pageCSI.storage.setBoughtBeforeFlag(boughtUrl, 'rebuy');
+  assert(proxiedFlag.ok, 'page bought-before proxied ok');
+  assert(
+    pageSends.some((m) => m.type === 'CSI_TASTE_PROFILE' && m.op === 'boughtBefore'),
+    'bought-before sent CSI_TASTE_PROFILE'
+  );
+  assert(
+    workerStore.csi_taste_profile.boughtBefore[boughtUrl] === 'rebuy',
+    'proxied bought-before landed in worker store'
+  );
+}
+
 console.log('smoke-profile: OK');

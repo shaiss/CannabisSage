@@ -151,23 +151,45 @@
     });
   }
 
-  function fillChecks(container, items, selected) {
+  function fillChecks(container, items, selected, opts) {
+    const caseInsensitive = !!(opts && opts.caseInsensitive);
     const on = new Set(selected || []);
+    const onLower = caseInsensitive
+      ? new Set(
+          [...on].map((v) => (typeof v === 'string' ? v.toLowerCase() : String(v).toLowerCase()))
+        )
+      : null;
     container.innerHTML = '';
     items.forEach(({ id, label }) => {
       const wrap = document.createElement('label');
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.value = id;
-      if (on.has(id)) input.checked = true;
+      const hit = caseInsensitive
+        ? onLower.has(typeof id === 'string' ? id.toLowerCase() : String(id).toLowerCase())
+        : on.has(id);
+      if (hit) input.checked = true;
       wrap.appendChild(input);
       wrap.appendChild(document.createTextNode(` ${label}`));
       container.appendChild(wrap);
     });
   }
 
-  function readChecks(container) {
-    return [...container.querySelectorAll('input:checked')].map((el) => el.value);
+  function readChecks(container, preferred) {
+    const checked = [...container.querySelectorAll('input:checked')].map((el) => el.value);
+    if (!preferred || !preferred.length) return checked;
+    // Preserve stored casing when the checkbox id only matches case-insensitively
+    // (e.g. cache listed 'ACME' while the profile stored 'Acme').
+    const prefByLower = new Map();
+    preferred.forEach((p) => {
+      if (typeof p === 'string' && p && !prefByLower.has(p.toLowerCase())) {
+        prefByLower.set(p.toLowerCase(), p);
+      }
+    });
+    return checked.map((v) => {
+      const key = typeof v === 'string' ? v.toLowerCase() : String(v).toLowerCase();
+      return prefByLower.get(key) || v;
+    });
   }
 
   function setProfileEnabled(on) {
@@ -240,8 +262,12 @@
       watched.slice(1)
     );
     const brandItems = brands.map((id) => ({ id, label: id }));
-    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoves || []);
-    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoids || []);
+    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoves || [], {
+      caseInsensitive: true
+    });
+    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoids || [], {
+      caseInsensitive: true
+    });
     document.getElementById('profile-brands-empty').hidden = brands.length > 0;
     fillSelect(
       document.getElementById('profile-deal'),
@@ -306,8 +332,8 @@
       avoidTerpenes: readChecks(document.getElementById('profile-avoid')),
       budget,
       watchedStores,
-      brandLoves: readChecks(document.getElementById('profile-brand-loyal')),
-      brandAvoids: readChecks(document.getElementById('profile-brand-avoid')),
+      brandLoves: readChecks(document.getElementById('profile-brand-loyal'), base.brandLoves || []),
+      brandAvoids: readChecks(document.getElementById('profile-brand-avoid'), base.brandAvoids || []),
       dealTier: document.getElementById('profile-deal').value || 'any'
     };
   }
@@ -332,7 +358,14 @@
   document.getElementById('profile-save').addEventListener('click', async () => {
     // Guard against Save while Apply holds the import lock (stale form would overwrite).
     if (importApplyBusy) return;
-    const existing = await CSI.storage.loadTasteProfile();
+    let existing;
+    try {
+      // Strict read: a storage failure must not look like empty → emptyEnabled wipe.
+      existing = await CSI.storage.loadTasteProfileStrict();
+    } catch (e) {
+      showStatus((e && e.message) || 'Could not read profile');
+      return;
+    }
     const raw = readProfileForm(existing);
     // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
     if (!raw.enabled && CSI.profile.isStoredProfile(existing)) {
@@ -711,6 +744,7 @@
     }
     try {
       const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
+      if (result && result.ok === false) throw new Error(result.error || 'Saved-watch write failed');
       renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
     } catch (e) {
       renderDigestResult(

@@ -43,6 +43,12 @@ assert(licensesSrc.includes('hasDatabaseUrl'), 'neon gate');
 assert(licensesSrc.includes('allowDevFileStore'), 'dev file fallback gate');
 assert(licensesSrc.includes('upsertLicense'), 'sole CRUD upsert');
 assert(licensesSrc.includes('getLicense'), 'sole CRUD get');
+assert(licensesSrc.includes('isEntitlementActive'), 'entitlement active helper');
+assert(
+  /typeof endRaw !== 'string'/.test(licensesSrc) &&
+    /Number\.isNaN\(end\) \|\| end < now\.getTime\(\)/.test(licensesSrc),
+  'isEntitlementActive fails closed on unparseable currentPeriodEnd'
+);
 
 const dbSrc = fs.readFileSync(path.join(webRoot, 'lib/db.ts'), 'utf8');
 assert(dbSrc.includes('@neondatabase/serverless'), 'neon driver');

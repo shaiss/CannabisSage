@@ -238,10 +238,13 @@ export async function findBySubscriptionId(subscriptionId: string): Promise<Lice
 export function isEntitlementActive(record: LicenseRecord | null, now = new Date()): boolean {
   if (!record) return false;
   if (record.status !== 'active' && record.status !== 'past_due') return false;
-  if (record.currentPeriodEnd) {
-    const end = new Date(record.currentPeriodEnd).getTime();
-    if (!Number.isNaN(end) && end < now.getTime()) return false;
-  }
+  const endRaw = record.currentPeriodEnd;
+  // Missing/empty period end is lifetime (server may omit current_period_end).
+  if (endRaw == null || endRaw === '') return true;
+  // Fail closed: present but non-string or unparseable expiry is not active.
+  if (typeof endRaw !== 'string') return false;
+  const end = Date.parse(endRaw);
+  if (Number.isNaN(end) || end < now.getTime()) return false;
   return true;
 }
 

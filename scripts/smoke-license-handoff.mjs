@@ -1,13 +1,15 @@
-#!/usr/bin/env -S node --experimental-strip-types
+#!/usr/bin/env node
 /**
  * License handoff smoke: openManage must not put the key in a query string.
  * Fragment (#key=…) is OK; the account page clears it client-side.
- * Run: node --experimental-strip-types scripts/smoke-license-handoff.mjs
- *      (shebang includes the flag when executed directly)
+ * Run: node scripts/smoke-license-handoff.mjs
+ * (Node 20+ — transpiles web/lib/license-handoff.ts via typescript; no strip-types)
  */
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import vm from 'vm';
+import { createRequire } from 'module';
 import { fileURLToPath, pathToFileURL } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -40,8 +42,9 @@ assert(
   'account page validates via POST body, not a query string'
 );
 
-const handoffSrc = fs.readFileSync(path.join(web, 'lib/license-handoff.ts'), 'utf8');
-assert(/location\.hash|loc\.hash/.test(handoffSrc), 'handoff helper reads hash');
+const handoffTsPath = path.join(web, 'lib/license-handoff.ts');
+const handoffSrc = fs.readFileSync(handoffTsPath, 'utf8');
+assert(/loc\.hash/.test(handoffSrc), 'handoff helper reads hash');
 assert(/replaceState/.test(handoffSrc), 'handoff helper clears URL via replaceState');
 assert(/searchParams\.delete\(\s*['"]key['"]\s*\)/.test(handoffSrc), 'handoff strips legacy ?key=');
 
@@ -50,9 +53,26 @@ assert(/Referrer-Policy/.test(nextConfigSrc), 'Referrer-Policy configured');
 assert(/no-referrer/.test(nextConfigSrc), 'account page uses Referrer-Policy: no-referrer');
 assert(/['"]\/account['"]/.test(nextConfigSrc), 'Referrer-Policy scoped to /account');
 
-const { takeLicenseKeyFromUrl } = await import(
-  pathToFileURL(path.join(web, 'lib/license-handoff.ts')).href
-);
+/** Load the real helper via typescript transpile (works on Node 20 without strip-types). */
+async function loadHandoffHelper() {
+  const requireFromWeb = createRequire(path.join(web, 'package.json'));
+  const ts = requireFromWeb('typescript');
+  const { outputText } = ts.transpileModule(handoffSrc, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+      removeComments: false
+    },
+    fileName: 'license-handoff.ts'
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'csi-license-handoff-'));
+  const out = path.join(dir, 'license-handoff.mjs');
+  fs.writeFileSync(out, outputText);
+  return import(pathToFileURL(out).href);
+}
+
+const { takeLicenseKeyFromUrl } = await loadHandoffHelper();
+assert(typeof takeLicenseKeyFromUrl === 'function', 'transpiled takeLicenseKeyFromUrl loaded');
 
 /** Mutable location + history stand-in for table-driven helper checks. */
 function makeBrowse(href) {

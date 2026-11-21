@@ -116,7 +116,7 @@ assert(accountSrc.includes('@/lib/license-handoff'), 'account imports license-ha
 assert(accountSrc.includes('takeLicenseKeyFromUrl'), 'account calls takeLicenseKeyFromUrl');
 const handoffSrc = fs.readFileSync(path.join(webRoot, 'lib/license-handoff.ts'), 'utf8');
 assert(handoffSrc.includes('replaceState'), 'handoff clears fragment/query key from URL');
-assert(/loc\.hash|location\.hash/.test(handoffSrc), 'handoff reads fragment');
+assert(/loc\.hash/.test(handoffSrc), 'handoff reads fragment');
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.31', 'extension 1.3.31');

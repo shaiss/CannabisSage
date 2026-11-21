@@ -615,6 +615,16 @@ chrome.runtime.onMessage.addListener(
       sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
       return false;
     }
+    // Content scripts (sender.tab set) may only flag bought-before or run the
+    // one-time v1→v2 migrateWrite. Save / delete / import stay extension-page only.
+    const contentSafeOps = message.op === 'boughtBefore' || message.op === 'migrateWrite';
+    if (sender.tab && !contentSafeOps) {
+      sendResponse({
+        ok: false,
+        error: 'Blocked: content script cannot mutate profile this way.'
+      });
+      return false;
+    }
     (/**
      * Run a CSI_TASTE_PROFILE mutation on the worker's single writer queue.
      * @returns {Promise<void>}
@@ -631,7 +641,12 @@ chrome.runtime.onMessage.addListener(
         } else if (message.op === 'boughtBefore') {
           result = await self.CSI.storage.setBoughtBeforeFlag(payload.url, payload.flag);
         } else if (message.op === 'migrateWrite') {
-          result = await self.CSI.storage.migrateTasteProfileWrite(payload.value);
+          const value = payload.value;
+          if (value == null || typeof value !== 'object' || Array.isArray(value)) {
+            result = { ok: false, error: 'invalid migration payload' };
+          } else {
+            result = await self.CSI.storage.migrateTasteProfileWrite(value);
+          }
         } else result = { ok: false, error: 'unknown profile op' };
         sendResponse(result);
       } catch (err) {

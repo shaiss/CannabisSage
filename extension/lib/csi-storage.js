@@ -575,10 +575,24 @@
     return enqueueTasteProfile(() => migrateTasteProfileWriteUnlocked(normalizedValue));
   }
 
-  async function migrateTasteProfileWriteUnlocked(normalizedValue) {
+  async function migrateTasteProfileWriteUnlocked(payloadValue) {
+    // Re-validate at write time: proxied migrateWrite must not skip normalize /
+    // isStoredProfile the way save/import enforce on every mutation.
+    if (payloadValue == null || typeof payloadValue !== 'object' || Array.isArray(payloadValue)) {
+      return { ok: false, error: 'invalid migration payload' };
+    }
+    const normalized = CSI.profile?.normalize?.(payloadValue);
+    if (!normalized || !normalized.ok || !CSI.profile.isStoredProfile(normalized.value)) {
+      return {
+        ok: false,
+        error: (normalized && normalized.error) || 'invalid migration profile'
+      };
+    }
+    const normalizedValue = normalized.value;
     try {
       const again = await storageGetStrict([KEYS.PROFILE]);
       const current = again[KEYS.PROFILE];
+      // Delete (or never-stored) wins: do not resurrect the key.
       if (current == null) return { ok: true, value: { enabled: false } };
       const remig = CSI.profile.migrateIfNeeded(current);
       if (remig && remig.ok && !remig.didMigrate) {

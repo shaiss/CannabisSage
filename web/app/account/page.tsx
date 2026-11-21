@@ -1,12 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { takeLicenseKeyFromUrl } from '@/lib/license-handoff';
 
 export default function AccountPage() {
   const [licenseKey, setLicenseKey] = useState('');
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fromUrl = takeLicenseKeyFromUrl();
+    if (fromUrl) setLicenseKey(fromUrl.toUpperCase());
+  }, []);
 
   async function validate() {
     setError(null);
@@ -56,6 +62,7 @@ export default function AccountPage() {
           onChange={(e) => setLicenseKey(e.target.value)}
           placeholder="CSG-XXXX-XXXX-XXXX"
           style={{ display: 'block', width: '100%', marginTop: 6, padding: '0.6rem' }}
+          autoComplete="off"
         />
       </label>
       <div className="cta-row" style={{ marginTop: '1rem' }}>

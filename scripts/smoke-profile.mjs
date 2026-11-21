@@ -2132,6 +2132,70 @@ assert(bgSrc.includes('ensureTasteProfileModules'), 'worker checks taste profile
   assert(tabMig && tabMig.ok, 'content-script migrateWrite allowed');
   assert(workerStore.csi_taste_profile.schemaVersion === 2, 'tab migrateWrite persisted v2');
 
+  // Caller-supplied migrateWrite payload must not replace storage: persist only
+  // the upgrade of the re-read v1 profile (content scripts cannot smuggle a
+  // different valid v2, e.g. enabled:false or alternate prefs).
+  workerStore.csi_taste_profile = {
+    schemaVersion: 1,
+    enabled: true,
+    forms: ['flower'],
+    sizes: [],
+    likedTerpenes: [],
+    avoidTerpenes: [],
+    tripBudgetUsd: 40,
+    homeStore: 'sunnyside',
+    secondaryStores: [],
+    brandLoyal: ['Savvy'],
+    brandAvoid: [],
+    dealTier: 'any',
+    boughtBefore: {}
+  };
+  const storedV1 = { ...workerStore.csi_taste_profile };
+  const expectedUpgrade = W.profile.normalize(W.profile.migrateIfNeeded(storedV1).value);
+  assert(expectedUpgrade.ok && expectedUpgrade.value.enabled === true, 'fixture upgrade expected');
+  assert(expectedUpgrade.value.brandLoves.includes('Savvy'), 'fixture keeps brandLoyal→brandLoves');
+  const hostileDiffering = W.profile.emptyEnabled();
+  hostileDiffering.enabled = false;
+  hostileDiffering.schemaVersion = 2;
+  hostileDiffering.watchedStores = ['curaleaf'];
+  hostileDiffering.brandLoves = ['HostileBrand'];
+  hostileDiffering.budget = { min: null, max: 1, currency: 'USD' };
+  const hostileNorm = W.profile.normalize(hostileDiffering);
+  assert(
+    hostileNorm.ok && W.profile.isStoredProfile(hostileNorm.value),
+    'hostile differing payload is valid stored shape'
+  );
+  const differMig = await dispatch(
+    {
+      type: 'CSI_TASTE_PROFILE',
+      op: 'migrateWrite',
+      payload: { value: hostileNorm.value }
+    },
+    tabSender
+  );
+  assert(differMig && differMig.ok, 'migrateWrite accepts valid payload gate');
+  assert(workerStore.csi_taste_profile.schemaVersion === 2, 'differing payload still wrote v2');
+  assert(
+    workerStore.csi_taste_profile.enabled === true,
+    'migrateWrite did not persist caller enabled:false'
+  );
+  assert(
+    workerStore.csi_taste_profile.brandLoves.includes('Savvy') &&
+      !workerStore.csi_taste_profile.brandLoves.includes('HostileBrand'),
+    'migrateWrite persisted upgrade of stored v1, not caller brands'
+  );
+  assert(
+    workerStore.csi_taste_profile.watchedStores[0] === 'sunnyside' &&
+      !workerStore.csi_taste_profile.watchedStores.includes('curaleaf'),
+    'migrateWrite persisted upgrade of stored homeStore, not caller watchedStores'
+  );
+  assert(
+    differMig.value &&
+      differMig.value.enabled === true &&
+      differMig.value.brandLoves.includes('Savvy'),
+    'migrateWrite response reflects stored upgrade, not caller payload'
+  );
+
   const badMigShape = await dispatch({
     type: 'CSI_TASTE_PROFILE',
     op: 'migrateWrite',

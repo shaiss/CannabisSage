@@ -1,0 +1,42 @@
+name: Smoke
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    name: Run smoke scripts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          # Match CWS publish / @types/node ^22 in web/
+          node-version: "22"
+
+      - name: Run smoke scripts
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          scripts=(scripts/smoke-*.mjs web/scripts/smoke-*.mjs)
+          if ((${#scripts[@]} == 0)); then
+            echo "error: no smoke-*.mjs scripts found" >&2
+            exit 1
+          fi
+          for script in "${scripts[@]}"; do
+            echo "==> ${script}"
+            node "${script}"
+          done
+          echo "All ${#scripts[@]} smoke script(s) passed"

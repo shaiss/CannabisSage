@@ -501,10 +501,16 @@
     setImportApplyBusy(true);
     try {
       // If the stored profile changed after preview, re-diff and require confirmation again.
-      const current =
-        (CSI.storage.peekTasteProfile
-          ? await CSI.storage.peekTasteProfile()
-          : await CSI.storage.loadTasteProfile()) || { enabled: false };
+      let current;
+      try {
+        current =
+          (CSI.storage.peekTasteProfile
+            ? await CSI.storage.peekTasteProfile()
+            : await CSI.storage.loadTasteProfileStrict()) || { enabled: false };
+      } catch (e) {
+        showStatus((e && e.message) || 'Could not read profile');
+        return;
+      }
       if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
         showStatus('Import cancelled');
         return;
@@ -529,10 +535,16 @@
             showStatus('Import cancelled');
             return;
           }
-          const latest =
-            (CSI.storage.peekTasteProfile
-              ? await CSI.storage.peekTasteProfile()
-              : await CSI.storage.loadTasteProfile()) || { enabled: false };
+          let latest;
+          try {
+            latest =
+              (CSI.storage.peekTasteProfile
+                ? await CSI.storage.peekTasteProfile()
+                : await CSI.storage.loadTasteProfileStrict()) || { enabled: false };
+          } catch (e) {
+            showStatus((e && e.message) || 'Could not read profile');
+            return;
+          }
           if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
             showStatus('Import cancelled');
             return;

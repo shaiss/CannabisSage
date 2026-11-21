@@ -1111,10 +1111,10 @@ assert(
   'Save shows error status on strict read failure'
 );
 assert(
-  /saveTasteProfileUnlocked[\s\S]{0,800}storageGetStrict/.test(
+  /saveTasteProfileUnlocked[\s\S]{0,2400}storageGetStrict/.test(
     fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8')
   ),
-  'disable path uses storageGetStrict'
+  'saveTasteProfileUnlocked uses storageGetStrict'
 );
 
 await CSI.storage.deleteTasteProfile();
@@ -1161,6 +1161,112 @@ assert(!disableOnReadFail.ok, 'disable save aborts when strict read fails');
 assert(/storage read failed/i.test(disableOnReadFail.error || ''), 'disable save reports read failure');
 assert(store.csi_taste_profile.enabled === true, 'failed disable read did not wipe enabled profile');
 assert(store.csi_taste_profile.brandLoves.includes('Acme'), 'failed disable read kept brandLoves');
+
+// (1b) Failed-read peek / import preview must surface error (not "create" diff).
+assert(
+  /peekTasteProfile[\s\S]{0,80}loadTasteProfileStrict|storageGetStrict/.test(
+    fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8')
+  ),
+  'peekTasteProfile uses strict read'
+);
+{
+  const storageSrcForPreview = fs.readFileSync(path.join(ext, 'lib/csi-storage.js'), 'utf8');
+  const previewFnStart = storageSrcForPreview.indexOf('async function previewTasteProfileImport');
+  const previewFn = storageSrcForPreview.slice(previewFnStart, previewFnStart + 900);
+  assert(previewFnStart >= 0, 'previewTasteProfileImport found');
+  assert(
+    previewFn.includes("storage read failed") || previewFn.includes('storage read failed'),
+    'previewTasteProfileImport surfaces strict read failure'
+  );
+}
+store.csi_taste_profile = {
+  ...wipeGuard.value,
+  budget: { min: null, max: 80, currency: 'USD' },
+  updatedAt: wipeGuard.value.updatedAt || Date.now()
+};
+const beforePeekFail = JSON.stringify(store.csi_taste_profile);
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+let peekThrew = false;
+try {
+  await CSI.storage.peekTasteProfile();
+} catch (e) {
+  peekThrew = /storage read failed/i.test((e && e.message) || '');
+}
+assert(peekThrew, 'peekTasteProfile throws on read failure');
+assert(JSON.stringify(store.csi_taste_profile) === beforePeekFail, 'failed peek left storage intact');
+
+const replaceExport = CSI.profile.exportJson({
+  ...wipeGuard.value,
+  budget: { min: null, max: 120, currency: 'USD' },
+  updatedAt: 1
+});
+assert(replaceExport.ok, 'replace-preview export ok');
+chromeOpts._getCalls = 0;
+chromeOpts.failGetOnCall = 1;
+const peekFailPreview = await CSI.storage.previewTasteProfileImport(replaceExport.json);
+assert(!peekFailPreview.ok, 'import preview fails when peek/strict read fails');
+assert(/storage read failed/i.test(peekFailPreview.error || ''), 'preview reports storage read failed');
+assert(!Array.isArray(peekFailPreview.lines), 'failed preview does not emit create/replace diff lines');
+assert(JSON.stringify(store.csi_taste_profile) === beforePeekFail, 'failed preview left storage intact');
+// Successful strict read against a stored profile still diffs as replace (not create).
+const okPreview = await CSI.storage.previewTasteProfileImport(replaceExport.json);
+assert(okPreview.ok, 'preview succeeds after read recovers');
+assert(
+  !(okPreview.lines || []).some((l) => /Create a new local profile/i.test(l)),
+  'preview against stored profile is replace, not create'
+);
+assert(
+  (okPreview.lines || []).some((l) => /budget/.test(l)),
+  'preview lists budget change for replace'
+);
+
+// (1c) Concurrent boughtBefore after Save basis: newer stored map wins at commit.
+const raceKey = CSI.profile.productKeyFromUrl('https://www.sunnyside.shop/product/race-bb-1');
+const raceBasis = 5_000;
+store.csi_taste_profile = {
+  ...CSI.profile.emptyEnabled(),
+  enabled: true,
+  formats: [{ id: 'flower', slot: null }],
+  sizes: ['3.5g'],
+  likedTerpenes: ['Limonene'],
+  avoidTerpenes: [],
+  watchedStores: ['sunnyside'],
+  brandLoves: ['Acme'],
+  brandAvoids: [],
+  dealTier: 'any',
+  boughtBefore: {},
+  updatedAt: raceBasis
+};
+// Simulate listing flag committed after the popup read (newer updatedAt).
+store.csi_taste_profile = {
+  ...store.csi_taste_profile,
+  boughtBefore: { [raceKey]: 'rebuy' },
+  updatedAt: raceBasis + 50
+};
+const staleSave = await CSI.storage.saveTasteProfile({
+  ...store.csi_taste_profile,
+  boughtBefore: {}, // popup's stale map from raceBasis
+  brandLoves: ['Acme', 'Savvy'],
+  updatedAt: raceBasis
+});
+assert(staleSave.ok, 'stale-basis Save still commits form edits');
+assert(
+  staleSave.value.boughtBefore[raceKey] === 'rebuy',
+  'concurrent boughtBefore survives Save (newer stored wins)'
+);
+assert(staleSave.value.brandLoves.includes('Savvy'), 'form edits still applied when merging boughtBefore');
+assert(store.csi_taste_profile.boughtBefore[raceKey] === 'rebuy', 'storage kept concurrent flag');
+
+// Same-queue setBoughtBeforeFlag still applies (basis matches stored updatedAt).
+const flagAfterMerge = await CSI.storage.setBoughtBeforeFlag(
+  'https://www.sunnyside.shop/product/race-bb-1',
+  'fine'
+);
+assert(
+  flagAfterMerge.ok && flagAfterMerge.value.boughtBefore[raceKey] === 'fine',
+  'setBoughtBeforeFlag still updates when basis matches'
+);
 
 // (2) Brand checkboxes: case-insensitive fill + preserve stored casing on save.
 assert(/caseInsensitive:\s*true/.test(popupJs), 'brand fillChecks use caseInsensitive');
@@ -1254,47 +1360,84 @@ assert(
   'commitSavedDigest ok===false throws before renderDigestResult'
 );
 assert(!/result\.ok === true/.test(popupJs.match(/commitSavedDigest[\s\S]{0,400}/)[0]), 'does not require ok===true');
+assert(
+  /catch\s*\(\s*e\s*\)\s*\{[\s\S]{0,200}status:\s*['"]error['"]/.test(popupJs),
+  'loadDigestUi catch renders error status (string assert)'
+);
 
 {
-  // Behavioral: simulate the popup guard against a proxied {ok:false} result.
-  let rendered = null;
-  function renderDigestResult(view) {
-    rendered = view;
-  }
-  const result = { ok: false, error: 'watch update failed' };
-  let threw = null;
-  try {
-    if (result && result.ok === false) throw new Error(result.error || 'Saved-watch write failed');
-    renderDigestResult(result && result.view);
-  } catch (e) {
-    threw = e;
-    renderDigestResult({
-      status: 'error',
-      message: (e && e.message) || 'Saved-watch write failed'
-    });
-  }
-  assert(threw, 'ok===false throws');
-  assert(rendered && rendered.status === 'error', 'error status rendered');
-  assert(rendered.message === 'watch update failed', 'error message from result.error');
-  assert(rendered.status !== 'locked', 'does not render Pro upgrade/locked card');
-}
-
-{
-  // Error view must not clear the action badge (failed write did not clear pending restock).
-  const renderFn = popupJs.slice(
+  // Exercise real renderDigestResult: error view must not clear the badge.
+  const renderSrc = popupJs.slice(
     popupJs.indexOf('function renderDigestResult'),
     popupJs.indexOf('async function loadDigestUi')
   );
-  assert(renderFn.includes("view.status !== 'error'"), 'error path does not reset badge');
-  assert(!/syncBadge\?\.\(view && view\.status === ['"]digest['"] \?/.test(renderFn), 'badge sync is no longer unconditional ternary to 0');
-  let badgeCalls = [];
-  const view = { status: 'error', message: 'watch update failed' };
-  if (view && view.status === 'digest') {
-    badgeCalls.push(3);
-  } else if (!view || view.status !== 'error') {
-    badgeCalls.push(0);
+  assert(renderSrc.includes("view.status !== 'error'"), 'error path does not reset badge');
+  assert(
+    !/syncBadge\?\.\(view && view\.status === ['"]digest['"] \?/.test(renderSrc),
+    'badge sync is no longer unconditional ternary to 0'
+  );
+  const escapeSrc = popupJs.match(/function escapeHtml\(value\) \{[\s\S]*?\n  \}/);
+  assert(escapeSrc, 'extracted escapeHtml from popup');
+
+  function el() {
+    return {
+      hidden: true,
+      textContent: '',
+      innerHTML: '',
+      appendChild() {
+        return null;
+      }
+    };
   }
-  assert(badgeCalls.length === 0, 'error path does not reset badge (behavioral)');
+  const nodes = {
+    'digest-locked': el(),
+    'digest-status': el(),
+    'digest-list': el(),
+    'digest-disclaimer': el(),
+    'digest-saved': el(),
+    'digest-saved-list': el()
+  };
+  const badgeCalls = [];
+  const digestCtx = {
+    document: {
+      getElementById(id) {
+        return nodes[id] || el();
+      },
+      createElement() {
+        return {
+          className: '',
+          innerHTML: '',
+          appendChild() {
+            return null;
+          }
+        };
+      }
+    },
+    CSI: {
+      digest: {
+        COPY: {},
+        allowlistedUrl: () => false,
+        reasons: () => [],
+        badgeCount: () => 3,
+        syncBadge(n) {
+          badgeCalls.push(n);
+        }
+      },
+      escapeHtml: (v) => String(v ?? '')
+    }
+  };
+  const renderDigestResult = vm.runInNewContext(
+    `${escapeSrc[0]}\n${renderSrc}\nrenderDigestResult`,
+    digestCtx
+  );
+  renderDigestResult({ status: 'error', message: 'watch update failed' }, []);
+  assert(badgeCalls.length === 0, 'real renderDigestResult error path does not syncBadge');
+  assert(nodes['digest-status'].hidden === false, 'error status element shown');
+  assert(
+    nodes['digest-status'].textContent === 'watch update failed',
+    'error message rendered from view'
+  );
+  assert(nodes['digest-locked'].hidden === true, 'error path does not show locked/upgrade card');
 }
 
 // (4) Cross-context csi_taste_profile writer via CSI_TASTE_PROFILE (mirrors CSI_SAVED_WATCH).

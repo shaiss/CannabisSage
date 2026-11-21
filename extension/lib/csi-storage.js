@@ -489,22 +489,22 @@
   }
 
   /**
-   * Read profile without write-back. Used for import preview so Cancel cannot
-   * leave a migrated v2 key behind.
-   */
-  async function peekTasteProfile() {
-    const data = await storageGet([KEYS.PROFILE]);
-    return materializeTasteProfile(data[KEYS.PROFILE]);
-  }
-
-  /**
-   * Strict read for Save: a chrome.storage failure must not look like an empty
-   * profile (which would seed emptyEnabled and wipe stored fields on write).
-   * Migrates in memory only — persistence goes through saveTasteProfile.
+   * Strict read-only profile load (no migrate write-back). A chrome.storage
+   * failure rejects so callers never treat a failed read as an empty profile
+   * (which would show import "create" instead of "replace", or seed a Save wipe).
    */
   async function loadTasteProfileStrict() {
     const data = await storageGetStrict([KEYS.PROFILE]);
     return materializeTasteProfile(data[KEYS.PROFILE]);
+  }
+
+  /**
+   * Read profile without write-back. Same strict semantics as
+   * loadTasteProfileStrict — used for import preview / Apply so a failed read
+   * cannot look like empty storage.
+   */
+  async function peekTasteProfile() {
+    return loadTasteProfileStrict();
   }
 
   /**
@@ -621,21 +621,51 @@
 
   async function saveTasteProfileUnlocked(raw) {
     const now = Date.now();
+    // Capture the caller's basis before normalize stamps updatedAt = now.
+    const incomingBasisUpdatedAt =
+      raw && typeof raw === 'object' && typeof raw.updatedAt === 'number' ? raw.updatedAt : null;
     const parsed = CSI.profile?.normalize?.(raw, { now });
     if (!parsed || !parsed.ok) {
       return { ok: false, error: (parsed && parsed.error) || 'invalid profile' };
     }
 
-    try {
-      // Opt-in write: first save must be enabled.
-      if (parsed.value && parsed.value.enabled === true) {
-        await storageSet({ [KEYS.PROFILE]: parsed.value });
-        return { ok: true, value: parsed.value };
+    /**
+     * Merge boughtBefore at commit time so a concurrent listing flag written
+     * after the popup's Save read is not wiped when this Save commits.
+     *
+     * Newer-wins on profile.updatedAt:
+     * - If stored.updatedAt > incoming basis updatedAt → use stored.boughtBefore
+     *   (a writer committed after the Save basis; keep those flags).
+     * - Otherwise → use incoming.boughtBefore (this queued mutation's map,
+     *   e.g. setBoughtBeforeFlag after a same-queue peek).
+     * - No stored profile / no basis timestamp → use incoming.
+     */
+    function mergeBoughtBefore(storedProfile, incomingProfile) {
+      const incomingBB =
+        incomingProfile &&
+        incomingProfile.boughtBefore &&
+        typeof incomingProfile.boughtBefore === 'object' &&
+        !Array.isArray(incomingProfile.boughtBefore)
+          ? { ...incomingProfile.boughtBefore }
+          : {};
+      if (!storedProfile || !CSI.profile.isStoredProfile(storedProfile)) return incomingBB;
+      const storedAt = storedProfile.updatedAt;
+      if (
+        incomingBasisUpdatedAt != null &&
+        typeof storedAt === 'number' &&
+        storedAt > incomingBasisUpdatedAt
+      ) {
+        const storedBB = storedProfile.boughtBefore;
+        return storedBB && typeof storedBB === 'object' && !Array.isArray(storedBB)
+          ? { ...storedBB }
+          : {};
       }
+      return incomingBB;
+    }
 
-      // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
-      // Strict read: a failed get must not look like !hadStored (which skips the write
-      // and can leave callers thinking the wipe succeeded — or overwrite after a soft read).
+    try {
+      // Strict read for every full write: distinguish missing key from read failure,
+      // and obtain a fresh boughtBefore basis for the merge below.
       let existingData;
       try {
         existingData = await storageGetStrict([KEYS.PROFILE]);
@@ -645,14 +675,30 @@
       const existing = CSI.profile?.normalize?.(existingData[KEYS.PROFILE]);
       const hadStored =
         existing && existing.ok && CSI.profile.isStoredProfile(existing.value);
+      const storedProfile = hadStored ? existing.value : null;
 
+      // Opt-in write: first save must be enabled.
+      if (parsed.value && parsed.value.enabled === true) {
+        const toWrite = {
+          ...parsed.value,
+          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value)
+        };
+        await storageSet({ [KEYS.PROFILE]: toWrite });
+        return { ok: true, value: toWrite };
+      }
+
+      // Disable path: keep key + fields with enabled:false. Only Delete removes the key.
       if (CSI.profile.isStoredProfile(parsed.value)) {
         // Full disabled payload — write only if a profile already exists (nothing until opt-in).
         if (!hadStored) {
           return { ok: true, value: { enabled: false } };
         }
-        await storageSet({ [KEYS.PROFILE]: parsed.value });
-        return { ok: true, value: parsed.value };
+        const toWrite = {
+          ...parsed.value,
+          boughtBefore: mergeBoughtBefore(storedProfile, parsed.value)
+        };
+        await storageSet({ [KEYS.PROFILE]: toWrite });
+        return { ok: true, value: toWrite };
       }
 
       // Bare { enabled: false }: flip the stored record off without wiping fields.
@@ -693,8 +739,16 @@
     if (!parsed || !parsed.ok) {
       return { ok: false, error: (parsed && parsed.error) || 'invalid import' };
     }
-    // Read-only: do not migrate-write during preview.
-    const current = await peekTasteProfile();
+    // Strict read-only: a failed get must not look like empty → "create" preview.
+    let current;
+    try {
+      current = await peekTasteProfile();
+    } catch (readErr) {
+      return {
+        ok: false,
+        error: (readErr && readErr.message) || 'storage read failed'
+      };
+    }
     const diff = CSI.profile.diffProfiles(current, parsed.value);
     return {
       ok: true,
@@ -781,7 +835,12 @@
   async function setBoughtBeforeFlagUnlocked(url, flag) {
     // Peek (no migrate write) — already on the writer queue; nested migrate enqueue
     // would deadlock. Saving the flag persists any in-memory v1→v2 materialization.
-    const profile = await peekTasteProfile();
+    let profile;
+    try {
+      profile = await peekTasteProfile();
+    } catch (readErr) {
+      return { ok: false, error: (readErr && readErr.message) || 'storage read failed' };
+    }
     if (!profile.enabled) return { ok: false, error: 'profile is not enabled' };
     const key = CSI.profile.productKeyFromUrl(url);
     if (!key) return { ok: false, error: 'unsupported product URL' };

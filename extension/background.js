@@ -41,6 +41,23 @@ function ensureSavedWatchModules() {
 }
 
 /**
+ * Taste-profile mutations from content scripts and the popup run here so one
+ * serialized writer owns csi_taste_profile across heaps.
+ */
+function ensureTasteProfileModules() {
+  if (
+    !self.CSI?.storage?.saveTasteProfile ||
+    !self.CSI?.storage?.deleteTasteProfile ||
+    !self.CSI?.storage?.importTasteProfile ||
+    !self.CSI?.storage?.setBoughtBeforeFlag ||
+    !self.CSI?.storage?.migrateTasteProfileWrite ||
+    !self.CSI?.profile?.normalize
+  ) {
+    throw new Error('taste profile modules missing');
+  }
+}
+
+/**
  * Pro for a saved digest is the stored license, same gate as the popup
  * (CSI.features.can(savedItemDigest) after CSI.entitlement.refreshIsPro).
  * Message payload isPro is not an input.
@@ -587,6 +604,40 @@ chrome.runtime.onMessage.addListener(
         sendResponse({
           ok: false,
           error: err && err.message ? err.message : 'watch update failed'
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'CSI_TASTE_PROFILE') {
+    if (!sender || sender.id !== chrome.runtime.id) {
+      sendResponse({ ok: false, error: 'Blocked: unauthorized sender.' });
+      return false;
+    }
+    (/**
+     * Run a CSI_TASTE_PROFILE mutation on the worker's single writer queue.
+     * @returns {Promise<void>}
+     */
+    async () => {
+      try {
+        ensureTasteProfileModules();
+        const payload = message.payload || {};
+        let result;
+        if (message.op === 'save') result = await self.CSI.storage.saveTasteProfile(payload.raw);
+        else if (message.op === 'delete') result = await self.CSI.storage.deleteTasteProfile();
+        else if (message.op === 'import') {
+          result = await self.CSI.storage.importTasteProfile(payload.raw, payload.opts);
+        } else if (message.op === 'boughtBefore') {
+          result = await self.CSI.storage.setBoughtBeforeFlag(payload.url, payload.flag);
+        } else if (message.op === 'migrateWrite') {
+          result = await self.CSI.storage.migrateTasteProfileWrite(payload.value);
+        } else result = { ok: false, error: 'unknown profile op' };
+        sendResponse(result);
+      } catch (err) {
+        sendResponse({
+          ok: false,
+          error: err && err.message ? err.message : 'profile update failed'
         });
       }
     })();

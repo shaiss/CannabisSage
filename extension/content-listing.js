@@ -1020,7 +1020,12 @@
     state.selection = await CSI.storage.loadCompare();
     await refreshSavedUrls();
     await refreshDigestBadge();
-    state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    try {
+      state.profile = (await CSI.storage.loadTasteProfile?.()) || { enabled: false };
+    } catch (e) {
+      CSI.warn?.('loadTasteProfile failed during listing init', e);
+      state.profile = { enabled: false };
+    }
     await refreshTasteMap();
     state.filters = await CSI.storage.loadFilters();
     await CSI.glossary.ensureGlossary();
@@ -1052,18 +1057,31 @@
       storageListener = (changes, area) => {
         if (area !== 'local' || !active) return;
         if (changes.csi_taste_map || changes.csi_taste_profile) {
-          CSI.storage.loadTasteProfile().then(async (profile) => {
-            state.profile = profile || { enabled: false };
-            await refreshTasteMap();
-            querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
-              const p = CSI.getElementProduct(card);
-              if (!p) return;
-              if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
-              CSI.storeElementProduct(card, p);
-              renderBadges(card, p, p.status || 'ok');
+          CSI.storage
+            .loadTasteProfile()
+            .then(
+              (profile) => profile || { enabled: false },
+              (e) => {
+                CSI.warn?.('loadTasteProfile failed in storage listener', e);
+                return { enabled: false };
+              }
+            )
+            .then(async (profile) => {
+              state.profile = profile;
+              try {
+                await refreshTasteMap();
+                querySelectorAllDeep('[data-csi-enhanced="true"]').forEach((card) => {
+                  const p = CSI.getElementProduct(card);
+                  if (!p) return;
+                  if (state.tasteMap) p.matchScore = CSI.scoreTasteMatch(p, state.tasteMap);
+                  CSI.storeElementProduct(card, p);
+                  renderBadges(card, p, p.status || 'ok');
+                });
+                applyFiltersAndSort();
+              } catch (refreshErr) {
+                CSI.warn?.('taste refresh failed after profile change', refreshErr);
+              }
             });
-            applyFiltersAndSort();
-          });
         }
         if (changes.csi_saved_watch) {
           refreshSavedUrls();

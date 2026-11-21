@@ -151,23 +151,45 @@
     });
   }
 
-  function fillChecks(container, items, selected) {
+  function fillChecks(container, items, selected, opts) {
+    const caseInsensitive = !!(opts && opts.caseInsensitive);
     const on = new Set(selected || []);
+    const onLower = caseInsensitive
+      ? new Set(
+          [...on].map((v) => (typeof v === 'string' ? v.toLowerCase() : String(v).toLowerCase()))
+        )
+      : null;
     container.innerHTML = '';
     items.forEach(({ id, label }) => {
       const wrap = document.createElement('label');
       const input = document.createElement('input');
       input.type = 'checkbox';
       input.value = id;
-      if (on.has(id)) input.checked = true;
+      const hit = caseInsensitive
+        ? onLower.has(typeof id === 'string' ? id.toLowerCase() : String(id).toLowerCase())
+        : on.has(id);
+      if (hit) input.checked = true;
       wrap.appendChild(input);
       wrap.appendChild(document.createTextNode(` ${label}`));
       container.appendChild(wrap);
     });
   }
 
-  function readChecks(container) {
-    return [...container.querySelectorAll('input:checked')].map((el) => el.value);
+  function readChecks(container, preferred) {
+    const checked = [...container.querySelectorAll('input:checked')].map((el) => el.value);
+    if (!preferred || !preferred.length) return checked;
+    // Preserve stored casing when the checkbox id only matches case-insensitively
+    // (e.g. cache listed 'ACME' while the profile stored 'Acme').
+    const prefByLower = new Map();
+    preferred.forEach((p) => {
+      if (typeof p === 'string' && p && !prefByLower.has(p.toLowerCase())) {
+        prefByLower.set(p.toLowerCase(), p);
+      }
+    });
+    return checked.map((v) => {
+      const key = typeof v === 'string' ? v.toLowerCase() : String(v).toLowerCase();
+      return prefByLower.get(key) || v;
+    });
   }
 
   function setProfileEnabled(on) {
@@ -178,7 +200,10 @@
   async function listedBrands(profile) {
     const entries = (await CSI.storage.listPdpCache?.()) || [];
     const fromCache = CSI.profile.brandsFromCacheEntries(entries);
-    const extra = [...(profile.brandLoyal || []), ...(profile.brandAvoid || [])];
+    const extra = [
+      ...(profile.brandLoves || profile.brandLoyal || []),
+      ...(profile.brandAvoids || profile.brandAvoid || [])
+    ];
     const seen = new Set(fromCache.map((b) => b.toLowerCase()));
     extra.forEach((b) => {
       if (b && !seen.has(b.toLowerCase())) {
@@ -195,10 +220,12 @@
     setProfileEnabled(enabled);
     // Reload stored fields even when disabled so re-enable is not a blank rewrite.
     const p = stored ? profile : CSI.profile.emptyEnabled();
+    // Popup chips stay on productFormKey-compatible FORMS; detailed FORMAT_IDS stay via import.
+    const formatIds = CSI.profile.formatIds(p).filter((id) => CSI.profile.FORMS.includes(id));
     fillChecks(
       document.getElementById('profile-forms'),
       CSI.profile.FORMS.map((id) => ({ id, label: id })),
-      p.forms
+      formatIds
     );
     fillChecks(
       document.getElementById('profile-sizes'),
@@ -220,21 +247,27 @@
     const terps = CSI.profile.terpeneIds().map((id) => ({ id, label: id }));
     fillChecks(document.getElementById('profile-liked'), terps, p.likedTerpenes);
     fillChecks(document.getElementById('profile-avoid'), terps, p.avoidTerpenes);
-    document.getElementById('profile-budget').value = p.tripBudgetUsd || '';
+    const budgetMax = CSI.profile.budgetMax(p);
+    document.getElementById('profile-budget').value = budgetMax != null ? budgetMax : '';
+    const watched = Array.isArray(p.watchedStores) ? p.watchedStores : [];
     fillSelect(
       document.getElementById('profile-home'),
       CSI.profile.STORE_IDS.map((id) => [id, STORE_LABELS[id] || id]),
-      p.homeStore,
+      watched[0] || null,
       true
     );
     fillChecks(
       document.getElementById('profile-secondary'),
       CSI.profile.STORE_IDS.map((id) => ({ id, label: STORE_LABELS[id] || id })),
-      p.secondaryStores
+      watched.slice(1)
     );
     const brandItems = brands.map((id) => ({ id, label: id }));
-    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoyal);
-    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoid);
+    fillChecks(document.getElementById('profile-brand-loyal'), brandItems, p.brandLoves || [], {
+      caseInsensitive: true
+    });
+    fillChecks(document.getElementById('profile-brand-avoid'), brandItems, p.brandAvoids || [], {
+      caseInsensitive: true
+    });
     document.getElementById('profile-brands-empty').hidden = brands.length > 0;
     fillSelect(
       document.getElementById('profile-deal'),
@@ -244,22 +277,63 @@
     );
   }
 
-  function readProfileForm() {
+  /**
+   * Build a save payload from the popup controls, preserving every schema-v2
+   * field the current UI does not edit (goals, slots, budget.min, etc.).
+   */
+  function readProfileForm(existing) {
     const enabled = document.getElementById('profile-enable').checked;
     const budgetRaw = document.getElementById('profile-budget').value;
+    const home = document.getElementById('profile-home').value || null;
+    const secondary = readChecks(document.getElementById('profile-secondary'));
+    const watchedStores = [];
+    const seen = new Set();
+    [home, ...secondary].forEach((id) => {
+      if (!id || seen.has(id)) return;
+      seen.add(id);
+      watchedStores.push(id);
+    });
+
+    const base = CSI.profile.isStoredProfile(existing) ? existing : CSI.profile.emptyEnabled();
+    const uiFormatIds = readChecks(document.getElementById('profile-forms'));
+    const existingFormats = Array.isArray(base.formats) ? base.formats : [];
+    const preservedDetailed = existingFormats.filter(
+      (f) => f && typeof f.id === 'string' && !CSI.profile.FORMS.includes(f.id)
+    );
+    const fromUi = uiFormatIds.map((id) => {
+      const prev = existingFormats.find((f) => f && f.id === id);
+      return { id, slot: prev && prev.slot != null ? prev.slot : null };
+    });
+    const formats = [...fromUi, ...preservedDetailed];
+
+    const prevMin =
+      base.budget && base.budget.min != null && Number.isInteger(Number(base.budget.min))
+        ? Number(base.budget.min)
+        : null;
+    let budget = null;
+    if (budgetRaw !== '') {
+      const max = Number(budgetRaw);
+      // Keep a hidden/imported min even when max is below it — normalize rejects
+      // with a clear conflict message instead of silently deleting the min.
+      budget = { min: prevMin, max, currency: 'USD' };
+    } else if (prevMin != null) {
+      // Clearing max must not wipe an unedited minimum-only budget.
+      budget = { min: prevMin, max: null, currency: 'USD' };
+    }
+
     return {
+      ...base,
       enabled,
-      forms: readChecks(document.getElementById('profile-forms')),
+      formats,
       sizes: readChecks(document.getElementById('profile-sizes')),
       cannabinoidRatio: document.getElementById('profile-ratio').value || null,
       potencyBandThc: document.getElementById('profile-potency').value || null,
       likedTerpenes: readChecks(document.getElementById('profile-liked')),
       avoidTerpenes: readChecks(document.getElementById('profile-avoid')),
-      tripBudgetUsd: budgetRaw === '' ? null : Number(budgetRaw),
-      homeStore: document.getElementById('profile-home').value || null,
-      secondaryStores: readChecks(document.getElementById('profile-secondary')),
-      brandLoyal: readChecks(document.getElementById('profile-brand-loyal')),
-      brandAvoid: readChecks(document.getElementById('profile-brand-avoid')),
+      budget,
+      watchedStores,
+      brandLoves: readChecks(document.getElementById('profile-brand-loyal'), base.brandLoves || []),
+      brandAvoids: readChecks(document.getElementById('profile-brand-avoid'), base.brandAvoids || []),
       dealTier: document.getElementById('profile-deal').value || 'any'
     };
   }
@@ -268,7 +342,7 @@
     const profile = await CSI.storage.loadTasteProfile();
     const brandSource = CSI.profile.isStoredProfile(profile)
       ? profile
-      : { brandLoyal: [], brandAvoid: [] };
+      : { brandLoves: [], brandAvoids: [] };
     const brands = await listedBrands(brandSource);
     fillProfileForm(profile, brands);
   }
@@ -276,12 +350,23 @@
   document.getElementById('profile-enable').addEventListener('change', (e) => {
     document.getElementById('profile-fields').disabled = !e.target.checked;
   });
+
+  let pendingImport = null;
+  let importPreviewSeq = 0;
+  let importApplyBusy = false;
+
   document.getElementById('profile-save').addEventListener('click', async () => {
-    const raw = readProfileForm();
-    const existing = await CSI.storage.loadTasteProfile();
-    if (CSI.profile.isStoredProfile(existing) && existing.boughtBefore) {
-      raw.boughtBefore = existing.boughtBefore;
+    // Guard against Save while Apply holds the import lock (stale form would overwrite).
+    if (importApplyBusy) return;
+    let existing;
+    try {
+      // Strict read: a storage failure must not look like empty → emptyEnabled wipe.
+      existing = await CSI.storage.loadTasteProfileStrict();
+    } catch (e) {
+      showStatus((e && e.message) || 'Could not read profile');
+      return;
     }
+    const raw = readProfileForm(existing);
     // Uncheck + Save: keep stored fields with enabled:false (including boughtBefore).
     if (!raw.enabled && CSI.profile.isStoredProfile(existing)) {
       const saved = await CSI.storage.saveTasteProfile({ ...existing, enabled: false });
@@ -317,9 +402,207 @@
     out.value = dumped.json;
     showStatus('Exported below');
   });
+
+  function setImportApplyBusy(busy) {
+    importApplyBusy = !!busy;
+    const cancelBtn = document.getElementById('profile-import-cancel');
+    const applyBtn = document.getElementById('profile-import-confirm');
+    const deleteBtn = document.getElementById('profile-delete');
+    const saveBtn = document.getElementById('profile-save');
+    const fileInput = document.getElementById('profile-import-file');
+    const importBtn = document.getElementById('profile-import');
+    const preview = document.getElementById('profile-import-preview');
+    const previewOpen = !!(preview && !preview.hidden && pendingImport);
+    if (cancelBtn) cancelBtn.disabled = importApplyBusy;
+    if (deleteBtn) deleteBtn.disabled = importApplyBusy;
+    if (saveBtn) saveBtn.disabled = importApplyBusy;
+    if (fileInput) fileInput.disabled = importApplyBusy;
+    if (importBtn) importBtn.disabled = importApplyBusy;
+    if (applyBtn) applyBtn.disabled = importApplyBusy || !previewOpen;
+  }
+
+  function hideImportPreview() {
+    importPreviewSeq += 1;
+    pendingImport = null;
+    const preview = document.getElementById('profile-import-preview');
+    const diff = document.getElementById('profile-import-diff');
+    const fileInput = document.getElementById('profile-import-file');
+    preview.hidden = true;
+    diff.textContent = '';
+    if (fileInput) fileInput.value = '';
+    setImportApplyBusy(importApplyBusy);
+  }
+
+  function showImportPreview(preview) {
+    pendingImport = {
+      value: preview.value,
+      // Stale-check basis is monotonic rev (updatedAt is display-only).
+      basisRev: preview.currentRev == null ? null : preview.currentRev
+    };
+    const box = document.getElementById('profile-import-preview');
+    const diff = document.getElementById('profile-import-diff');
+    // Diff text stays inside the extension popup — never written to host DOM.
+    diff.textContent = (preview.lines || []).join('\n') || 'No field changes.';
+    box.hidden = false;
+    setImportApplyBusy(importApplyBusy);
+  }
+
+  document.getElementById('profile-import').addEventListener('click', () => {
+    document.getElementById('profile-import-file').click();
+  });
+  document.getElementById('profile-import-file').addEventListener('change', async (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const seq = ++importPreviewSeq;
+    pendingImport = null;
+    const applyBtn = document.getElementById('profile-import-confirm');
+    if (applyBtn) applyBtn.disabled = true;
+    document.getElementById('profile-import-preview').hidden = true;
+    document.getElementById('profile-import-diff').textContent = '';
+
+    const maxBytes = CSI.profile?.MAX_IMPORT_BYTES || 64 * 1024;
+    if (typeof file.size === 'number' && file.size > maxBytes) {
+      if (seq !== importPreviewSeq) return;
+      hideImportPreview();
+      showStatus('Import exceeds size cap');
+      return;
+    }
+
+    let text;
+    try {
+      text = await file.text();
+    } catch {
+      if (seq !== importPreviewSeq) return;
+      hideImportPreview();
+      showStatus('Could not read file');
+      return;
+    }
+    if (seq !== importPreviewSeq) return;
+    const preview = await CSI.storage.previewTasteProfileImport(text);
+    if (seq !== importPreviewSeq) return;
+    if (!preview.ok) {
+      hideImportPreview();
+      showStatus(preview.error || 'Invalid import');
+      return;
+    }
+    showImportPreview(preview);
+    showStatus('Review import changes, then Apply');
+  });
+  document.getElementById('profile-import-confirm').addEventListener('click', async () => {
+    const snapshot = pendingImport;
+    const applySeq = importPreviewSeq;
+    if (!snapshot || !snapshot.value) {
+      showStatus('Nothing to import');
+      return;
+    }
+    if (importApplyBusy) return;
+    const importValue = snapshot.value;
+    const basisRev = snapshot.basisRev;
+    // Lock Cancel / Apply / Delete / file pick until importTasteProfile settles so a
+    // mid-flight Cancel cannot persist the write while the UI reports cancelled.
+    setImportApplyBusy(true);
+    try {
+      // If the stored profile advanced after preview, re-diff and require confirmation again.
+      let current;
+      try {
+        current =
+          (CSI.storage.peekTasteProfile
+            ? await CSI.storage.peekTasteProfile()
+            : await CSI.storage.loadTasteProfileStrict()) || { enabled: false };
+      } catch (e) {
+        showStatus((e && e.message) || 'Could not read profile');
+        return;
+      }
+      if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+        showStatus('Import cancelled');
+        return;
+      }
+      const currentRev = CSI.profile.isStoredProfile(current)
+        ? CSI.profile.profileRev(current)
+        : null;
+      const basisAsNum = basisRev == null ? 0 : CSI.profile.coerceRev(basisRev).value;
+      const currentAsNum = currentRev == null ? 0 : currentRev;
+      if (currentAsNum > basisAsNum) {
+        let diff = CSI.profile.diffProfiles(current, importValue);
+        if (CSI.profile.annotateAbnormalRev) {
+          diff = CSI.profile.annotateAbnormalRev(diff, current, importValue);
+        }
+        showImportPreview({
+          value: importValue,
+          currentRev,
+          lines: CSI.profile.formatDiffLines(diff)
+        });
+        showStatus('Stored profile changed — review again, then Apply');
+        return;
+      }
+      const saved = await CSI.storage.importTasteProfile(importValue, {
+        expectedRev: basisRev
+      });
+      if (!saved.ok) {
+        if (saved.stale) {
+          if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+            showStatus('Import cancelled');
+            return;
+          }
+          let latest;
+          try {
+            latest =
+              (CSI.storage.peekTasteProfile
+                ? await CSI.storage.peekTasteProfile()
+                : await CSI.storage.loadTasteProfileStrict()) || { enabled: false };
+          } catch (e) {
+            showStatus((e && e.message) || 'Could not read profile');
+            return;
+          }
+          if (importPreviewSeq !== applySeq || pendingImport !== snapshot) {
+            showStatus('Import cancelled');
+            return;
+          }
+          const latestRev = CSI.profile.isStoredProfile(latest)
+            ? CSI.profile.profileRev(latest)
+            : null;
+          let diff = CSI.profile.diffProfiles(latest, importValue);
+          if (CSI.profile.annotateAbnormalRev) {
+            diff = CSI.profile.annotateAbnormalRev(diff, latest, importValue);
+          }
+          showImportPreview({
+            value: importValue,
+            currentRev: latestRev,
+            lines: CSI.profile.formatDiffLines(diff)
+          });
+          showStatus(saved.error || 'profile changed, re-run import');
+          return;
+        }
+        showStatus(saved.error || 'Import failed');
+        return;
+      }
+      // Write succeeded — always refresh UI and report success (Cancel was disabled).
+      hideImportPreview();
+      document.getElementById('profile-export-out').hidden = true;
+      await loadProfileUi();
+      await loadPicksUi();
+      showStatus(
+        saved.value.enabled ? 'Profile imported' : 'Profile imported (off — data kept until Delete)'
+      );
+    } finally {
+      setImportApplyBusy(false);
+    }
+  });
+  document.getElementById('profile-import-cancel').addEventListener('click', () => {
+    if (importApplyBusy) return;
+    hideImportPreview();
+    showStatus('Import cancelled');
+  });
+
   document.getElementById('profile-delete').addEventListener('click', async () => {
-    await CSI.storage.deleteTasteProfile();
+    if (importApplyBusy) return;
+    const deleted = await CSI.storage.deleteTasteProfile();
+    if (!deleted.ok) {
+      showStatus(deleted.error || 'Delete failed');
+      return;
+    }
     document.getElementById('profile-export-out').hidden = true;
+    hideImportPreview();
     await loadProfileUi();
     await loadPicksUi();
     showStatus('Profile deleted');
@@ -474,7 +757,12 @@
         savedList.appendChild(li);
       });
     }
-    CSI.digest?.syncBadge?.(view && view.status === 'digest' ? CSI.digest.badgeCount(view) : 0);
+    // Failed digest writes leave pending restock in place — do not clear the badge.
+    if (view && view.status === 'digest') {
+      CSI.digest?.syncBadge?.(CSI.digest.badgeCount(view));
+    } else if (!view || view.status !== 'error') {
+      CSI.digest?.syncBadge?.(0);
+    }
   }
 
   async function loadDigestUi() {
@@ -485,8 +773,19 @@
       renderDigestResult({ status: 'locked', message: CSI.digest.COPY.locked }, savedItems);
       return;
     }
-    const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
-    renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
+    try {
+      const result = await CSI.storage.commitSavedDigest(Date.now(), { isPro: true });
+      if (result && result.ok === false) throw new Error(result.error || 'Saved-watch write failed');
+      renderDigestResult(result && result.view, (result && result.watch && result.watch.items) || savedItems);
+    } catch (e) {
+      renderDigestResult(
+        {
+          status: 'error',
+          message: (e && e.message) || 'Saved-watch write failed'
+        },
+        savedItems
+      );
+    }
   }
 
   document.getElementById('digest-upgrade').addEventListener('click', () => {
@@ -495,8 +794,22 @@
   document.getElementById('digest-saved-list').addEventListener('click', async (event) => {
     const btn = event.target.closest('.digest-remove');
     if (!btn) return;
-    await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
-    await loadDigestUi();
+    try {
+      const removed = await CSI.storage.removeSavedItem(btn.getAttribute('data-url'));
+      if (!removed || !removed.ok) {
+        throw new Error((removed && removed.error) || 'Saved-watch write failed');
+      }
+      await loadDigestUi();
+    } catch (e) {
+      const savedItems = await CSI.storage.loadSavedItems().catch(() => []);
+      renderDigestResult(
+        {
+          status: 'error',
+          message: (e && e.message) || 'Saved-watch write failed'
+        },
+        savedItems
+      );
+    }
   });
 
   document.getElementById('picks-upgrade').addEventListener('click', () => {

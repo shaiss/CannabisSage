@@ -67,13 +67,46 @@
     if (!profile || profile.enabled !== true) return [];
     const out = [];
     const seen = new Set();
-    [profile.homeStore, ...(profile.secondaryStores || [])].forEach((id) => {
+    const watched = Array.isArray(profile.watchedStores)
+      ? profile.watchedStores
+      : [profile.homeStore, ...(profile.secondaryStores || [])];
+    watched.forEach((id) => {
       if (typeof id !== 'string' || !id) return;
       if (seen.has(id)) return;
       seen.add(id);
       out.push(id);
     });
     return out;
+  }
+
+  function profileBudgetMax(profile) {
+    if (CSI.profile?.budgetMax) return CSI.profile.budgetMax(profile);
+    if (!profile) return null;
+    if (profile.budget && profile.budget.max != null) return profile.budget.max;
+    return profile.tripBudgetUsd != null ? profile.tripBudgetUsd : null;
+  }
+
+  function profileFormatIds(profile) {
+    if (CSI.profile?.formatIds) return CSI.profile.formatIds(profile);
+    if (!profile) return [];
+    if (Array.isArray(profile.formats)) {
+      return profile.formats
+        .map((f) => (typeof f === 'string' ? f : f && f.id))
+        .filter((id) => typeof id === 'string');
+    }
+    return Array.isArray(profile.forms) ? profile.forms.slice() : [];
+  }
+
+  function profileBrandAvoids(profile) {
+    if (!profile) return [];
+    if (Array.isArray(profile.brandAvoids)) return profile.brandAvoids;
+    return Array.isArray(profile.brandAvoid) ? profile.brandAvoid : [];
+  }
+
+  function profileBrandLoves(profile) {
+    if (!profile) return [];
+    if (Array.isArray(profile.brandLoves)) return profile.brandLoves;
+    return Array.isArray(profile.brandLoyal) ? profile.brandLoyal : [];
   }
 
   function productSizeKey(product) {
@@ -129,14 +162,14 @@
     const brand = CSI.profile?.normalizeBrandLabel?.(String((product && product.brand) || ''));
     if (!brand) return false;
     const key = brand.toLowerCase();
-    return (profile.brandAvoid || []).some((b) => String(b).toLowerCase() === key);
+    return profileBrandAvoids(profile).some((b) => String(b).toLowerCase() === key);
   }
 
   function brandLoyalHit(profile, product) {
     const brand = CSI.profile?.normalizeBrandLabel?.(String((product && product.brand) || ''));
     if (!brand) return false;
     const key = brand.toLowerCase();
-    return (profile.brandLoyal || []).some((b) => String(b).toLowerCase() === key);
+    return profileBrandLoves(profile).some((b) => String(b).toLowerCase() === key);
   }
 
   function netListedPrice(product) {
@@ -234,11 +267,12 @@
     if (medianInfo && price != null && price < medianInfo.median) {
       reasons.push(`${COPY.priceBelowMedian}: $${medianInfo.median.toFixed(2)}`);
     }
-    if (profile.tripBudgetUsd != null && price != null) {
-      if (price <= profile.tripBudgetUsd) {
-        reasons.push(`${COPY.priceBudget}: $${profile.tripBudgetUsd}`);
+    const cap = profileBudgetMax(profile);
+    if (cap != null && price != null) {
+      if (price <= cap) {
+        reasons.push(`${COPY.priceBudget}: $${cap}`);
       } else {
-        reasons.push(`${COPY.priceOverBudget}: $${profile.tripBudgetUsd}`);
+        reasons.push(`${COPY.priceOverBudget}: $${cap}`);
       }
     }
     return reasons;
@@ -264,9 +298,13 @@
     const flag = CSI.profile?.flagForProduct?.(profile, url);
     if (flag === 'never') return { ok: false, reason: 'never' };
 
-    if ((profile.forms || []).length) {
+    const formatIds = profileFormatIds(profile);
+    if (formatIds.length) {
       const form = CSI.productFormKey?.(product, url);
-      if (!form || !profile.forms.includes(form)) return { ok: false, reason: 'form' };
+      const matches = CSI.profile?.formatMatchesProduct
+        ? CSI.profile.formatMatchesProduct(profile, form)
+        : form && formatIds.includes(form);
+      if (!matches) return { ok: false, reason: 'form' };
     }
 
     if ((profile.sizes || []).length) {
@@ -295,8 +333,11 @@
       }
     }
 
-    if (profile.tripBudgetUsd != null) {
-      if (price == null || price > profile.tripBudgetUsd) return { ok: false, reason: 'budget' };
+    // dealsOnly is schema-only in PR A; ranking/filtering is #73 PR E.
+
+    const cap = profileBudgetMax(profile);
+    if (cap != null) {
+      if (price == null || price > cap) return { ok: false, reason: 'budget' };
     }
 
     return { ok: true, product, url, adapterId, price, flag };
@@ -358,7 +399,15 @@
       const size = productSizeKey(product);
       const ratio = productRatioKey(product);
       const band = productPotencyBand(product);
-      if (form && (profile.forms || []).includes(form)) {
+      // Only claim a form match when the profile actually selected formats.
+      const selectedFormats = profileFormatIds(profile);
+      if (
+        form &&
+        selectedFormats.length &&
+        (CSI.profile?.formatMatchesProduct
+          ? CSI.profile.formatMatchesProduct(profile, form)
+          : selectedFormats.includes(form))
+      ) {
         filterReasons.push(`${COPY.matchedForm}: ${form}`);
       }
       if (size && (profile.sizes || []).includes(size)) {
@@ -446,9 +495,17 @@
       !!(CSI.features?.can?.(FEATURE_ID));
     if (!isPro) return emptyResult('locked', { message: COPY.locked });
 
-    const profile =
-      options.profile ||
-      (CSI.storage?.loadTasteProfile ? await CSI.storage.loadTasteProfile() : { enabled: false });
+    let profile = options.profile;
+    if (!profile) {
+      try {
+        profile = CSI.storage?.loadTasteProfile
+          ? await CSI.storage.loadTasteProfile()
+          : { enabled: false };
+      } catch (e) {
+        CSI.warn?.('loadTasteProfile failed during picks', e);
+        profile = { enabled: false };
+      }
+    }
     const cacheEntries =
       options.cacheEntries ||
       (CSI.storage?.listPdpCache ? await CSI.storage.listPdpCache() : []);

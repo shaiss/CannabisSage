@@ -9,6 +9,7 @@
  */
 import assert from 'assert';
 import path from 'path';
+import { createRequire } from 'module';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import { randomBytes } from 'crypto';
@@ -125,7 +126,54 @@ assert(!/searchParams\.get\(\s*['"]key['"]\s*\)/.test(validateSrc), 'validate ha
 
 const nextConfigSrc = fs.readFileSync(path.join(webRoot, 'next.config.js'), 'utf8');
 assert(/Content-Security-Policy/.test(nextConfigSrc), 'account CSP present');
-assert(/script-src 'self'/.test(nextConfigSrc), 'account CSP blocks third-party scripts');
+
+/** Parse a CSP header value into { directive: token[] }. */
+function parseCspDirectives(csp) {
+  const out = Object.create(null);
+  for (const part of String(csp).split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const [name, ...tokens] = trimmed.split(/\s+/);
+    out[name.toLowerCase()] = tokens;
+  }
+  return out;
+}
+
+{
+  const requireFromWeb = createRequire(path.join(webRoot, 'package.json'));
+  const configPath = path.join(webRoot, 'next.config.js');
+  delete requireFromWeb.cache[requireFromWeb.resolve(configPath)];
+  const nextConfig = requireFromWeb(configPath);
+  assert.equal(typeof nextConfig.headers, 'function', 'next.config exports headers()');
+  const headerBlocks = await Promise.resolve(nextConfig.headers());
+  const account = (headerBlocks || []).find((h) => h && h.source === '/account');
+  assert.ok(account, '/account header block present');
+  const cspHeader = (account.headers || []).find(
+    (h) => h && String(h.key).toLowerCase() === 'content-security-policy'
+  );
+  assert.ok(cspHeader && cspHeader.value, 'Content-Security-Policy header present');
+  const directives = parseCspDirectives(cspHeader.value);
+  const scriptSrc = directives['script-src'];
+  assert.ok(Array.isArray(scriptSrc) && scriptSrc.length, 'script-src directive present');
+  // Exact allowlist: Next needs unsafe-inline/eval; external hosts must fail.
+  const SCRIPT_SRC_ALLOWLIST = new Set(["'self'", "'unsafe-inline'", "'unsafe-eval'"]);
+  for (const token of scriptSrc) {
+    assert.ok(
+      SCRIPT_SRC_ALLOWLIST.has(token),
+      `account CSP script-src token not in allowlist: ${token}`
+    );
+  }
+  assert.ok(scriptSrc.includes("'self'"), "script-src must include 'self'");
+  const scriptSrcElem = directives['script-src-elem'];
+  if (scriptSrcElem) {
+    for (const token of scriptSrcElem) {
+      assert.ok(
+        SCRIPT_SRC_ALLOWLIST.has(token),
+        `account CSP script-src-elem token not in allowlist: ${token}`
+      );
+    }
+  }
+}
 
 const manifest = JSON.parse(fs.readFileSync(path.join(extRoot, 'manifest.json'), 'utf8'));
 assert(manifest.version === '1.3.32', 'extension 1.3.32');

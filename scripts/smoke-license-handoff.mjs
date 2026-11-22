@@ -71,7 +71,70 @@ assert(/Referrer-Policy/.test(nextConfigSrc), 'Referrer-Policy configured');
 assert(/no-referrer/.test(nextConfigSrc), 'account page uses Referrer-Policy: no-referrer');
 assert(/['"]\/account['"]/.test(nextConfigSrc), 'Referrer-Policy scoped to /account');
 assert(/Content-Security-Policy/.test(nextConfigSrc), 'CSP configured for /account');
-assert(/script-src 'self'/.test(nextConfigSrc), 'CSP script-src is self-only (no third-party hosts)');
+
+/** Parse a CSP header value into { directive: token[] }. */
+function parseCspDirectives(csp) {
+  const out = Object.create(null);
+  for (const part of String(csp).split(';')) {
+    const trimmed = part.trim();
+    if (!trimmed) continue;
+    const [name, ...tokens] = trimmed.split(/\s+/);
+    out[name.toLowerCase()] = tokens;
+  }
+  return out;
+}
+
+/**
+ * Load the real /account CSP from next.config.js and assert script-src tokens
+ * are exactly the Next.js allowlist (no external hosts). Also reject a
+ * script-src-elem override that would re-open third-party script hosts.
+ */
+function assertAccountScriptSrcAllowlist(label, configSrc) {
+  const requireFromWeb = createRequire(path.join(web, 'package.json'));
+  // Clear cache so a mid-run mutation of next.config.js is visible.
+  const configPath = path.join(web, 'next.config.js');
+  delete requireFromWeb.cache[requireFromWeb.resolve(configPath)];
+  const nextConfig = requireFromWeb(configPath);
+  assert(typeof nextConfig.headers === 'function', `${label}: next.config exports headers()`);
+  // headers() is async in Next config; support both sync and Promise.
+  return Promise.resolve(nextConfig.headers()).then((headerBlocks) => {
+    const account = (headerBlocks || []).find((h) => h && h.source === '/account');
+    assert(account, `${label}: /account header block present`);
+    const cspHeader = (account.headers || []).find(
+      (h) => h && String(h.key).toLowerCase() === 'content-security-policy'
+    );
+    assert(cspHeader && cspHeader.value, `${label}: Content-Security-Policy header present`);
+    const directives = parseCspDirectives(cspHeader.value);
+    const scriptSrc = directives['script-src'];
+    assert(Array.isArray(scriptSrc) && scriptSrc.length, `${label}: script-src directive present`);
+    // Exact allowlist: Next needs unsafe-inline/eval; no hosts beyond 'self'.
+    const SCRIPT_SRC_ALLOWLIST = new Set(["'self'", "'unsafe-inline'", "'unsafe-eval'"]);
+    for (const token of scriptSrc) {
+      assert(
+        SCRIPT_SRC_ALLOWLIST.has(token),
+        `${label}: script-src token not in allowlist: ${token}`
+      );
+    }
+    assert(scriptSrc.includes("'self'"), `${label}: script-src must include 'self'`);
+    // script-src-elem, if present, must not reopen external hosts.
+    const scriptSrcElem = directives['script-src-elem'];
+    if (scriptSrcElem) {
+      for (const token of scriptSrcElem) {
+        assert(
+          SCRIPT_SRC_ALLOWLIST.has(token),
+          `${label}: script-src-elem token not in allowlist: ${token}`
+        );
+      }
+    }
+    // Source still mentions the policy (guards against accidental deletion).
+    assert(/script-src/.test(configSrc), `${label}: next.config source mentions script-src`);
+    return cspHeader.value;
+  });
+}
+
+const accountCspValue = await assertAccountScriptSrcAllowlist('account CSP', nextConfigSrc);
+assert(/style-src/.test(accountCspValue), 'account CSP includes style-src for inline/React styles + fonts CSS');
+assert(/font-src/.test(accountCspValue), 'account CSP includes font-src for Google Fonts');
 
 // Item 2: /account must stay free of third-party scripts (any could read #key= before cleanup).
 const layoutSrc = fs.readFileSync(path.join(web, 'app/layout.tsx'), 'utf8');

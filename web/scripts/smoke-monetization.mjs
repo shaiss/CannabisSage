@@ -127,16 +127,45 @@ assert(!/searchParams\.get\(\s*['"]key['"]\s*\)/.test(validateSrc), 'validate ha
 const nextConfigSrc = fs.readFileSync(path.join(webRoot, 'next.config.js'), 'utf8');
 assert(/Content-Security-Policy/.test(nextConfigSrc), 'account CSP present');
 
-/** Parse a CSP header value into { directive: token[] }. */
+/**
+ * Parse a CSP header value into { directive: token[] }.
+ * Rejects policies where a directive name appears more than once
+ * (case-insensitive): browsers honor the first occurrence, so a later
+ * allowlist-only repeat must not overwrite an earlier host-permissive one.
+ */
 function parseCspDirectives(csp) {
   const out = Object.create(null);
   for (const part of String(csp).split(';')) {
     const trimmed = part.trim();
     if (!trimmed) continue;
     const [name, ...tokens] = trimmed.split(/\s+/);
-    out[name.toLowerCase()] = tokens;
+    const key = name.toLowerCase();
+    assert.ok(
+      !Object.prototype.hasOwnProperty.call(out, key),
+      `duplicate CSP directive: ${key}`
+    );
+    out[key] = tokens;
   }
   return out;
+}
+
+// Rejection case: first script-src allows a CDN; a second 'self'-only repeat
+// must not overwrite it (browsers keep the first).
+{
+  let rejected = false;
+  try {
+    parseCspDirectives("script-src 'self' https://cdn.example.com; script-src 'self'");
+  } catch (e) {
+    rejected = /duplicate CSP directive:\s*script-src/i.test(String(e && e.message));
+  }
+  assert.ok(rejected, 'duplicate script-src directive must be rejected');
+  rejected = false;
+  try {
+    parseCspDirectives("SCRIPT-SRC 'self' https://cdn.example.com; script-src 'self'");
+  } catch (e) {
+    rejected = /duplicate CSP directive:\s*script-src/i.test(String(e && e.message));
+  }
+  assert.ok(rejected, 'duplicate SCRIPT-SRC / script-src (case-insensitive) must be rejected');
 }
 
 {

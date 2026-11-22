@@ -73,12 +73,20 @@ function (global) {
     await chrome.storage.local.remove([STORAGE_KEY]);
   }
 
+  /**
+   * Pro when active and not expired. Missing/empty expiresAt is lifetime (kept).
+   * Fail closed: a present but non-string or unparseable expiresAt is expired.
+   * @param {object|null|undefined} rec
+   * @param {number} [now]
+   * @returns {boolean}
+   */
   function isProFromRecord(rec, now = Date.now()) {
     if (!rec || !rec.active) return false;
-    if (rec.expiresAt) {
-      const t = Date.parse(rec.expiresAt);
-      if (!Number.isNaN(t) && t < now) return false;
-    }
+    const exp = rec.expiresAt;
+    if (exp == null || exp === '') return true;
+    if (typeof exp !== 'string') return false;
+    const t = Date.parse(exp);
+    if (Number.isNaN(t) || t < now) return false;
     return true;
   }
 
@@ -183,6 +191,7 @@ function (global) {
     writeStored,
     clearStored,
     isPro,
+    isProFromRecord,
     refreshIsPro,
     activate,
     validateRemote,
